@@ -270,12 +270,17 @@ function bandParams(eq) {
   return bands;
 }
 
-// EQ Eight's band shapes, matched against the Filter Type menu Live reports (value_items).
+// EQ Eight's band shapes, matched against the Filter Type menu Live reports (value_items),
+// with letters only, so "Low Cut 48", "LowCut48" and "Low cut (48 dB)" all match.
 // "steep" picks the 48 dB/oct cut over the 12 dB/oct one.
 const SHAPES = {
-  bell: /^bell/i, notch: /^notch/i, low_shelf: /^low ?shelf/i, high_shelf: /^high ?shelf/i,
-  low_cut: /^low ?cut/i, high_cut: /^high ?cut/i
+  bell: /bell|peak/, notch: /notch/, low_shelf: /lo(w)?shelf/, high_shelf: /hi(gh)?shelf/,
+  low_cut: /lo(w)?cut|highpass/, high_cut: /hi(gh)?cut|lowpass/
 };
+// EQ Eight's menu order in Live 12, used when the names don't match:
+// low cut 48, low cut 12, low shelf, bell, notch, high shelf, high cut 12, high cut 48
+const SHAPE_SLOTS = { low_cut: [1, 0], high_cut: [6, 7], low_shelf: [2], bell: [3], notch: [4], high_shelf: [5] };
+const letters = function (name) { return String(name).toLowerCase().replace(/[^a-z]/g, ""); };
 // Which free band to use: low shapes take the low bands, high shapes the high ones, the rest the middle
 const BAND_ORDER = {
   low_cut: ["1", "2", "3", "4"], low_shelf: ["1", "2", "3", "4"],
@@ -313,8 +318,13 @@ function shapeValue(param, opts) {
   const items = param.get("value_items");
   if (!Array.isArray(items)) return -1;
   const fits = [];
-  items.forEach(function (name, i) { if (SHAPES[opts.shape].test(String(name))) fits.push({ name: String(name), i: i }); });
-  if (!fits.length) return -1;
+  items.forEach(function (name, i) { if (SHAPES[opts.shape].test(letters(name))) fits.push({ name: String(name), i: i }); });
+  if (!fits.length) {
+    post("EQ Eight Filter Type menu: " + JSON.stringify(items) + "\n");
+    const slots = SHAPE_SLOTS[opts.shape];
+    if (items.length !== 8 || !slots) return -1;
+    return slots.length > 1 ? slots[opts.steep ? 1 : 0] : slots[0];
+  }
   if (fits.length > 1) {   // the two cuts: 48 dB/oct when steep, else 12
     const want = opts.steep ? /48/ : /12/;
     const pick = fits.filter(function (f) { return want.test(f.name); })[0];
@@ -326,7 +336,7 @@ function shapeValue(param, opts) {
 // A band that's on but changes nothing: a bell or shelf at 0 dB (cuts and notches always change the sound)
 function isFlat(b) {
   const type = String(b["Filter Type"].call("str_for_value", one(b["Filter Type"], "value")));
-  if (!/bell|shelf/i.test(type)) return false;
+  if (!/bell|peak|shelf/.test(letters(type))) return false;
   const g = displayed(b["Gain"], one(b["Gain"], "value"));
   return g !== null && Math.abs(g) < 0.05;
 }
@@ -341,7 +351,7 @@ function applyEq(device, added, freq, gain, q, index, opts) {
     for (let i = 0; i < order.length && !band; i++) {
       const b = bands[order[i]];
       if (b && b["Filter On"] && one(b["Filter On"], "value") === 1 &&
-          SHAPES[opts.shape].test(String(b["Filter Type"].call("str_for_value", one(b["Filter Type"], "value"))))) band = order[i];
+          SHAPES[opts.shape].test(letters(b["Filter Type"].call("str_for_value", one(b["Filter Type"], "value"))))) band = order[i];
     }
   }
   // A free band: switched off, or on but doing nothing (a fresh EQ Eight has bands 1 to 4 on, flat at 0 dB)
@@ -369,7 +379,8 @@ function applyEq(device, added, freq, gain, q, index, opts) {
   const type = shapeValue(b["Filter Type"], opts);
   if (type < 0) {
     undoStack.pop();
-    send("eq_done", { ok: false, text: "EQ Eight has no " + opts.shape.replace("_", " ") + " shape Aria could find." });
+    send("eq_done", { ok: false, text: "EQ Eight has no " + opts.shape.replace("_", " ") + " shape Aria could find. Its menu: " +
+                      JSON.stringify(b["Filter Type"].get("value_items")) });
     return;
   }
   b["Filter Type"].set("value", type);
@@ -428,4 +439,24 @@ function volume(trackIndex, changeDb) {
   undoStack.push({ kind: "params", params: [{ id: Number(fader.id), value: before }], what: "volume", track: trackIndex });
   const shown = setByDisplay(fader, target);
   send("volume_done", { ok: true, text: "\"" + one(track, "name") + "\" " + (changeDb > 0 ? "up" : "down") + " " + Math.abs(changeDb) + " dB, now " + shown + "." });
+}
+
+// ---------- Spike S1: what each device on a track exposes to the Live API ----------
+// One "device_params" reply per device (a plugin can have hundreds), then "devices_end".
+
+function devices(trackIndex) {
+  const track = trackAt(trackIndex);
+  const devs = ids(track.get("devices"));
+  devs.forEach(function (id, i) {
+    const d = new LiveAPI("id " + id);
+    const params = ids(d.get("parameters")).map(function (pid) {
+      const p = new LiveAPI("id " + pid);
+      const v = one(p, "value");
+      return { name: String(one(p, "name")), value: v, display: String(p.call("str_for_value", v)),
+               min: one(p, "min"), max: one(p, "max"), quantized: one(p, "is_quantized") === 1 };
+    });
+    send("device_params", { index: i, name: String(one(d, "name")), class_name: String(one(d, "class_name")),
+                            type: one(d, "type"), params: params });
+  });
+  send("devices_end", { track: String(one(track, "name")), count: devs.length });
 }

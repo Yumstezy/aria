@@ -403,12 +403,46 @@ async function askContext() {
   };
 }
 
+// "/devices <track>": list every device on a track and every parameter Live exposes for it
+// (spike S1 in docs/device-control.md). Saved in full to Application Support/Aria/devices-<track>.json.
+let deviceDump = null;
+Max.addHandler("device_params", (s) => { if (deviceDump) deviceDump.devices.push(decode(s)); });
+Max.addHandler("devices_end", (s) => { if (deviceDump) { deviceDump.done(decode(s)); } });
+
+async function listDevices(trackName) {
+  const live = await askLive("state", "live_state");
+  const t = live.tracks.find((x) => x.name.toLowerCase() === trackName.toLowerCase())
+    || live.tracks.find((x) => x.name.toLowerCase().includes(trackName.toLowerCase()));
+  if (!t) throw new UserError(`No track called "${trackName}". Tracks: ${live.tracks.map((x) => x.name).join(", ")}.`);
+  const result = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { deviceDump = null; reject(new UserError("Live didn't list the devices in time.")); }, 15000);
+    deviceDump = { devices: [], done: (end) => { clearTimeout(timer); const out = { ...end, devices: deviceDump.devices }; deviceDump = null; resolve(out); } };
+    toLive("devices", t.index);
+  });
+  const file = path.join(path.dirname(HISTORY_FILE), `devices-${t.name.replace(/[^\w -]/g, "_")}.json`);
+  fs.writeFileSync(file, JSON.stringify(result, null, 1));
+  const lines = result.devices.map((d) => `${d.name}: ${d.params.length} controls`);
+  return { reply: `"${t.name}" has ${result.devices.length} devices. ${lines.join(". ")}. Full list saved for Claude.`, file };
+}
+
 let asking = false;
 Max.addHandler("ask", async (s) => {
   if (asking) return;
   asking = true;
   const { text } = decode(s);
   toUI("ask_pending", { request: text });
+  if (/^\/devices\b/i.test(text)) {
+    try {
+      const out = await listDevices(text.replace(/^\/devices\s*/i, "").trim());
+      askLog.push({ request: text, reply: out.reply, done: [], suggestions: [], problems: [], error: null, notes: [], at: Date.now() });
+    } catch (e) {
+      askLog.push({ request: text, reply: null, done: [], suggestions: [], problems: [], error: e.message, notes: [], at: Date.now() });
+    }
+    asking = false;
+    toUI("ask_pending", { request: null });
+    logChanged();
+    return;
+  }
   try {
     await ensureEngine();
     const context = await askContext();

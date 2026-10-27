@@ -329,6 +329,8 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
   - A band that's on but flat (a fresh EQ Eight has bands 1 to 4 on at 0 dB) counts as free.
 - **Window, fourth pass (Oct 27).** The window docks **Left** or **Right** (floats over Live) or goes **Full**. In docked mode, buttons at the top switch sides, pop out Ask Muse, and go back to Full. **Ask Muse pops out** into its own small window (`p chat` in the device, `?view=chat`) that floats over Live; it shows the same saved history. A see-through window isn't possible as far as we know: Max windows are opaque, so the page can only look like glass.
 - **Everyday asks:** "add clarity", "less muddy", "some air" and the like now use standard starting points (for example clarity is +2 dB at 3 kHz) instead of asking for numbers. A Mix check finding's frequency wins when there is one.
+- **Low cut failed in Live: "EQ Eight has no low cut shape Aria could find."** The menu names didn't match the guessed pattern (High Shelf did). Shapes now match by letters anywhere in the name, with a fallback to EQ Eight's fixed 8-slot menu order. The real names print to the Max console.
+- **`/devices <track>` in Ask Muse** lists every device on a track and every parameter Live exposes, saved to `~/Library/Application Support/Aria/devices-<track>.json`. That's spike S1: run it with Pro-Q 4 on a track.
 - **Voice** isn't in yet. Muse Voice Transcribe works (step 1.4). The open question is the microphone: whether `jweb` can record it, or whether it goes through Live's input.
 
 ### The big change: device control
