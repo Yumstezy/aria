@@ -11,7 +11,7 @@ Tested setup: Live 12.4 Suite with its built-in Max 9.1.4.
 
 ## Build it
 
-1. **Add a blank device to the master track.** In Live's browser, open **Max for Live**, find **Max Audio Effect**, and drag it onto the **Master** track.
+1. **Add a blank device to the Main (master) track.** In Live's browser, open **Max for Live**, find **Max Audio Effect**, and drag it onto the **Main** track (Live 12 calls the master track "Main"). With Main selected, you can drop it in the "Drop Audio Effects Here" panel at the bottom.
 2. **Open the editor.** Click the small **Edit** button in the device's title bar, the icon next to the device name. A Max window opens. It already has two boxes joined by a wire: `plugin~` on top, `plugout~` below. Leave them alone. They pass the audio through.
 3. **Save it in the repo first,** so Max can find our script files. Choose **File > Save As**, go to `aria/device/spike/` and save as **`Aria Spike.amxd`**.
 4. **Make sure the patch is unlocked** (editable). If the lock icon at the bottom left is closed, press **Cmd+E**.
