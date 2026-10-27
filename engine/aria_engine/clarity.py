@@ -3,6 +3,7 @@
 Every finding is measured relative to the same mix, so no reference track is needed:
   resonance  a narrow peak standing above its own neighbourhood for most of the recording
   buildup    a low-mid band (120 Hz to 1 kHz) that grows louder than its own neighbours from some bar on
+             (off by default in master mode, see analyze)
   harsh      short bursts in 2 to 6 kHz that jump above their neighbourhood
 
 Each finding has a frequency range, the bars, its size in dB and how much of the time it's there.
@@ -23,7 +24,7 @@ FLOOR_DB = -80.0             # below this a band has no real content
 RESONANCE_MIN_DB = 6.0       # peak above its smoothed neighbourhood, averaged over time
 RESONANCE_FRAME_DB = 3.0     # per-frame margin that counts towards persistence
 RESONANCE_MIN_SHARE = 0.6    # must hold for this share of frames with content
-RESONANCE_RANGE = (80.0, 10000.0)
+RESONANCE_RANGE = (150.0, 10000.0)   # below this, narrow peaks are mostly bass notes, not resonances
 BUILDUP_MIN_DB = 4.0         # lasting rise of a band against its neighbours, and of the band itself
 BUILDUP_MIN_BARS = 2
 BUILDUP_RANGE = (120.0, 1000.0)  # the mud zone. Sub-bass fights are key tracks mode's job.
@@ -71,8 +72,14 @@ def _hz_range(centres, i, j=None):
     return [round(float(lo)), round(float(hi))]
 
 
-def analyze(audio, rate, tempo=None, start_beat=None, beats_per_bar=4.0):
-    """audio: (samples, channels) floats. Returns {"findings": [...], "bars": [...]}."""
+def analyze(audio, rate, tempo=None, start_beat=None, beats_per_bar=4.0, include_buildups=False):
+    """audio: (samples, channels) floats. Returns {"findings": [...], "bars": [...]}.
+
+    Build-ups are off by default. On a good reference mix (BRILL x 4times4, scanned Oct 26)
+    they fired at every arrangement change, where the drop brings the bass in, which is
+    the arrangement, not mud. Without knowing which track entered, master mode can't tell
+    the two apart. Key tracks mode can.
+    """
     mono = audio.mean(axis=1) if audio.ndim == 2 else audio
     if len(mono) < 4 * N_FFT:
         return {"findings": [], "unmeasured": "The recording is too short for a clarity check."}
@@ -92,7 +99,8 @@ def analyze(audio, rate, tempo=None, start_beat=None, beats_per_bar=4.0):
     active = db > FLOOR_DB
     findings = []
     findings += _resonances(db, centres, active, frame_bar)
-    findings += _buildups(db, centres, frame_bar, bars)
+    if include_buildups:
+        findings += _buildups(db, centres, frame_bar, bars)
     findings += _harsh(db, centres, frame_bar, bars, len(times))
     findings.sort(key=lambda f: f["score"], reverse=True)
     for f in findings:

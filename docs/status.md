@@ -196,6 +196,20 @@ Pass condition (from `docs/build-steps.md`): `uvicorn` serves `/health`, `pytest
 - **Muse advises on findings with a fix,** for example a -4.5 dB narrow cut at 339 Hz, in about 2 s. The validator now accepts "around 340 Hz" for a measured 339 Hz. Before that change it rejected 3 replies in 4.
 - **The strip shows "What sticks out":** rows you can click to jump the playhead.
 
+### Checked against a good mix (Oct 26)
+
+Ian supplied a good mix as a comparison: "BRILL x 4times4 - Drugs In The Club (Edit) v0", 152 BPM, analyzed locally and not in git. The whole song was scanned 16 bars at a time (8-bar steps), next to BELIEVE IT.
+
+| | Good mix | BELIEVE IT (rough) |
+|---|---|---|
+| First version: windows with nothing flagged | 10 of 19 | 2 of 16 |
+| After the changes below | **15 of 19 (78%)** | **6 of 16 (37%)** |
+
+- **Build-ups fired at every arrangement change in the good mix** (9 of its 14 findings): the drop bringing the bass in. Master mode can't tell "an element entered" from "this range got crowded", so build-ups are now off in master mode (`include_buildups=False`). Low-mid crowding moves to key tracks mode.
+- **Ringing notes now start at 150 Hz.** Below that, narrow peaks were sustained bass notes (107 and 160 Hz in the good mix).
+- **Left in the good mix:** harsh hits at 2.7 kHz in bars 75 to 120, and 160 Hz at bar 89. Ian to listen: intentional brightness, or a real issue?
+- **BELIEVE IT's findings persist across windows:** 508 Hz rings through bars 57 to 88, and 2.0 to 2.2 kHz hits through bars 17 to 40 and 98 to 136. Ian to listen.
+
 ## Next
 - **Ian:**
   - Reload Aria and try Check mix on a busy section.

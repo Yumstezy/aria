@@ -32,9 +32,9 @@ def peak_eq(x, hz, gain_db, q=8.0):
     return x + (10 ** (gain_db / 20) - 1) * band
 
 
-def run(x):
+def run(x, **kw):
     stereo = np.column_stack([x, x])
-    return clarity.analyze(stereo, RATE, tempo=TEMPO, start_beat=0.0)["findings"]
+    return clarity.analyze(stereo, RATE, tempo=TEMPO, start_beat=0.0, **kw)["findings"]
 
 
 def octaves_apart(a, b):
@@ -57,7 +57,8 @@ def test_buildup_from_a_known_bar_is_found():
     t = np.arange(len(x)) / RATE
     low_mid = sosfilt(butter(4, [200, 400], btype="band", fs=RATE, output="sos"), pink(16, seed=1))
     x = x + np.where(t >= 4 * BAR_SEC, 4.0, 0.0) * low_mid     # enters at bar 5
-    found = [f for f in run(x) if f["kind"] == "buildup"]
+    assert not [f for f in run(x) if f["kind"] == "buildup"], "build-ups are off by default"
+    found = [f for f in run(x, include_buildups=True) if f["kind"] == "buildup"]
     assert found, "buildup not found"
     b = found[0]
     assert abs(b["bars"][0] - 5) <= 1
@@ -73,6 +74,11 @@ def test_harsh_bursts_are_found():
     assert found, "harsh bursts not found"
     assert octaves_apart(found[0]["hz"], 3500) <= 1 / 6
     assert found[0]["bursts_per_bar"] >= 2
+
+
+def test_sustained_bass_note_is_not_a_resonance():
+    t = np.arange(16 * RATE) / RATE
+    assert run(pink(16) + 0.3 * np.sin(2 * np.pi * 110 * t)) == []
 
 
 def test_too_short_says_why():
