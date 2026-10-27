@@ -77,6 +77,28 @@ Both measure only inside the producer's own mix, so neither needs a reference tr
 
 Pass: on test mixes built from real stems with a known problem planted (a narrow +9 dB boost at a known frequency, or a buildup that starts at a known bar), the planted problem is ranked first. It must land within 1/6 octave and 1 bar of the truth.
 
+## Step 3b. Split mode: Meta's Demucs (Oct 27)
+
+Why: on Ian's "muddy mix" test, master mode said nothing stuck out, while Ian heard a quiet vocal, overpowering loops, a click on the bass and some mud. Those are relationships between sounds, and the summed master can't show them. A hand test splitting the mix with Demucs (Meta AI research) measured all of them on the track's loudest 16 bars:
+- the vocal 8.3 dB under the rest in 1 to 4 kHz while singing, and 3.4 dB under the drums and loops
+- a high-frequency burst on 85% of bass note starts (likely a click, possibly kick bleed)
+- the bass 7.5 dB over the other instruments in 150 to 400 Hz
+
+What it does:
+- **Splits the recording into vocals, drums, bass and other** with `htdemucs` on the CPU. That takes about 10 s per 25 s of audio on Ian's Mac. The Mac's GPU fails with this model ("Output channels > 65536 not supported at the MPS device").
+- **Measures masking between stems** in five ranges (low 30 to 150 Hz, low-mid 150 to 400, mid 400 Hz to 1 kHz, presence 1 to 4 kHz, air 4 to 12 kHz). A stem is covered when another stem is at least 3 dB louder in a range that matters to it, for most of the time it plays. Findings: "Vocals covered by drums at 1 to 4 kHz, 3.4 dB under, 70% of the time".
+- **Detects bass clicks:** a sharp high-frequency burst at bass note starts that don't land on a drum hit (to rule out kick bleed).
+- **Ignores near-silent stretches,** in master mode too. On the muddy mix, ringing notes were reported from bars sitting 30 to 45 dB under the song's loud part.
+- The same masking code is reused for Aria Ear in Step 4, with real track names instead of stem names.
+
+**License (decided Oct 26, Ian):**
+- Prototype only, disclosed.
+- Demucs code is MIT. The weights' license is unclear, per its author; they were trained partly on MUSDB, which is research only.
+- The README says this plainly. The weights download from Meta on first use and are never stored in the repo.
+- Revisit before any paid release: a model with a clear license, or Aria Ear only.
+
+Pass: on Ian's muddy mix (bars 1 to 16), split mode reports the vocal covered in 1 to 4 kHz, and the bass over the others in the low-mids. On BRILL x 4times4 (the good mix), it reports at most one masking finding per 16 bars. Total Check mix time stays under 15 s after an 8-bar recording.
+
 ## Step 4. Clarity, key tracks mode: Aria Ear (Oct 28 to 29)
 
 - **`device/Aria Ear.amxd`:** a tiny device for any track or group. It passes audio through untouched and reports its track's name to the main Aria.

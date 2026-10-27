@@ -118,6 +118,7 @@ docs/          build steps, contracts, screens
 
 - Never add SF Pro, Helvetica, Coolvetica or Lemon Milk font files. On a Mac the system font gives the SF look. Geist is bundled under the OFL.
 - Rubber Band is GPL. If we use it, call it as a separate command-line tool. Don't link it.
+- Demucs (split mode): the code is MIT, but the model weights' license is unclear, per its author. Use it for the prototype only, say so in the README, and never commit the weights.
 - No commercial music anywhere in the repo or the video.
 
 ## How to work

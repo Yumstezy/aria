@@ -1,0 +1,4 @@
+# Split mode (build step 3b): Meta's Demucs separates the mix into vocals, drums, bass and other.
+# Code is MIT. The model weights' license is unclear per its author (trained partly on research-only
+# MUSDB). Prototype and non-commercial use only, disclosed in README. Weights download on first use.
+demucs==4.1.0
