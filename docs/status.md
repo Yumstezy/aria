@@ -29,6 +29,17 @@ Run with `engine/spikes/muse_spike.py`. The measurements in it are a test fixtur
 **1.3 Tool calling. Yes, on both models.**
 - "Make bars 1 to 16 the intro" became `set_section({"start_bar":1,"bars":16,"name":"Intro"})` in 0.8 s (1.1) and 1.2 s (1.3).
 
+**1.4 Muse Voice Transcribe. Yes.**
+- Endpoint: `POST https://api.meta.ai/v1/asr/transcribe`, multipart form with a `request` JSON part and an `audio` WAV part. Model `muse-voice-transcribe-1.0`.
+- There's a `PUSH_TO_TALK` mode, which matches the hold-to-talk design. It costs $0.18 per hour of audio.
+- A 4.2 s spoken request (made with the Mac's `say` command) came back in 2.0 s as: "Make bars one to 16 the intro, then cut the cut the harshness in the choruses." Close enough for Muse Spark to act on.
+- **It only accepts mono 16-bit PCM WAV at 16 or 24 kHz.** 44.1 kHz, 48 kHz, 24-bit and float are all rejected with HTTP 400. Live records at 44.1 or 48 kHz, so the engine converts the recording to 16 kHz mono before sending.
+- Voice can move up from stretch whenever Ask Muse is solid.
+
+**1.5 to 1.8: the device files and guide are ready.**
+- `device/spike/bridge_spike.js` and `device/spike/live_spike.js`. The bridge's HTTP code was tested against the running engine: it answered in 6 ms.
+- Waiting on Ian to build the test device with `docs/max-guide-step1.md` and run the tests.
+
 ### Plan for the rest of Step 1
 
 Pass condition: all eight questions have a written yes or no and a chosen path.
