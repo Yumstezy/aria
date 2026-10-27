@@ -71,12 +71,21 @@
     return unit ? n + ' ' + unit : n;
   }
 
+  // Number large, unit small, so values fit Live's narrow strip.
   function setMeasure(key, value, reason) {
     var el = $('[data-measure="' + key + '"]');
     if (!el) return;
-    el.textContent = value === null ? 'Not measured' : value;
+    el.textContent = '';
     el.classList.toggle('is-missing', value === null);
     el.title = value === null ? (reason || '') : '';
+    if (value === null) { el.textContent = 'Not measured'; return; }
+    var parts = String(value).split(' ');
+    el.appendChild(document.createTextNode(parts[0]));
+    if (parts[1]) {
+      var unit = document.createElement('small');
+      unit.textContent = ' ' + parts.slice(1).join(' ');
+      el.appendChild(unit);
+    }
   }
 
   function stripState(state) {
@@ -107,7 +116,7 @@
     var w = m.width || {};
     // Width per band as a percentage of side energy: Bass · Mids · Treble.
     var widths = ['bass', 'mids', 'treble'].map(function (b) { return w[b] === null || w[b] === undefined ? null : Math.round(w[b] * 100); });
-    setMeasure('width', widths.every(function (x) { return x === null; }) ? null : widths.map(function (x) { return x === null ? 'n/a' : x; }).join('·') + '%',
+    setMeasure('width', widths.every(function (x) { return x === null; }) ? null : widths.map(function (x) { return x === null ? 'n/a' : x; }).join('·') + ' %',
       why['width.mids'] || why.all);
     var wEl = $('[data-measure="width"]');
     if (wEl && !wEl.classList.contains('is-missing')) wEl.title = 'Side share of each band: Bass · Mids · Treble. 0% is mono.';
