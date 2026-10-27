@@ -1,0 +1,96 @@
+/* Aria design tokens, generated from tokens.json */
+:root, [data-theme="sky"] {
+  --ground: #dcecfb;
+  --orb-1: #245fcf;
+  --orb-2: #7cc0f7;
+  --glass: rgba(255,255,255,0.72);
+  --glass-edge: rgba(255,255,255,0.90);
+  --card: #ffffff;
+  --card-edge: rgba(12,30,60,0.06);
+  --well: rgba(12,30,60,0.07);
+  --hairline: rgba(12,30,60,0.12);
+  --track: rgba(12,30,60,0.18);
+  --ink: #0c1e3c;
+  --ink-muted: #42526b;
+  --ink-faint: #465570;
+  --tile-top: #1b4fb3;
+  --tile-base: #245fcf;
+  --tile-bottom: #5aa2f0;
+  --tile-core: #0a1f4d;
+  --on-tile: #ffffff;
+  --on-tile-muted: rgba(255,255,255,0.86);
+  --solid: #0c1e3c;
+  --on-solid: #ffffff;
+  --on-solid-muted: #b9c4d3;
+  --chip: rgba(4,14,36,0.62);
+  --action: #1f5fd0;
+  --on-action: #ffffff;
+  --focus-ring: var(--action);
+  --hot: #c2410c;
+  --hot-glow: #ffb07a;
+  --good: #0d7a4b;
+  --good-glow: #8ff0c4;
+  --cool: #2b6fd6;
+  --watch: #8a5600;
+  --action-glow: rgba(31,95,208,0.45);
+  --shadow-tile: 0 10px 30px -12px rgba(20,50,100,0.28);
+  --shadow-rim: inset 0 1px 0 rgba(255,255,255,0.95);
+  --shadow-rim-tile: inset 0 1px 0 rgba(255,255,255,0.28), inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+[data-theme="night"] {
+  --ground: #070b14;
+  --orb-1: #1a3f8a;
+  --orb-2: #0f2a5c;
+  --glass: rgba(16,24,42,0.62);
+  --glass-edge: rgba(255,255,255,0.12);
+  --card: #111a2c;
+  --card-edge: rgba(255,255,255,0.08);
+  --well: rgba(255,255,255,0.08);
+  --hairline: rgba(255,255,255,0.12);
+  --track: rgba(255,255,255,0.20);
+  --ink: #f5f8fc;
+  --ink-muted: #b9c4d3;
+  --ink-faint: #97a3b4;
+  --tile-top: #1b4fb3;
+  --tile-base: #245fcf;
+  --tile-bottom: #5aa2f0;
+  --tile-core: #0a1f4d;
+  --on-tile: #ffffff;
+  --on-tile-muted: rgba(255,255,255,0.86);
+  --solid: #1a3566;
+  --on-solid: #ffffff;
+  --on-solid-muted: #b9c4d3;
+  --chip: rgba(4,14,36,0.62);
+  --action: #6cb4ff;
+  --on-action: #04121f;
+  --focus-ring: var(--action);
+  --hot: #ff9a5c;
+  --hot-glow: #ffb07a;
+  --good: #5fdba6;
+  --good-glow: #8ff0c4;
+  --cool: #6cb4ff;
+  --watch: #ffc761;
+  --action-glow: rgba(108,180,255,0.35);
+  --shadow-tile: 0 10px 30px -12px rgba(0,0,0,0.6);
+  --shadow-rim: inset 0 1px 0 rgba(255,255,255,0.14);
+  --shadow-rim-tile: inset 0 1px 0 rgba(255,255,255,0.28), inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 32px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+  --blur-glass: 24px;
+  --blur-aura: 80px;
+  --blur-core: 56px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", Geist, "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Geist Mono", Menlo, Consolas, monospace;
+}
+@font-face { font-family: "Geist"; src: url("fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "Geist Mono"; src: url("fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; }

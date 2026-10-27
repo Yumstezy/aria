@@ -1,0 +1,87 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../ds/tokens.css"><link rel="stylesheet" href="../ds/components/bundle.css">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.step-n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:999px;background:var(--action);color:var(--on-action);font-size:12px;font-weight:700}
+.slider{flex:1;accent-color:var(--action)}
+.step-n.is-done{background:var(--good)}
+.steps{flex-direction:row;align-items:center;gap:0;padding:12px 20px}
+.step{flex:1;display:flex;align-items:center;gap:10px;white-space:nowrap}
+.step:last-child{flex:1.7}
+.step .cp-seg button{white-space:nowrap}
+.step + .step{border-left:1px solid var(--hairline);padding-left:20px}
+.step b{font-size:14px}
+.ctl{font-size:12px;font-weight:600;color:var(--ink-muted);min-width:64px}
+</style>
+</head><body style="margin:0">
+
+<div class="cp-stage" data-theme="sky" style="width: 1200px; height: 680px; min-height: 0; box-sizing: border-box; padding: 32px;">
+<div class="cp-glass cp-window" style="height: 616px;">
+<aside class="cp-rail">
+<div class="cp-mark">
+<svg viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="8" fill="var(--action)"></rect><path d="M8 10v6M11.5 7v12M15 9v8M18.5 11v4" stroke="#fff" stroke-width="2" stroke-linecap="round"></path></svg>
+<b>Aria</b>
+</div>
+<nav class="cp-nav" aria-label="Tools">
+<a href="01-home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg>Home</a>
+<a href="03-mix-check-simple.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 15c3 0 3-7 6-7s3 9 6 9 3-6 6-6"></path></svg>Mix check</a>
+<a href="05-live-analyzer.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20V11M9 20V5M14 20v-8M19 20V8"></path></svg>Live analyzer</a>
+<a href="06-groove-match.html" aria-current="page"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="8" r="1.8"></circle><circle cx="10" cy="8" r="1.8"></circle><circle cx="15" cy="8" r="1.8"></circle><circle cx="20" cy="8" r="1.8"></circle><circle cx="6.5" cy="16" r="1.8"></circle><circle cx="11.5" cy="16" r="1.8"></circle><circle cx="16.5" cy="16" r="1.8"></circle></svg>Groove match</a>
+<a href="07-reference-sections.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="5" height="12" rx="1.5"></rect><rect x="10" y="6" width="11" height="12" rx="1.5"></rect></svg>Reference</a>
+</nav>
+<div class="cp-ask-dock cp-push">
+<button class="cp-ask-btn" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>Ask Muse</button>
+<span class="cp-meta">or hold your mapped key</span>
+</div>
+</aside>
+<main class="cp-main">
+<header class="cp-spread">
+<div>
+<span class="cp-cap">Hat loop + Perc loop · 124 BPM</span>
+<h1 class="cp-title" style="margin-top: 4px;">Groove match</h1>
+</div>
+<button class="cp-btn cp-btn-primary">Apply</button>
+</header>
+<section class="cp-tile cp-card steps">
+<div class="step"><span class="step-n is-done">1</span><b>Same speed</b><span class="cp-chip">124 BPM</span></div>
+<div class="step"><span class="step-n is-done">2</span><b>Same start</b><span class="cp-chip">bar 1</span></div>
+<div class="step"><span class="step-n">3</span><b>Follow</b><div class="cp-seg" role="group" aria-label="Match to"><button aria-pressed="true">Reference</button><button aria-pressed="false">Hat loop</button><button aria-pressed="false">Straight</button></div></div>
+</section>
+<div class="cp-bento">
+<section class="cp-tile cp-card span-6" style="gap: 12px;">
+<div class="cp-spread"><span class="cp-cap">Before</span><span class="cp-tag cp-tag-hot">Perc is rushing</span></div>
+<svg viewBox="0 0 409 142" class="cp-svg" role="img" aria-label="Loop B lands 19 ms early on every off-beat" style="display:block;width:100%;height:auto"><line x1="70" x2="70" y1="0" y2="120" class="cp-grid-strong"></line><line x1="90.8" x2="90.8" y1="0" y2="120" class="cp-grid"></line><line x1="111.6" x2="111.6" y1="0" y2="120" class="cp-grid"></line><line x1="132.4" x2="132.4" y1="0" y2="120" class="cp-grid"></line><line x1="153.3" x2="153.3" y1="0" y2="120" class="cp-grid-strong"></line><line x1="174.1" x2="174.1" y1="0" y2="120" class="cp-grid"></line><line x1="194.9" x2="194.9" y1="0" y2="120" class="cp-grid"></line><line x1="215.7" x2="215.7" y1="0" y2="120" class="cp-grid"></line><line x1="236.5" x2="236.5" y1="0" y2="120" class="cp-grid-strong"></line><line x1="257.3" x2="257.3" y1="0" y2="120" class="cp-grid"></line><line x1="278.1" x2="278.1" y1="0" y2="120" class="cp-grid"></line><line x1="298.9" x2="298.9" y1="0" y2="120" class="cp-grid"></line><line x1="319.8" x2="319.8" y1="0" y2="120" class="cp-grid-strong"></line><line x1="340.6" x2="340.6" y1="0" y2="120" class="cp-grid"></line><line x1="361.4" x2="361.4" y1="0" y2="120" class="cp-grid"></line><line x1="382.2" x2="382.2" y1="0" y2="120" class="cp-grid"></line><line x1="403" x2="403" y1="0" y2="120" class="cp-grid-strong"></line><text x="73" y="136" class="cp-axis" text-anchor="start">1</text><text x="156.3" y="136" class="cp-axis" text-anchor="start">2</text><text x="239.5" y="136" class="cp-axis" text-anchor="start">3</text><text x="322.8" y="136" class="cp-axis" text-anchor="start">4</text><text x="0" y="22" class="cp-rowhead" text-anchor="start">Ref feel</text><path d="M70,28L70,10L81,28Z" class="cp-tr-ref"></path><path d="M94.1,28L94.1,15L105.1,28Z" class="cp-tr-ref"></path><path d="M111.6,28L111.6,15L122.6,28Z" class="cp-tr-ref"></path><path d="M135.7,28L135.7,15L146.7,28Z" class="cp-tr-ref"></path><path d="M153.3,28L153.3,10L164.3,28Z" class="cp-tr-ref"></path><path d="M177.3,28L177.3,15L188.3,28Z" class="cp-tr-ref"></path><path d="M194.9,28L194.9,15L205.9,28Z" class="cp-tr-ref"></path><path d="M219,28L219,15L230,28Z" class="cp-tr-ref"></path><path d="M236.5,28L236.5,10L247.5,28Z" class="cp-tr-ref"></path><path d="M260.6,28L260.6,15L271.6,28Z" class="cp-tr-ref"></path><path d="M278.1,28L278.1,15L289.1,28Z" class="cp-tr-ref"></path><path d="M302.2,28L302.2,15L313.2,28Z" class="cp-tr-ref"></path><path d="M319.8,28L319.8,10L330.8,28Z" class="cp-tr-ref"></path><path d="M343.8,28L343.8,15L354.8,28Z" class="cp-tr-ref"></path><path d="M361.4,28L361.4,15L372.4,28Z" class="cp-tr-ref"></path><path d="M385.5,28L385.5,15L396.5,28Z" class="cp-tr-ref"></path><text x="0" y="56" class="cp-rowhead" text-anchor="start">Hat loop</text><path d="M70.2,68L70.2,50L81.2,68Z" class="cp-tr"></path><path d="M93.9,68L93.9,55L104.9,68Z" class="cp-tr"></path><path d="M111.8,68L111.8,55L122.8,68Z" class="cp-tr"></path><path d="M135.5,68L135.5,55L146.5,68Z" class="cp-tr"></path><path d="M153.4,68L153.4,50L164.4,68Z" class="cp-tr"></path><path d="M177.2,68L177.2,55L188.2,68Z" class="cp-tr"></path><path d="M195,68L195,55L206,68Z" class="cp-tr"></path><path d="M218.8,68L218.8,55L229.8,68Z" class="cp-tr"></path><path d="M236.7,68L236.7,50L247.7,68Z" class="cp-tr"></path><path d="M260.4,68L260.4,55L271.4,68Z" class="cp-tr"></path><path d="M278.3,68L278.3,55L289.3,68Z" class="cp-tr"></path><path d="M302,68L302,55L313,68Z" class="cp-tr"></path><path d="M319.9,68L319.9,50L330.9,68Z" class="cp-tr"></path><path d="M343.7,68L343.7,55L354.7,68Z" class="cp-tr"></path><path d="M361.5,68L361.5,55L372.5,68Z" class="cp-tr"></path><path d="M385.3,68L385.3,55L396.3,68Z" class="cp-tr"></path><text x="0" y="71" class="cp-valtext" text-anchor="start">on feel</text><text x="0" y="96" class="cp-rowhead" text-anchor="start">Perc loop</text><path d="M70,108L70,90L81,108Z" class="cp-tr"></path><path d="M90.8,108L90.8,95L101.8,108Z" class="cp-tr-hot"></path><line x1="94.1" x2="90.8" y1="112" y2="112" class="cp-err"></line><path d="M111.6,108L111.6,95L122.6,108Z" class="cp-tr"></path><path d="M132.4,108L132.4,95L143.4,108Z" class="cp-tr-hot"></path><line x1="135.7" x2="132.4" y1="112" y2="112" class="cp-err"></line><path d="M153.3,108L153.3,90L164.3,108Z" class="cp-tr"></path><path d="M174.1,108L174.1,95L185.1,108Z" class="cp-tr-hot"></path><line x1="177.3" x2="174.1" y1="112" y2="112" class="cp-err"></line><path d="M194.9,108L194.9,95L205.9,108Z" class="cp-tr"></path><path d="M215.7,108L215.7,95L226.7,108Z" class="cp-tr-hot"></path><line x1="219" x2="215.7" y1="112" y2="112" class="cp-err"></line><path d="M236.5,108L236.5,90L247.5,108Z" class="cp-tr"></path><path d="M257.3,108L257.3,95L268.3,108Z" class="cp-tr-hot"></path><line x1="260.6" x2="257.3" y1="112" y2="112" class="cp-err"></line><path d="M278.1,108L278.1,95L289.1,108Z" class="cp-tr"></path><path d="M298.9,108L298.9,95L309.9,108Z" class="cp-tr-hot"></path><line x1="302.2" x2="298.9" y1="112" y2="112" class="cp-err"></line><path d="M319.8,108L319.8,90L330.8,108Z" class="cp-tr"></path><path d="M340.6,108L340.6,95L351.6,108Z" class="cp-tr-hot"></path><line x1="343.8" x2="340.6" y1="112" y2="112" class="cp-err"></line><path d="M361.4,108L361.4,95L372.4,108Z" class="cp-tr"></path><path d="M382.2,108L382.2,95L393.2,108Z" class="cp-tr-hot"></path><line x1="385.5" x2="382.2" y1="112" y2="112" class="cp-err"></line><text x="0" y="111" class="cp-valtext is-hot" text-anchor="start">-19 ms</text></svg>
+</section>
+<section class="cp-tile cp-card span-6" style="gap: 12px;">
+<div class="cp-spread"><span class="cp-cap">After</span><span class="cp-tag cp-tag-good">In time</span></div>
+<svg viewBox="0 0 409 142" class="cp-svg" role="img" aria-label="Both loops now land on the reference feel" style="display:block;width:100%;height:auto"><line x1="70" x2="70" y1="0" y2="120" class="cp-grid-strong"></line><line x1="90.8" x2="90.8" y1="0" y2="120" class="cp-grid"></line><line x1="111.6" x2="111.6" y1="0" y2="120" class="cp-grid"></line><line x1="132.4" x2="132.4" y1="0" y2="120" class="cp-grid"></line><line x1="153.3" x2="153.3" y1="0" y2="120" class="cp-grid-strong"></line><line x1="174.1" x2="174.1" y1="0" y2="120" class="cp-grid"></line><line x1="194.9" x2="194.9" y1="0" y2="120" class="cp-grid"></line><line x1="215.7" x2="215.7" y1="0" y2="120" class="cp-grid"></line><line x1="236.5" x2="236.5" y1="0" y2="120" class="cp-grid-strong"></line><line x1="257.3" x2="257.3" y1="0" y2="120" class="cp-grid"></line><line x1="278.1" x2="278.1" y1="0" y2="120" class="cp-grid"></line><line x1="298.9" x2="298.9" y1="0" y2="120" class="cp-grid"></line><line x1="319.8" x2="319.8" y1="0" y2="120" class="cp-grid-strong"></line><line x1="340.6" x2="340.6" y1="0" y2="120" class="cp-grid"></line><line x1="361.4" x2="361.4" y1="0" y2="120" class="cp-grid"></line><line x1="382.2" x2="382.2" y1="0" y2="120" class="cp-grid"></line><line x1="403" x2="403" y1="0" y2="120" class="cp-grid-strong"></line><text x="73" y="136" class="cp-axis" text-anchor="start">1</text><text x="156.3" y="136" class="cp-axis" text-anchor="start">2</text><text x="239.5" y="136" class="cp-axis" text-anchor="start">3</text><text x="322.8" y="136" class="cp-axis" text-anchor="start">4</text><text x="0" y="22" class="cp-rowhead" text-anchor="start">Ref feel</text><path d="M70,28L70,10L81,28Z" class="cp-tr-ref"></path><path d="M94.1,28L94.1,15L105.1,28Z" class="cp-tr-ref"></path><path d="M111.6,28L111.6,15L122.6,28Z" class="cp-tr-ref"></path><path d="M135.7,28L135.7,15L146.7,28Z" class="cp-tr-ref"></path><path d="M153.3,28L153.3,10L164.3,28Z" class="cp-tr-ref"></path><path d="M177.3,28L177.3,15L188.3,28Z" class="cp-tr-ref"></path><path d="M194.9,28L194.9,15L205.9,28Z" class="cp-tr-ref"></path><path d="M219,28L219,15L230,28Z" class="cp-tr-ref"></path><path d="M236.5,28L236.5,10L247.5,28Z" class="cp-tr-ref"></path><path d="M260.6,28L260.6,15L271.6,28Z" class="cp-tr-ref"></path><path d="M278.1,28L278.1,15L289.1,28Z" class="cp-tr-ref"></path><path d="M302.2,28L302.2,15L313.2,28Z" class="cp-tr-ref"></path><path d="M319.8,28L319.8,10L330.8,28Z" class="cp-tr-ref"></path><path d="M343.8,28L343.8,15L354.8,28Z" class="cp-tr-ref"></path><path d="M361.4,28L361.4,15L372.4,28Z" class="cp-tr-ref"></path><path d="M385.5,28L385.5,15L396.5,28Z" class="cp-tr-ref"></path><text x="0" y="56" class="cp-rowhead" text-anchor="start">Hat loop</text><path d="M70.2,68L70.2,50L81.2,68Z" class="cp-tr"></path><path d="M93.9,68L93.9,55L104.9,68Z" class="cp-tr"></path><path d="M111.8,68L111.8,55L122.8,68Z" class="cp-tr"></path><path d="M135.5,68L135.5,55L146.5,68Z" class="cp-tr"></path><path d="M153.4,68L153.4,50L164.4,68Z" class="cp-tr"></path><path d="M177.2,68L177.2,55L188.2,68Z" class="cp-tr"></path><path d="M195,68L195,55L206,68Z" class="cp-tr"></path><path d="M218.8,68L218.8,55L229.8,68Z" class="cp-tr"></path><path d="M236.7,68L236.7,50L247.7,68Z" class="cp-tr"></path><path d="M260.4,68L260.4,55L271.4,68Z" class="cp-tr"></path><path d="M278.3,68L278.3,55L289.3,68Z" class="cp-tr"></path><path d="M302,68L302,55L313,68Z" class="cp-tr"></path><path d="M319.9,68L319.9,50L330.9,68Z" class="cp-tr"></path><path d="M343.7,68L343.7,55L354.7,68Z" class="cp-tr"></path><path d="M361.5,68L361.5,55L372.5,68Z" class="cp-tr"></path><path d="M385.3,68L385.3,55L396.3,68Z" class="cp-tr"></path><text x="0" y="71" class="cp-valtext" text-anchor="start">on feel</text><text x="0" y="96" class="cp-rowhead" text-anchor="start">Perc loop</text><path d="M70,108L70,90L81,108Z" class="cp-tr-good"></path><path d="M94.1,108L94.1,95L105.1,108Z" class="cp-tr-good"></path><path d="M111.6,108L111.6,95L122.6,108Z" class="cp-tr-good"></path><path d="M135.7,108L135.7,95L146.7,108Z" class="cp-tr-good"></path><path d="M153.3,108L153.3,90L164.3,108Z" class="cp-tr-good"></path><path d="M177.3,108L177.3,95L188.3,108Z" class="cp-tr-good"></path><path d="M194.9,108L194.9,95L205.9,108Z" class="cp-tr-good"></path><path d="M219,108L219,95L230,108Z" class="cp-tr-good"></path><path d="M236.5,108L236.5,90L247.5,108Z" class="cp-tr-good"></path><path d="M260.6,108L260.6,95L271.6,108Z" class="cp-tr-good"></path><path d="M278.1,108L278.1,95L289.1,108Z" class="cp-tr-good"></path><path d="M302.2,108L302.2,95L313.2,108Z" class="cp-tr-good"></path><path d="M319.8,108L319.8,90L330.8,108Z" class="cp-tr-good"></path><path d="M343.8,108L343.8,95L354.8,108Z" class="cp-tr-good"></path><path d="M361.4,108L361.4,95L372.4,108Z" class="cp-tr-good"></path><path d="M385.5,108L385.5,95L396.5,108Z" class="cp-tr-good"></path><text x="0" y="111" class="cp-valtext is-good" text-anchor="start">on feel</text></svg>
+</section>
+<section class="cp-tile cp-card span-4" style="gap: 6px;">
+<span class="cp-cap">How far off now</span>
+<div class="cp-row" style="gap: 18px; align-items: baseline;"><span class="cp-figure-sm">1<small>ms avg</small></span><span class="cp-figure-sm">3<small>ms max</small></span></div>
+<span class="cp-meta">Too small to hear</span>
+</section>
+<section class="cp-tile cp-card span-8" style="gap: 12px; justify-content: center;">
+<div class="cp-row" style="gap: 12px;">
+<label for="strength" class="ctl">Strength</label>
+<input id="strength" class="slider" type="range" min="0" max="100" step="5" value="100">
+<span class="cp-chip">100%</span>
+</div>
+<div class="cp-row" style="gap: 8px;">
+<span class="ctl">Nudge</span>
+<button class="cp-btn cp-btn-sm" aria-label="Nudge Perc loop 1 millisecond earlier">-1 ms</button>
+<span class="cp-chip">0 ms</span>
+<button class="cp-btn cp-btn-sm" aria-label="Nudge Perc loop 1 millisecond later">+1 ms</button>
+<div class="cp-seg" role="group" aria-label="Compare" style="margin-left: auto;"><button aria-pressed="false">A</button><button aria-pressed="true">B</button></div>
+</div>
+</section>
+<section class="cp-tile cp-solid span-12" style="flex-direction: row; align-items: center; gap: 12px; padding: 14px 20px;">
+<span class="cp-tile-title">Perc moves to the reference feel. Hat loop stays put.</span>
+<div class="cp-row" style="margin-left: auto;"><span class="cp-chip">New clip, original kept</span><button class="cp-btn cp-btn-ghost cp-btn-sm">Undo</button></div>
+</section>
+</div>
+</main>
+
+</div>
+</div>
+</body></html>

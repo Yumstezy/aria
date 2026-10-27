@@ -1,0 +1,192 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../ds/tokens.css"><link rel="stylesheet" href="../ds/components/bundle.css">
+<style>
+body{margin:0}
+a{color:inherit;text-decoration:none}
+.lanes{display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px 12px;align-items:center}
+.lane-label{font-size:12px;font-weight:600;color:var(--ink-muted)}
+.lane{display:flex;gap:4px;min-width:0}
+.blk{position:relative;min-width:0;height:56px;box-sizing:border-box;border:0;border-radius:10px;background:var(--well);color:var(--ink);font:inherit;text-align:left;padding:8px 10px;display:flex;flex-direction:column;justify-content:center;gap:2px;cursor:pointer;overflow:hidden}
+.blk b{font-size:12px;font-weight:600;white-space:nowrap}
+.blk span{font:500 10.5px var(--font-mono);color:var(--ink-faint);white-space:nowrap}
+.blk.is-peak{background:var(--track)}
+.blk.is-ref{cursor:default}
+.blk.is-low{background:repeating-linear-gradient(135deg,var(--well) 0 6px,transparent 6px 12px);box-shadow:inset 0 0 0 2px var(--watch)}
+.blk.is-low span{color:var(--watch)}
+.blk.is-sel{box-shadow:inset 0 0 0 2px var(--action)}
+.blk.is-sel::before,.blk.is-sel::after{content:"";position:absolute;top:50%;width:4px;height:24px;margin-top:-12px;border-radius:2px;background:var(--action)}
+.blk.is-sel::before{left:3px}
+.blk.is-sel::after{right:3px}
+.blk:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+.names{display:flex;flex-wrap:wrap;gap:6px}
+.name-btn{font:inherit;font-size:12px;font-weight:600;height:28px;padding:0 12px;border-radius:999px;border:1px solid var(--card-edge);background:var(--well);color:var(--ink-muted);cursor:pointer}
+.name-btn[aria-pressed="true"]{background:var(--action);color:var(--on-action);border-color:transparent}
+.tool-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tool-label{font-size:12px;font-weight:600;color:var(--ink-muted);min-width:96px}
+</style>
+</head><body style="margin:0">
+
+<div class="cp-stage" data-theme="sky" style="width: 1200px; height: 860px; min-height: 0; box-sizing: border-box; padding: 32px;">
+<div class="cp-glass cp-window" style="height: 796px;">
+<aside class="cp-rail">
+<div class="cp-mark">
+<svg viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="8" fill="var(--action)"></rect><path d="M8 10v6M11.5 7v12M15 9v8M18.5 11v4" stroke="#fff" stroke-width="2" stroke-linecap="round"></path></svg>
+<b>Aria</b>
+</div>
+<nav class="cp-nav" aria-label="Tools">
+<a href="01-home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg>Home</a>
+<a href="03-mix-check-simple.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 15c3 0 3-7 6-7s3 9 6 9 3-6 6-6"></path></svg>Mix check</a>
+<a href="05-live-analyzer.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20V11M9 20V5M14 20v-8M19 20V8"></path></svg>Live analyzer</a>
+<a href="06-groove-match.html"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="8" r="1.8"></circle><circle cx="10" cy="8" r="1.8"></circle><circle cx="15" cy="8" r="1.8"></circle><circle cx="20" cy="8" r="1.8"></circle><circle cx="6.5" cy="16" r="1.8"></circle><circle cx="11.5" cy="16" r="1.8"></circle><circle cx="16.5" cy="16" r="1.8"></circle></svg>Groove match</a>
+<a href="07-reference-sections.html" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="5" height="12" rx="1.5"></rect><rect x="10" y="6" width="11" height="12" rx="1.5"></rect></svg>Reference</a>
+</nav>
+<div class="cp-ask-dock cp-push">
+<button class="cp-ask-btn" aria-expanded="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>Ask Muse</button>
+<span class="cp-meta">or hold your mapped key</span>
+</div>
+</aside>
+<main class="cp-main">
+<header class="cp-spread">
+<div>
+<span class="cp-cap">Reference.wav · melodic house · 124 BPM</span>
+<h1 class="cp-title" style="margin-top: 4px;">Sections</h1>
+</div>
+<div class="cp-row">
+<span class="cp-meta">Sections from</span>
+<div class="cp-seg" role="group" aria-label="Sections from"><button aria-pressed="true">Detected</button><button aria-pressed="false">My Live markers</button></div>
+<button class="cp-btn cp-btn-primary">Add markers to Live</button>
+</div>
+</header>
+
+<section class="cp-tile cp-solid" style="flex-direction: row; align-items: center; gap: 16px; padding: 14px 18px;">
+<span class="cp-chip"><i class="cp-dot-hot"></i>Not sure</span>
+<div style="display: grid; gap: 2px; flex: 1;">
+<span class="cp-tile-title">Bars 9 to 16 got louder and brighter, but the chords repeat the intro.</span>
+<span class="cp-meta">Is this still the intro?</span>
+</div>
+<button class="cp-btn cp-btn-light cp-btn-sm">Yes, it's still the intro</button>
+<button class="cp-btn cp-btn-ghost cp-btn-sm">No, it's a new section</button>
+</section>
+
+<section class="cp-tile cp-card" style="gap: 14px;">
+<div class="cp-spread">
+<span class="cp-cap">Your track against the reference</span>
+<span class="cp-figure-sm" style="font-size: 22px;">+8<small>bars before your first chorus</small></span>
+</div>
+<div class="lanes">
+<span class="lane-label">Reference</span>
+<div class="lane">
+
+<span class="blk is-ref" style="flex: 8 1 0px;"><b>Intro</b><span>8 bars</span></span>
+
+<span class="blk is-ref" style="flex: 16 1 0px;"><b>Verse</b><span>16 bars</span></span>
+
+<span class="blk is-ref" style="flex: 8 1 0px;"><b>Build</b><span>8 bars</span></span>
+
+<span class="blk is-ref is-peak" style="flex: 16 1 0px;"><b>Chorus</b><span>16 bars</span></span>
+
+<span class="blk is-ref" style="flex: 16 1 0px;"><b>Verse</b><span>16 bars</span></span>
+
+<span class="blk is-ref is-peak" style="flex: 16 1 0px;"><b>Chorus</b><span>16 bars</span></span>
+
+<span class="blk is-ref" style="flex: 16 1 0px;"><b>Outro</b><span>16 bars</span></span>
+
+</div>
+<span class="lane-label">Yours</span>
+<div class="lane">
+
+<button class="blk is-sel" style="flex: 8 1 0px;" aria-label="Intro, 8 bars, starts at bar 1"><b>Intro</b><span>8 bars</span></button>
+
+<button class="blk is-low" style="flex: 8 1 0px;" aria-label="Verse, 8 bars, starts at bar 9"><b>Verse</b><span>8 bars?</span></button>
+
+<button class="blk" style="flex: 16 1 0px;" aria-label="Verse, 16 bars, starts at bar 17"><b>Verse</b><span>16 bars</span></button>
+
+<button class="blk" style="flex: 8 1 0px;" aria-label="Build, 8 bars, starts at bar 33"><b>Build</b><span>8 bars</span></button>
+
+<button class="blk is-peak" style="flex: 16 1 0px;" aria-label="Chorus, 16 bars, starts at bar 41"><b>Chorus</b><span>16 bars</span></button>
+
+<button class="blk" style="flex: 16 1 0px;" aria-label="Verse, 16 bars, starts at bar 57"><b>Verse</b><span>16 bars</span></button>
+
+<button class="blk is-peak" style="flex: 16 1 0px;" aria-label="Chorus, 16 bars, starts at bar 73"><b>Chorus</b><span>16 bars</span></button>
+
+<button class="blk" style="flex: 16 1 0px;" aria-label="Outro, 16 bars, starts at bar 89"><b>Outro</b><span>16 bars</span></button>
+
+</div>
+</div>
+<span class="cp-meta">Click a section to edit it. In the device you can also drag its edges; they snap to 4 bars, hold Alt for single bars.</span>
+</section>
+<section class="cp-tile cp-card" style="gap: 12px;">
+<div class="cp-spread">
+<span class="cp-cap">Editing: Intro · bars 1 to 8</span>
+<button class="cp-btn cp-btn-ghost cp-btn-sm">Reset to detected</button>
+</div>
+<div class="tool-row">
+<span class="tool-label">Name</span>
+<div class="names">
+
+<button class="name-btn" aria-pressed="true">Intro</button>
+
+<button class="name-btn" aria-pressed="false">Verse</button>
+
+<button class="name-btn" aria-pressed="false">Build</button>
+
+<button class="name-btn" aria-pressed="false">Chorus</button>
+
+<button class="name-btn" aria-pressed="false">Drop</button>
+
+<button class="name-btn" aria-pressed="false">Break</button>
+
+<button class="name-btn" aria-pressed="false">Outro</button>
+
+</div>
+</div>
+<div class="tool-row">
+<span class="tool-label">End of section</span>
+<button class="cp-btn cp-btn-sm" aria-label="Move end 4 bars earlier">-4 bars</button>
+<button class="cp-btn cp-btn-sm" aria-label="Move end 1 bar earlier">-1</button>
+<span class="cp-chip">ends at bar 8</span>
+<button class="cp-btn cp-btn-sm" aria-label="Move end 1 bar later">+1</button>
+<button class="cp-btn cp-btn-sm" aria-label="Move end 4 bars later">+4 bars</button>
+</div>
+<div class="tool-row">
+<span class="tool-label">Structure</span>
+<button class="cp-btn cp-btn-sm">Merge with next</button>
+<button class="cp-btn cp-btn-sm">Split in half</button>
+</div>
+</section>
+<div class="cp-row" style="gap: 12px; align-items: stretch;">
+<section class="cp-tile cp-card" style="flex: 1; gap: 6px;">
+<div class="cp-spread"><span class="cp-cap">Tempo</span><span class="cp-tag cp-tag-good">Match</span></div>
+<span class="cp-figure-sm">124<small>BPM, both tracks</small></span>
+</section>
+<section class="cp-tile cp-card" style="flex: 1; gap: 6px;">
+<div class="cp-spread"><span class="cp-cap">Key</span><span class="cp-tag cp-tag-good">Match</span></div>
+<span class="cp-figure-sm">A minor<small>both tracks</small></span>
+</section>
+<section class="cp-tile cp-card" style="flex: 1.4; gap: 6px;">
+<span class="cp-cap">Why this matters</span>
+<span class="cp-body">Mix check compares chorus with chorus and verse with verse, so every chart follows the sections you set here.</span>
+</section>
+</div>
+</main>
+
+<section class="cp-ask-pop" role="dialog" aria-label="Ask Muse">
+<div class="cp-ask-head"><b>Ask Muse</b><span class="cp-ask-ctx">about Sections</span><button class="cp-icon-btn cp-ask-x" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
+
+
+<span class="cp-meta">Ask about this screen, or tell Muse what to change.</span>
+
+<div class="cp-ask-sugs">
+
+<button class="cp-sug">Bars 1 to 16 are all intro</button>
+
+<button class="cp-sug">Call my second chorus a Drop</button>
+
+<button class="cp-sug">Use my Live markers instead</button>
+
+</div>
+<div class="cp-composer"><button class="cp-icon-btn" aria-label="Ask by voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button><input placeholder="Ask, or tell Muse what to change" aria-label="Ask Muse"><button class="cp-icon-btn is-on" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></div>
+</section>
+
+</div>
+</div>
+</body></html>
