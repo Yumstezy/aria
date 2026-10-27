@@ -182,12 +182,11 @@ Pass condition (from `docs/build-steps.md`): `uvicorn` serves `/health`, `pytest
 5. Stop the engine and reload the page. It should say the engine isn't running.
 
 ## Next
+- **Claude:** Step 3, clarity in master mode (resonances, build-ups, harsh spots, with bars). Then Step 4, Aria Ear and track clashes.
 - **Ian:**
   - Confirm the marker naming.
-  - Decide whether Aria may compare loudness and true peak with published streaming targets (for example -14 LUFS) when there's no reference.
-  - Collect test-pack audio: a reference track he owns, a bounce of his own song, and mixes with planted problems.
-- **ML teammate:** follow `ml/README.md`. Ian provides the EDM mixes. Send Claude his GitHub username to invite him.
-- **Claude:** Step 3, sections, once there's a reference track in `test-pack/`.
+  - Say whether the stems in `~/Downloads/BELIEVE IT STEMS` are his to use. If yes, Claude builds test mixes with planted problems from them, kept out of git unless Ian says otherwise.
+- **ML teammate:** follow `ml/README.md`. Ian provides the EDM mixes. Send Claude his GitHub username for an invite.
 
 ## Decisions so far
 - The build started Oct 26.
@@ -195,6 +194,7 @@ Pass condition (from `docs/build-steps.md`): `uvicorn` serves `/health`, `pytest
 - With no reference, Check mix shows raw measurements with no verdict.
 - The repo is public from the start, so `.env` and tester audio are gitignored.
 - Ian has Live 12.4 Suite (Max 9.1.4) and a Meta API key.
+- **Clarity first (Oct 26):** Aria's core job is finding clashes and problem spots, not loudness. There are two modes: master only, and key tracks with Aria Ear devices. Loudness and true peak appear only in the Detailed view, and Muse never builds advice around them. A reference comparison is optional (Step 8).
 - Devices are generated from Live's blank Max Audio Effect by `device/tools/`, not built in the Max editor.
 - The ML track trains on measurements only (about 2 KB per mix). Audio never goes into the repo.
 

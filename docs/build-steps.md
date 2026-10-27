@@ -55,36 +55,51 @@ Owned by the teammate who knows ML, with Ian's help. Follow `docs/ml-plan.md`.
 - Two approaches are tested on the same held-out songs: a trained classifier, and Muse Spark given real rated examples (see `docs/ml-plan.md`).
 - Oct 31 checkpoint: does either beat the simple baselines on held-out songs? If not, it waits until after the hackathon.
 
-## Step 3. Sections (Oct 28)
+## Why the plan changed (Oct 26, after Step 2)
 
-Mix check compares chorus with chorus, so it needs sections first. Confirm this order with Ian before starting.
+Ian's call after the first real Check mixes: loudness and true peak are what every meter already shows. A good EDM mix should be loud, but mostly it has to be **clear**, and mixing is finding space for each sound. So Aria's core job is now finding **clarity problems**: what's too loud, what's clashing, and where. Loudness and peak numbers stay, but only in the Detailed view, and Muse never builds advice around them.
 
-- `POST /sections`: beat grid with librosa, bars from tempo and the first downbeat, then section boundaries snapped to 4 bar phrases. Use chroma repetition, so a louder repeat of the intro stays "intro" and gets flagged as unsure (see contracts, `confidence`).
-- Muse Spark names the sections. It gets the boundaries, the measured energy per section, the producer's Live track and clip names, and the audio if Step 1.2 passed. Names come from the fixed list in contracts.
-- Run it on the reference and on the producer's bounce.
+Aria has two modes, and the producer picks one:
+- **Master mode:** the full mix only, no setup. It finds build-ups, harsh spots and narrow resonances, and says which bars they're in. It can't say which two tracks are fighting.
+- **Key tracks mode:** the producer drops a small **Aria Ear** device on 4 to 6 key tracks or groups (Kick, Bass, Leads, Vocals). It finds which tracks clash, in which band and in which bars.
 
-Pass: on the reference in the test pack, section starts land within 1 bar of the answer key and the names match.
+Both measure only inside the producer's own mix, so neither needs a reference track and the no-invented-data rule holds. A reference comparison is still useful later (Step 8), but it's no longer the core.
 
-## Step 4. Mix check analysis (Oct 29)
+## Step 3. Clarity, master mode (Oct 27)
 
-Per section, for both tracks:
-- band levels for Bass (below 250 Hz), Mids (250 Hz to 2 kHz) and Treble (above 2 kHz), plus the 5 band detail
-- integrated and short-term LUFS
-- width per band (mid/side ratio)
-- chorus lift: the loudness jump into each chorus versus the verse before it
+- The engine turns the recording into a spectrogram (frequency over time) at fine resolution, smoothed to about 1/6 octave.
+- It finds three kinds of problem, each as a measured fact about this mix:
+  - **Resonance:** a narrow peak that stands at least 6 dB above its smoothed neighbourhood and holds for most of the recording. Example: "a narrow peak at 340 Hz stands 9 dB above its neighbours".
+  - **Build-up:** a band that jumps well above its own level elsewhere in the recording when something enters. Example: "200 to 400 Hz rises 5 dB from bar 37, when the pads come in".
+  - **Harsh spots:** short bursts in 2 to 6 kHz that stand well above that band's own average. Example: "hits at 3.5 kHz jump 8 dB above the band on every snare in bars 41 to 44".
+- Each finding has a frequency range, the bars it happens in, its size in dB and how much of the time it's there. The engine ranks them and keeps the top 3.
+- Longer recordings help here. Check mix can record 16 bars as an option.
 
-Then compare yours with the reference section by section. Pick the three biggest problems and rank them.
+Pass: on test mixes built from real stems with a known problem planted (a narrow +9 dB boost at a known frequency, or a buildup that starts at a known bar), the planted problem is ranked first. It must land within 1/6 octave and 1 bar of the truth.
 
-Pass: on each of the 3 test mixes, the planted problem is ranked first and lands in the right section.
+## Step 4. Clarity, key tracks mode: Aria Ear (Oct 28 to 29)
+
+- **`device/Aria Ear.amxd`:** a tiny device for any track or group. It passes audio through untouched and reports its track's name to the main Aria.
+- **Recording together:** when the producer presses Check mix, the main Aria tells every Ear to record its track at the same moment (a shared Max `send`/`receive`), while Aria records Main.
+- **The engine compares every pair of Ear tracks** in narrow bands, moment by moment. It's a clash when both tracks carry real energy in the same band at the same time, within a few dB of each other, so neither stands clear.
+- **Each clash has:** the two track names, the band in Hz, the bars, how much of the time they overlap, and which track is louder there. The engine ranks clashes by how long they last and how loud they are, and keeps the top 3.
+- **The strip and window show** "Bass and Kick clash at 50 to 90 Hz, bars 33 to 48" with the section map.
+- **Without Ears,** Check mix falls back to master mode.
+
+Pass: on a test session built from real stems with a known clash planted (two tracks pushed into the same band in known bars), the clash is ranked first. It must name the right two tracks, the band within 1/6 octave and the bars within 1 bar.
 
 ## Step 5. Muse Spark advice and the Simple view (Oct 30)
 
-- The engine sets each aspect's `status` and numbers from the comparison. `muse.py` writes the words: the status word, the one line, and the Fix first headline and why. The prompt includes the reference style and the section names. The output is validated, and anything off the action menu is dropped.
-- The UI builds the Mix check Simple view from that JSON: the verdict hero, Fix first, six status cards with You vs Pro bars, and "Where it happens". The Detailed view uses the chart helpers.
-- Clicking a section or a finding moves Live's playhead there.
-- Muse Spark is named on screen while it writes.
+- **Muse gets the findings, not loudness.** `muse.py` sends the ranked clarity findings with their numbers, track names and bars. Each piece of advice is:
+  - a plain headline ("Your bass and kick are fighting in the drop")
+  - what it means for a listener ("the low end sounds blurry on big speakers")
+  - one concrete fix: cut one track at a frequency, sidechain one to the other, or move one in the stereo field
+- **The output is validated** as before. It may only cite measured numbers, and any action must come from the action menu.
+- **The Simple view leads with the clarity findings.** Fix first is the biggest clash or problem. "Where it happens" shows the bars. Loudness and true peak sit in the Detailed view as plain numbers.
+- **"Fix it for me"** applies the fix through Muse tool calling, for example an `eq_band` on that track's EQ Eight, with Undo.
+- **Clicking a finding** moves Live's playhead to its first bar.
 
-Pass: on the demo song, Check mix ends on the Simple view with "Your choruses are too bright" first, and clicking Chorus 2 jumps the playhead.
+Pass: on the test session, Check mix ends with the planted clash as Fix first. "Fix it for me" adds the EQ cut on the right track, and Undo removes it.
 
 ## Step 6. Ask Muse drives Live (Oct 31)
 
@@ -105,8 +120,9 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
 
 Pass: 3 of 3 test mixes pass, Step 6 passes, and the decision is written in `docs/status.md`.
 
-## Step 8. Reference breakdown (Nov 1)
+## Step 8. Reference and sections (Nov 1)
 
+- Optional comparison with a reference track. The engine finds sections in both: beat grid with librosa, boundaries snapped to 4 bar phrases, and chroma repetition so a louder repeat of the intro stays "intro".
 - The Reference screen shows both lanes. Sections are editable: rename, move an edge by 1 or 4 bars, merge, split, reset, or use Live markers instead.
 - "Add markers to Live" writes named cue points at each section start.
 - Every Mix check chart reads the edited sections.

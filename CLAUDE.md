@@ -1,6 +1,6 @@
 # Aria
 
-Aria is an AI co-producer for Ableton Live: a Max for Live device on the master channel. It compares the producer's mix with a reference track, section by section, and Muse Spark explains what to fix in plain words. Built for the Meta Global AI Developer Hackathon, Indie track.
+Aria is an AI co-producer for Ableton Live: a Max for Live device on the master channel. It finds clarity problems in the producer's mix, meaning sounds that clash or stick out, and where they happen. Muse Spark explains what to fix in plain words and can apply the fix. Comparing with a reference track is optional. See "Why the plan changed" in `docs/build-steps.md`. Built for the Meta Global AI Developer Hackathon, Indie track.
 
 - Build window: Oct 26 to Nov 4, 2026. Feature freeze end of day Nov 2. Submit by noon PT Nov 4.
 - Only code written from Oct 26 onward goes in the repo. Commit often, with clear messages, so the history shows the build window.
