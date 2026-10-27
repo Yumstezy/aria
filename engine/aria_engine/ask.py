@@ -15,6 +15,22 @@ MAX_TOKENS = 1200
 MAX_NAME = 32
 MAX_WHY = 160
 DEFAULT_Q = 1.0   # a broad bell when the producer doesn't say how wide
+CUT_Q = 0.71      # a plain cut with no bump at the corner
+SHAPES = ["bell", "low_cut", "high_cut", "low_shelf", "high_shelf", "notch"]
+NO_GAIN = ("low_cut", "high_cut", "notch")
+RECENT = 3        # earlier exchanges Muse sees, so "it" and "that" make sense
+
+# One EQ Eight band, shared by eq_band and track_eq
+EQ_PROPS = {
+    "shape": {"type": "string", "enum": SHAPES,
+              "description": "bell (boost or dip around a frequency), low_cut (remove everything below freq_hz, a high-pass), "
+                             "high_cut (remove everything above, a low-pass), low_shelf / high_shelf (lift or lower everything "
+                             "below / above), notch (remove one narrow note). Default bell."},
+    "freq_hz": {"type": "number", "minimum": 20, "maximum": 20000},
+    "gain_db": {"type": "number", "minimum": -6, "maximum": 6, "description": "For bell and shelves only. Negative cuts."},
+    "steep": {"type": "boolean", "description": "Cuts only: true for a hard 48 dB/oct cut, false for a gentle 12 dB/oct one."},
+    "q": {"type": "number", "minimum": 0.3, "maximum": 12, "description": "Width. Leave out for the default; 4 to 8 for a narrow ringing note."},
+}
 
 # The action menu Muse may use today, with the limits the device enforces too.
 TOOLS = [
@@ -26,23 +42,15 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {
             "bar": {"type": "integer", "minimum": 1}, "name": {"type": "string", "maxLength": MAX_NAME}}, "required": ["bar", "name"]}}},
     {"type": "function", "function": {
-        "name": "eq_band", "description": "Set one bell band on the EQ Eight at the end of the Main track (Aria adds one if needed). Negative gain cuts.",
-        "parameters": {"type": "object", "properties": {
-            "freq_hz": {"type": "number", "minimum": 20, "maximum": 20000},
-            "gain_db": {"type": "number", "minimum": -6, "maximum": 6},
-            "q": {"type": "number", "minimum": 0.3, "maximum": 12, "description": "Width. Leave out for a broad 1.0; use 4 to 8 for a narrow ringing note."}},
-            "required": ["freq_hz", "gain_db"]}}},
+        "name": "eq_band", "description": "Set one band on Live's EQ Eight at the end of the Main track (Aria adds one if needed). Changes the whole mix.",
+        "parameters": {"type": "object", "properties": EQ_PROPS, "required": ["freq_hz"]}}},
     {"type": "function", "function": {
         "name": "track_volume", "description": "Turn one of the producer's tracks up or down by a few dB. Use the exact track name from context.tracks.",
         "parameters": {"type": "object", "properties": {
             "track": {"type": "string"}, "change_db": {"type": "number", "minimum": -6, "maximum": 6}}, "required": ["track", "change_db"]}}},
     {"type": "function", "function": {
-        "name": "track_eq", "description": "Set one bell band on an EQ Eight on one of the producer's tracks (Aria adds one if needed). Use the exact track name from context.tracks. Negative gain cuts.",
-        "parameters": {"type": "object", "properties": {
-            "track": {"type": "string"},
-            "freq_hz": {"type": "number", "minimum": 20, "maximum": 20000},
-            "gain_db": {"type": "number", "minimum": -6, "maximum": 6},
-            "q": {"type": "number", "minimum": 0.3, "maximum": 12}}, "required": ["track", "freq_hz", "gain_db"]}}},
+        "name": "track_eq", "description": "Set one band on Live's EQ Eight on one of the producer's tracks (Aria adds one if needed). Use the exact track name from context.tracks.",
+        "parameters": {"type": "object", "properties": {"track": {"type": "string"}, **EQ_PROPS}, "required": ["track", "freq_hz"]}}},
     {"type": "function", "function": {
         "name": "check_mix", "description": "Run a new Mix check: Aria records 16 bars of Main and analyzes them.",
         "parameters": {"type": "object", "properties": {}}}},
@@ -64,8 +72,12 @@ would help, use "suggest" for it instead, and it waits for their yes.
 You get JSON context: the latest Mix check findings (what sticks out, where, by how much), the bars it covered,
 the playhead bar, the tempo, the markers already in the producer's Live set (name and bar), and their tracks (name). When they name a
 part of the song, like "the drop", use a marker with that name; if there isn't one, say so. Use only numbers from the context or from the producer's words. Never invent a number.
-If they ask for a fix from the findings, use the finding's frequency. An EQ cut is a negative gain_db.
-If they don't say how wide, leave q out (a broad 1.0); a ringing note gets a narrow q of 4 to 8.
+If they ask for a fix from the findings, use the finding's frequency.
+EQ uses Live's own EQ Eight, which every producer has. Pick the shape from their words:
+- "cut the low end", "high-pass", "remove the lows below X": shape low_cut at X. "hard", "steep" or "brick wall": steep true.
+- "cut the highs", "low-pass", "darker above X": shape high_cut. "more/less bass" or "more/less air" overall: a shelf.
+- "dip", "boost", "cut X dB at Y", mud, a ringing note: bell (negative gain_db cuts). A ringing note gets a narrow q of 4 to 8.
+A cut with no frequency given: low_cut at 100 Hz for a vocal, 30 Hz for anything else. Say which frequency you used.
 
 eq_band sits on the Main track, so it changes every sound at once. Use it only for things that live in the
 whole mix: a ringing note, harsh hits, or a frequency the producer names. Never use eq_band for a buried sound
@@ -81,7 +93,14 @@ named like Synth, Keys, Pad, Lead or Chords; prefer a group track when there is 
 matches, don't guess: name the tracks you see and ask which one.
 If you can't do what they ask with these tools, say so plainly and don't call a tool.
 
-Always also reply in one or two short sentences: what you did or why you couldn't. No emojis, no em dashes."""
+context.recent holds the last few exchanges (what they asked, what you did). Use it for "it", "that" and "again":
+"it" is usually the track from the last request.
+
+A request can ask for several things ("make it louder and cut the low end"). Call a tool for every part, in this
+answer. Your reply describes only the tool calls you made in this answer: never say you did, will do or are "sorting"
+something you didn't call a tool for. If you can't do a part, say which part and why.
+
+Reply in one or two short sentences. No emojis, no em dashes."""
 
 
 def _numbers(text):
@@ -157,9 +176,17 @@ def check_action(name, args, tracks=()):
             bar, label = int(args["bar"]), str(args["name"]).strip()
             return {"bar": bar, "name": label} if 1 <= bar <= 9999 and 0 < len(label) <= MAX_NAME else None
         if name == "eq_band":
-            f, g, q = float(args["freq_hz"]), float(args["gain_db"]), float(args.get("q", DEFAULT_Q))
-            ok = 20 <= f <= 20000 and -6 <= g <= 6 and 0.3 <= q <= 12 and g != 0
-            return {"freq_hz": round(f), "gain_db": round(g, 1), "q": round(q, 2)} if ok else None
+            shape = args.get("shape") or "bell"
+            if shape not in SHAPES:
+                return None
+            f = float(args["freq_hz"])
+            g = 0.0 if shape in NO_GAIN else float(args["gain_db"])
+            q = float(args.get("q") or (CUT_Q if shape in ("low_cut", "high_cut") else DEFAULT_Q))
+            ok = 20 <= f <= 20000 and -6 <= g <= 6 and 0.3 <= q <= 12 and (shape in NO_GAIN or g != 0)
+            out = {"shape": shape, "freq_hz": round(f), "gain_db": round(g, 1), "q": round(q, 2)}
+            if shape in ("low_cut", "high_cut"):
+                out["steep"] = bool(args.get("steep", False))
+            return out if ok else None
         if name in ("check_mix", "undo"):
             return {}
     except (KeyError, TypeError, ValueError):
@@ -196,6 +223,8 @@ def interpret(message, context, request):
 
     reply = (message.content or "").strip() or None
     if reply:
+        reply = re.sub(r"\s*[\u2014\u2013]\s*", ", ", reply)   # no em or en dashes in anything the producer reads
+    if reply:
         allowed = _allowed(context, request, actions + [{"args": s["args"]} for s in suggestions])
         if any(round(n, 2) not in allowed for n in _numbers(reply)):
             reply = None   # cited a number we don't have; the actions themselves still stand
@@ -211,6 +240,7 @@ PART_NAMES = {"vocals": "vocal", "other": "synths and keys", "drums": "drums and
 def friendly(context):
     """Context for Muse with everyday part names. Numbers are untouched."""
     out = dict(context)
+    out["recent"] = (context.get("recent") or [])[-RECENT:]
     out["findings"] = [{k: PART_NAMES.get(v, v) if k in ("masked", "by") else v for k, v in f.items()}
                        for f in context.get("findings") or []]
     return out

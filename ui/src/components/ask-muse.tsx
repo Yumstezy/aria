@@ -18,10 +18,19 @@ function starters(findings: Finding[], startBar?: number): string[] {
   return out.slice(0, 4);
 }
 
+const SHAPE: Record<string, string> = { low_cut: "Low cut", high_cut: "High cut", low_shelf: "Low shelf", high_shelf: "High shelf", notch: "Notch" };
+
+function describeEq(a: Record<string, number | string>) {
+  const at = hz(Number(a.freq_hz)), shape = String(a.shape ?? "bell");
+  if (shape === "low_cut" || shape === "high_cut" || shape === "notch") return `${SHAPE[shape]} at ${at}`;
+  const gain = `${Number(a.gain_db) > 0 ? "+" : ""}${a.gain_db} dB`;
+  return shape === "bell" ? `${gain} at ${at}` : `${SHAPE[shape]} ${gain} at ${at}`;
+}
+
 function describeSuggestion(s: Suggestion) {
   const a = s.args;
-  if (s.type === "eq_band") return `${Number(a.gain_db) > 0 ? "+" : ""}${a.gain_db} dB at ${hz(Number(a.freq_hz))}`;
-  if (s.type === "track_eq") return `"${a.track}": ${Number(a.gain_db) > 0 ? "+" : ""}${a.gain_db} dB at ${hz(Number(a.freq_hz))}`;
+  if (s.type === "eq_band") return describeEq(a);
+  if (s.type === "track_eq") return `"${a.track}": ${describeEq(a)}`;
   if (s.type === "track_volume") return `"${a.track}" ${Number(a.change_db) > 0 ? "up" : "down"} ${Math.abs(Number(a.change_db))} dB`;
   if (s.type === "add_marker") return `Marker "${a.name}" at bar ${a.bar}`;
   if (s.type === "jump_to") return `Jump to bar ${a.bar}`;

@@ -318,6 +318,11 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
 - **Hard to see the window and Live together.** The window has two sizes: **Full**, and **Side**, a tall panel docked on the right that floats over Live. The button is next to Check again; the choice is remembered. In Side, everything stacks in one column.
 - **Chat history.** The bridge keeps the Ask Muse history in `~/Library/Application Support/Aria/ask-history.json` (last 100), and both the strip and the window show it. Clear asks once more before it deletes.
 - **Ask inline.** The Ask Muse box and the latest two exchanges sit at the bottom of Mix check.
+- **EQ shapes (second session, Oct 27).** Muse only had bell bands, so "a hard low end cut at 500 Hz" failed. Twice it also said it was "sorting the low end" without calling a tool. Now:
+  - EQ tools take a shape: bell, low cut, high cut, low shelf, high shelf, notch. "Hard" or "steep" picks the 48 dB/oct cut.
+  - Muse sees the last 3 exchanges, so "it" works.
+  - The prompt says to call a tool for every part of a request and to describe only what it called. Em dashes are stripped from replies.
+  - Replayed against Muse Spark, Ian's three requests from the log now each call the right tools.
 - **Voice** isn't in yet. Muse Voice Transcribe works (step 1.4). The open question is the microphone: whether `jweb` can record it, or whether it goes through Live's input.
 
 ### The big change: device control

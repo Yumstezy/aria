@@ -25,7 +25,7 @@ def test_asked_actions_come_back_cleaned():
         "Jumped to bar 17 and cut 3 dB at 3417 Hz.",
         call("jump_to", bar=17), call("eq_band", freq_hz=3417, gain_db=-3, q=4))))
     assert out["actions"] == [{"type": "jump_to", "args": {"bar": 17}},
-                              {"type": "eq_band", "args": {"freq_hz": 3417, "gain_db": -3.0, "q": 4.0}}]
+                              {"type": "eq_band", "args": {"shape": "bell", "freq_hz": 3417, "gain_db": -3.0, "q": 4.0}}]
     assert out["reply"].startswith("Jumped") and out["error"] is None
 
 
@@ -63,7 +63,7 @@ def test_empty_request_says_so():
 
 def test_eq_band_without_q_gets_a_broad_default():
     out = ask.ask("cut 3 dB at 3 kHz", CONTEXT, client=client_for(msg("Cut 3 dB at 3 kHz.", call("eq_band", freq_hz=3000, gain_db=-3))))
-    assert out["actions"] == [{"type": "eq_band", "args": {"freq_hz": 3000, "gain_db": -3.0, "q": 1.0}}]
+    assert out["actions"] == [{"type": "eq_band", "args": {"shape": "bell", "freq_hz": 3000, "gain_db": -3.0, "q": 1.0}}]
 
 
 def test_muse_sees_everyday_part_names():
@@ -87,7 +87,7 @@ def test_track_tools_need_a_real_track_name():
         call("track_volume", track="vocal", change_db=2), call("track_eq", track="LEADS", freq_hz=2000, gain_db=-3),
         call("track_volume", track="Vox Male 7", change_db=2))))
     assert out["actions"] == [{"type": "track_volume", "args": {"track": "Vocal", "change_db": 2.0}},
-                              {"type": "track_eq", "args": {"track": "LEADS", "freq_hz": 2000, "gain_db": -3.0, "q": 1.0}}]
+                              {"type": "track_eq", "args": {"track": "LEADS", "shape": "bell", "freq_hz": 2000, "gain_db": -3.0, "q": 1.0}}]
     assert out["dropped"] == 1
 
 
@@ -105,3 +105,21 @@ def test_a_dropped_call_says_why_instead_of_claiming_it_was_done():
     assert out["actions"] == [] and out["reply"] is None
     assert out["problems"] and 'No track called "Vox Male 7"' in out["problems"][0]
     assert out["error"] == out["problems"][0]
+
+
+def test_eq_shapes_cuts_have_no_gain_and_a_flat_corner():
+    hard = ask.check_action("track_eq", {"track": "Vocal", "shape": "low_cut", "freq_hz": 500, "steep": True}, ["Vocal"])
+    assert hard == {"track": "Vocal", "shape": "low_cut", "freq_hz": 500, "gain_db": 0.0, "q": 0.71, "steep": True}
+    assert ask.check_action("eq_band", {"shape": "high_shelf", "freq_hz": 8000, "gain_db": 2})["gain_db"] == 2.0
+    assert ask.check_action("eq_band", {"shape": "high_shelf", "freq_hz": 8000, "gain_db": 0}) is None   # a shelf needs a gain
+    assert ask.check_action("eq_band", {"shape": "tilt", "freq_hz": 800}) is None
+
+
+def test_reply_never_carries_em_dashes():
+    out = ask.interpret(msg("Got it — boosting that vocal.", call("track_volume", track="Vocal", change_db=2)), TRACKS, "louder")
+    assert out["reply"] == "Got it, boosting that vocal."
+
+
+def test_muse_sees_only_the_last_few_exchanges():
+    recent = [{"asked": f"ask {i}", "did": [], "replied": None} for i in range(6)]
+    assert [r["asked"] for r in ask.friendly({"recent": recent})["recent"]] == ["ask 3", "ask 4", "ask 5"]

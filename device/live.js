@@ -270,16 +270,30 @@ function bandParams(eq) {
   return bands;
 }
 
-function eq(freq, gain, q, trackIndex) {
+// EQ Eight's band shapes, matched against the Filter Type menu Live reports (value_items).
+// "steep" picks the 48 dB/oct cut over the 12 dB/oct one.
+const SHAPES = {
+  bell: /^bell/i, notch: /^notch/i, low_shelf: /^low ?shelf/i, high_shelf: /^high ?shelf/i,
+  low_cut: /^low ?cut/i, high_cut: /^high ?cut/i
+};
+// Which free band to use: low shapes take the low bands, high shapes the high ones, the rest the middle
+const BAND_ORDER = {
+  low_cut: ["1", "2", "3", "4"], low_shelf: ["1", "2", "3", "4"],
+  high_cut: ["8", "7", "6", "5"], high_shelf: ["8", "7", "6", "5"],
+  bell: ["4", "5", "3", "6", "2", "7", "1", "8"], notch: ["4", "5", "3", "6", "2", "7", "1", "8"]
+};
+
+function eq(freq, gain, q, trackIndex, shape, steep) {
   const index = trackIndex === undefined ? -1 : trackIndex;
+  const opts = { shape: SHAPES[shape] ? shape : "bell", steep: steep === 1 || steep === "1" || steep === true };
   const track = trackAt(index);
   let device = findEq(track);
-  if (device) { applyEq(device, false, freq, gain, q, index); return; }
+  if (device) { applyEq(device, false, freq, gain, q, index, opts); return; }
   const devs = ids(track.get("devices"));
   // On Main, add it just before Aria so Aria still hears the result; elsewhere at the end
   const at = index < 0 ? Math.max(0, devs.indexOf(Number(new LiveAPI("this_device").id))) : devs.length;
   try { track.call("insert_device", "EQ Eight", at); } catch (e) { post("insert_device failed: " + e + "\n"); }
-  pendingEq = { freq: freq, gain: gain, q: q, index: index };
+  pendingEq = { freq: freq, gain: gain, q: q, index: index, opts: opts };
   outlet(0, "defer", "eq_continue");
 }
 
@@ -291,19 +305,34 @@ function eq_continue() {
     send("eq_done", { ok: false, text: "Aria couldn't add an EQ Eight. Put one on that track, then ask again." });
     return;
   }
-  applyEq(device, true, p.freq, p.gain, p.q, p.index);
+  applyEq(device, true, p.freq, p.gain, p.q, p.index, p.opts);
 }
 
-function applyEq(device, added, freq, gain, q, index) {
+// The Filter Type value for a shape, from the menu Live reports, or -1
+function shapeValue(param, opts) {
+  const items = param.get("value_items");
+  if (!Array.isArray(items)) return -1;
+  const fits = [];
+  items.forEach(function (name, i) { if (SHAPES[opts.shape].test(String(name))) fits.push({ name: String(name), i: i }); });
+  if (!fits.length) return -1;
+  if (fits.length > 1) {   // the two cuts: 48 dB/oct when steep, else 12
+    const want = opts.steep ? /48/ : /12/;
+    const pick = fits.filter(function (f) { return want.test(f.name); })[0];
+    if (pick) return pick.i;
+  }
+  return fits[0].i;
+}
+
+function applyEq(device, added, freq, gain, q, index, opts) {
+  opts = opts || { shape: "bell", steep: false };
   const bands = bandParams(device);
-  // A band that's switched off, inner bands first; the outer ones are usually cuts
-  const order = ["4", "5", "3", "6", "2", "7", "1", "8"];
+  const order = BAND_ORDER[opts.shape];
   let band = null;
   for (let i = 0; i < order.length; i++) {
     const b = bands[order[i]];
     if (b && b["Filter On"] && one(b["Filter On"], "value") === 0) { band = order[i]; break; }
   }
-  if (!band) { send("eq_done", { ok: false, text: "All eight bands on your EQ Eight are in use. Free one, then ask again." }); return; }
+  if (!band) { send("eq_done", { ok: false, text: "The EQ Eight bands for that are all in use. Free one, then ask again." }); return; }
   const b = bands[band];
   const missing = BAND_KNOBS.filter(function (k) { return !b[k]; });
   if (missing.length) {
@@ -316,18 +345,27 @@ function applyEq(device, added, freq, gain, q, index) {
   });
   undoStack.push({ kind: "eq", params: keep, deviceId: added ? Number(device.id) : null, band: band, track: index === undefined ? -1 : index });
 
-  const types = b["Filter Type"].get("value_items");
-  const bell = Array.isArray(types) ? types.indexOf("Bell") : -1;
-  if (bell >= 0) b["Filter Type"].set("value", bell);
+  const type = shapeValue(b["Filter Type"], opts);
+  if (type < 0) {
+    undoStack.pop();
+    send("eq_done", { ok: false, text: "EQ Eight has no " + opts.shape.replace("_", " ") + " shape Aria could find." });
+    return;
+  }
+  b["Filter Type"].set("value", type);
+  const shapeName = String(b["Filter Type"].call("str_for_value", type));
+  // Cuts and notches have no gain; shelves and bells do
+  const hasGain = opts.shape === "bell" || /shelf/.test(opts.shape);
   const shown = {
+    shape: shapeName,
     freq: setByDisplay(b["Frequency"], freq),
-    gain: setByDisplay(b["Gain"], gain),
+    gain: hasGain ? setByDisplay(b["Gain"], gain) : null,
     q: setByDisplay(b["Q"], q)
   };
   b["Filter On"].set("value", 1);
   const where = index === undefined || index < 0 ? "Main" : "\"" + one(trackAt(index), "name") + "\"";
+  const what = hasGain ? shapeName + " " + shown.gain + " at " + shown.freq + ", Q " + shown.q : shapeName + " at " + shown.freq;
   send("eq_done", { ok: true, band: Number(band), added: added, shown: shown,
-                    text: (added ? "Added an EQ Eight on " + where + ". " : "On " + where + ": ") + "band " + band + " " + shown.gain + " at " + shown.freq + ", Q " + shown.q + "." });
+                    text: (added ? "Added an EQ Eight on " + where + ". " : "On " + where + ": ") + "band " + band + " " + what + "." });
 }
 
 // ---------- Undo: reverse the last change Aria made ----------

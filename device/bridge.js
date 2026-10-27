@@ -328,7 +328,7 @@ async function apply(action, tracks = []) {
     case "track_volume":
       return await askLive("volume", "volume_done", trackIndex(a.track), a.change_db);
     case "track_eq":
-      return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track));
+      return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track), a.shape || "bell", a.steep ? 1 : 0);
     case "jump_to":
       toLive("jump", a.bar);
       return { ok: true, text: `Moved the playhead to bar ${a.bar}.` };
@@ -337,7 +337,7 @@ async function apply(action, tracks = []) {
       return { ok: true, text: `Marker "${m.name}" at bar ${m.bar}.` };
     }
     case "eq_band":
-      return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q);
+      return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, -1, a.shape || "bell", a.steep ? 1 : 0);
     case "undo":
       return await askLive("undo", "undo_done");
     case "check_mix":
@@ -359,6 +359,8 @@ async function askContext() {
     playhead_bar: live ? Math.floor(live.song_beat / live.beats_per_bar) + 1 : null,
     markers: live ? live.markers : [],
     tracks: live ? live.tracks : [],
+    // The last few exchanges, so "it" and "that" make sense. What was done, as Aria reported it.
+    recent: askLog.slice(-3).map((x) => ({ asked: x.request, did: x.done.map((d) => d.text), replied: x.reply })),
   };
 }
 

@@ -10,6 +10,14 @@ While typing, the prompt autocompletes tracks, the devices on them, installed pl
 
 Today Ask Muse can do only five things: jump, marker, one EQ Eight band on Main, one EQ Eight band on a track, and track volume. This change lets it work with **any device already on a track** and **add Live's own devices** with a sound in mind.
 
+## Stock devices are the default (Ian, Oct 27)
+
+Not every producer owns FabFilter, Ozone or Valhalla. Every producer has Live's own devices.
+
+- Every tool works with **Live's stock devices first**: EQ Eight, Compressor, Glue Compressor, Hybrid Reverb, Echo and the rest. That's what Aria adds when it adds something.
+- Third-party plugins are used only when the producer names one ("using Pro-Q 4") or it's already on the track.
+- The catalog is per Mac. Muse sees only plugins and presets that this Mac actually has.
+
 ## What Live lets a device do
 
 | | What we know | Status |
