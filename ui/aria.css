@@ -1,0 +1,47 @@
+/* Aria page layout and empty states. Components come from design/ds/components/bundle.css. */
+html, body { margin: 0; height: 100%; }
+a { color: inherit; text-decoration: none; }
+
+.aria-window { height: calc(100vh - 2 * var(--space-6)); min-height: 700px; }
+.aria-window .cp-main { overflow-y: auto; }
+
+/* An empty data spot: says what will appear and how to get it. Never a sample number. */
+.aria-empty {
+  display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  min-height: 84px; padding: var(--space-4); box-sizing: border-box;
+  border: 1.5px dashed var(--track); border-radius: 14px; background: var(--well);
+  color: var(--ink-muted); font-size: 13px; line-height: 18px;
+}
+.aria-empty b { color: var(--ink); font-weight: 600; }
+.cp-hero .aria-empty { border-color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.10); color: var(--on-tile-muted); }
+.cp-hero .aria-empty b { color: var(--on-tile); }
+
+.aria-icon {
+  width: 34px; height: 34px; border-radius: 12px; background: var(--well);
+  display: grid; place-items: center; color: var(--action);
+}
+
+.aria-notice { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+
+/* First-run checklist on the blue hero tile */
+.aria-start-title { margin: 0; max-width: 440px; font-size: 28px; line-height: 32px; font-weight: 600; letter-spacing: -0.02em; }
+.aria-start .cp-steps { margin: 0; padding: 0; list-style: none; gap: 12px; }
+.aria-start .cp-step { color: var(--on-tile-muted); font-size: 14px; }
+.aria-start .cp-step i { border-color: rgba(255,255,255,0.45); }
+.aria-start .cp-step.is-done { color: var(--on-tile); }
+.aria-start .cp-step.is-done i { background: var(--good-glow); }
+.aria-start .cp-step.is-done i::after { border-color: var(--tile-core); }
+
+.aria-drop {
+  font: inherit; color: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; height: 112px; border: 2px dashed var(--track); border-radius: 16px; background: var(--well); cursor: pointer;
+}
+.aria-drop:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* Device strip: the jweb view is exactly Live's 169px device height. */
+.aria-strip-stage { min-height: 169px; height: 169px; padding: 0; }
+.aria-strip-stage .cp-strip { border-radius: var(--radius-lg); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

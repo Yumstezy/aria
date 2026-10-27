@@ -2,7 +2,21 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
-## Now: Step 0, repo and tooling (Oct 26)
+## Done: Step 0, repo and tooling (Oct 26)
+
+Passed on Ian's Mac:
+- `./install.sh` set up `engine/.venv` with Python 3.11.14 and started the engine.
+- `/health` answers on 127.0.0.1:8765.
+- `pytest`: 4 passed.
+- `ui/index.html` opens in Chrome and shows "Engine connected" live.
+
+One change from the plan below: the first-run Home is simpler than the screenshot. Six tiles all saying "nothing yet" was hard to read. It now shows two tiles:
+- **A "Get started" checklist.** The first item ticks when the engine is really running.
+- **The reference drop zone.**
+
+The results tiles (section map, Fix first, tool status) come back once there's real data for them.
+
+### Original Step 0 plan
 
 Pass condition (from `docs/build-steps.md`): `uvicorn` serves `/health`, `pytest` runs, and `ui/index.html` opens in Chrome and looks like the Home screenshot, with empty states where data will go.
 

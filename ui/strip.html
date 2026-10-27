@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aria strip</title>
+<link rel="stylesheet" href="../design/ds/tokens.css">
+<link rel="stylesheet" href="../design/ds/components/bundle.css">
+<link rel="stylesheet" href="aria.css">
+<script src="../design/ds/components/bundle.js"></script>
+<script src="app.js"></script>
+</head>
+<body>
+<div class="cp-stage aria-strip-stage" data-theme="sky">
+<div class="cp-glass cp-strip">
+
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <div class="cp-mark">
+      <svg viewBox="0 0 26 26" aria-hidden="true" style="width: 22px; height: 22px;"><rect width="26" height="26" rx="8" fill="var(--action)"></rect><path d="M8 10v6M11.5 7v12M15 9v8M18.5 11v4" stroke="#fff" stroke-width="2" stroke-linecap="round"></path></svg>
+      <b style="font-size: 13px;">Aria</b>
+    </div>
+    <button class="cp-btn cp-btn-primary cp-btn-block" data-action="check-mix">Check mix</button>
+    <button class="cp-voice" data-action="ask" data-label="Ask Muse" style="height: 32px; padding: 0 10px 0 8px; align-self: flex-start;" aria-label="Ask Muse"><span class="cp-voice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></span><span style="font-size: 12px; font-weight: 600; margin-left: 2px;">Ask</span></button>
+    <a class="cp-meta cp-push" href="#" data-action="open-window">Open window</a>
+  </div>
+
+  <section class="cp-tile cp-card" style="gap: 6px;">
+    <div class="cp-spread"><span class="cp-cap">Vs pro track</span><span class="cp-tag" data-engine>Checking engine</span></div>
+    <div class="aria-empty" style="min-height: 0; flex: 1; padding: 10px 12px;">
+      <b>Nothing measured yet.</b>
+      <span data-notice role="status">Press Check mix while your song plays.</span>
+    </div>
+  </section>
+
+  <section class="cp-tile cp-card" style="gap: 4px;">
+    <span class="cp-cap">Chorus lift</span>
+    <span class="cp-meta cp-push">Needs a reference and a Mix check.</span>
+  </section>
+
+</div>
+</div>
+</body>
+</html>
