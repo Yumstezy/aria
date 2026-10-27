@@ -1,0 +1,3 @@
+# ML track only (docs/ml-plan.md). Install into the engine venv: engine/.venv/bin/pip install -r ml/requirements.txt
+scikit-learn==1.6.1
+joblib==1.4.2
