@@ -321,7 +321,8 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
 - **Voice** isn't in yet. Muse Voice Transcribe works (step 1.4). The open question is the microphone: whether `jweb` can record it, or whether it goes through Live's input.
 
 ### The big change: device control
-See `docs/device-control.md`. "Cut the mids using Pro-Q 4", "raise it by .4 dB", "add some spacey reverb", with autocomplete of tracks, devices and plugins. Spike on Oct 28.
+- **Presets (Oct 27):** Ian's DØWD racks are renamed into `User Library/Aria Presets/`. A catalog of 6,717 presets (DØWD, FabFilter, Valhalla, Ozone) is built by `engine/aria_engine/presets.py`. A Remote Script is the likely way to load racks and plugins (spike S6).
+- See `docs/device-control.md`. "Cut the mids using Pro-Q 4", "raise it by .4 dB", "add some spacey reverb", with autocomplete of tracks, devices and plugins. Spike on Oct 28.
 
 ## Next
 - **Ian:**

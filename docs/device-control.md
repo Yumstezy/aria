@@ -21,7 +21,26 @@ Today Ask Muse can do only five things: jump, marker, one EQ Eight band on Main,
 | Add a third-party plugin | `insert_device` likely accepts only Live's own devices. Max for Live has no access to Live's browser | **Spike S2** (expect no) |
 | Load a preset | No browser access, so Aria can't load a `.adv` file directly. A `.adv` file is gzipped XML, so Aria can read the values and set them on a fresh device | **Spike S4** |
 
-If S2 fails, the answer to "use Pro-Q 4" when it isn't on the track is: *"Drop Pro-Q 4 on LEADS and ask again. I'll set it up."* Once it's on the track, Aria controls it like any other device.
+**Racks and plugins need Live's browser.** Max for Live can't reach the browser. A Live **Remote Script**, the small Python control-surface script Live loads at startup, can: `browser.load_item()` puts a rack, a preset or a third-party plugin on the selected track, the same as a double-click. The bridge would talk to it over a local socket. The producer turns it on once, in Live's Settings > Link, Tempo & MIDI > Control Surface: "Aria". This is spike **S6**, and it decides how far `add_device` goes.
+
+If S2 and S6 both fail, the answer to "use Pro-Q 4" when it isn't on the track is: *"Drop Pro-Q 4 on LEADS and ask again. I'll set it up."* Once it's on the track, Aria controls it like any other device.
+
+## Presets on Ian's Mac (found Oct 27)
+
+`engine/aria_engine/presets.py` lists them all in `~/Library/Application Support/Aria/presets/catalog.json` (`python -m aria_engine.presets`). That's 6,717 presets, all read from plain files:
+
+| Source | Count | Format | What Aria can read |
+|---|---|---|---|
+| DØWD racks and presets (Ian's pack) | 45 | `.adg` / `.adv`, gzipped XML | Devices inside, macro names, values |
+| FabFilter | 4,553 | `.ffp`. Pro-Q 4 is text with named knobs and Tags. Older plugins are binary: values in order, no names | Names, folders, tags, values |
+| Valhalla | 1,440 | `.vpreset`, XML, every knob 0 to 1 (Live's scale for plugin parameters) | Names, folders, values |
+| Ozone 12 | 679 | `.xml`, named parameters with real values, plus a comment | Names, comments, values |
+
+- **DØWD pack:** `device/tools/import_presets.py` copied it into `~/Music/Ableton/User Library/Aria Presets/` with clearer names, so they show up in Live's browser like that. Each one has a role (kick, bass, send, master and so on) and words for its sound, for example "Dreamy Space Reverb": spacey, airy, lush. The pack's own files are untouched. The name map lives in `~/Library/Application Support/Aria/presets/`, never in the repo, because it's a third-party pack.
+- **Applying a plugin preset:** with the plugin already on the track (or loaded by S6), Aria sets each knob through the Live API.
+  - Valhalla stores Live's own 0 to 1 scale, so names match and values go straight in.
+  - FabFilter and Ozone store real units. Aria sets those by display text (`setByDisplay`, as for EQ Eight).
+  - Binary FabFilter presets have no knob names, only the order. Spike **S7** checks whether that order matches Live's parameter list.
 
 ## What changes
 
@@ -44,6 +63,7 @@ Native devices `add_device` may add at first: EQ Eight, Compressor, Glue Compres
 Every value still comes from the producer's words, the context or a preset, never invented (CLAUDE.md). The engine validates each call against the parameter list it was sent.
 
 ### 3. Presets
+- **The catalog** (above) is what Muse picks from: name, plugin, folder, role and words. Muse gets only the few that match the request and the track, never all 6,717.
 - **Aria presets** are small JSON files in `device/presets/`, for example `hybrid-reverb-spacey.json`: `{device, name, words: ["spacey", "big", "airy"], params: {"Decay": "6.0 s", "Dry/Wet": "25 %"}}`. Values are display strings, set through `setByDisplay`, so they come out exact.
 - **The producer's own `.adv` presets:** Aria reads them from Live's User Library and converts them to the same form. Spike S4 checks that the names in the file match the parameter names the Live API shows.
 - Muse picks a preset by its `words`. If none fits, it says so and adds the plain device.
@@ -60,6 +80,8 @@ Every value still comes from the producer's words, the context or a preset, neve
 - **S3:** Set a Pro-Q 4 band gain to "-2.5 dB" with `setByDisplay`. Check it lands exactly.
 - **S4:** Read a `.adv` preset Ian sends, and set its values on a fresh native device. Compare by ear and by the knobs.
 - **S5:** Hybrid Reverb and Echo parameter names in Live 12.4, for the first Aria presets.
+- **S6:** A minimal Remote Script that loads "Dreamy Space Reverb" from the User Library, and then "FabFilter Pro-Q 4", onto the selected track, on a command from the bridge.
+- **S7:** Apply a Valhalla preset, a Pro-Q 4 text preset and a Pro-C 2 binary preset to the plugin on a track. Compare the plugin's own display with what the preset should show.
 
 Pass: in Live, these three work in a row, each with Undo:
 1. "cut 2 dB around 400 Hz on LEADS using Pro-Q 4" (Pro-Q 4 already on LEADS)
@@ -74,8 +96,8 @@ Pass: in Live, these three work in a row, each with Undo:
 5. Polish and the demo take (Nov 1). Feature freeze Nov 2.
 
 ## From Ian
-- **Presets:** a few `.adv` files for Live's own devices, each with two or three words for its sound. For example Hybrid Reverb "spacey, airy", Echo "dub throw", Saturator "warm", Glue Compressor "glue the drums". Five to ten is plenty. They go in `device/presets/` only if they're yours to share; otherwise they stay on your Mac.
-- **Plugins you reach for most** (Pro-Q 4, and which reverb and compressor), so the spike tests the ones in the demo.
+- **Done (Oct 27):** the DØWD racks, and FabFilter, Ozone and Valhalla as the plugins to support first.
+- **Later:** more of your own custom presets. Drop them in a folder and run `device/tools/import_presets.py` with a name map, or ask Claude to name them.
 
 ## Why it matters for judging (`docs/rubric.md`)
 - **Use of Meta AI (25%):** Muse Spark reads the set, picks the device and parameters, and sets real values with Undo. That is much deeper tool use than five fixed actions.
