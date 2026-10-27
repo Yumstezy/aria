@@ -4,6 +4,9 @@ uvicorn==0.34.0
 # Lets uvicorn read engine/.env (--env-file)
 python-dotenv==1.0.1
 
+# Muse Spark client. Meta's Model API is OpenAI compatible.
+openai==1.82.0
+
 # Tests
 pytest==8.3.4
 httpx==0.28.1

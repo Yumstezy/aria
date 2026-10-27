@@ -2,6 +2,35 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
+## In progress: Step 1, Day 1 tests (Oct 26)
+
+Run with `engine/spikes/muse_spike.py`. The measurements in it are a test fixture and the audio is a generated test tone, so neither reaches the app.
+
+**1.1 Muse Spark. Yes. Use `muse-spark-1.3` with `reasoning_effort: "minimal"`.**
+
+| Model | Reasoning | Advice JSON | Time | Output tokens |
+|---|---|---|---|---|
+| muse-spark-1.1 | default | valid | 6.0 s | 1781 |
+| muse-spark-1.1 | minimal | valid | 3.6 s | 808 |
+| muse-spark-1.3 | default | **empty**, spent all 2000 tokens thinking | 8.0 s | 2000 |
+| muse-spark-1.3 | minimal | valid | **2.5 s** | 540 |
+
+- Both models followed the no-reference rule. They only stated measured values and flagged the true peak above 0 dBTP. Neither called anything too bright or too quiet.
+- `response_format: {"type": "json_object"}` works.
+- **Always set `reasoning_effort`.** With default reasoning, 1.3 can use up the whole token budget and return nothing. The engine must also treat an empty reply as "no advice", with the reason.
+- The key must be created on dev.meta.ai under API keys. The first key Ian made was rejected (401); a fresh one worked.
+
+**1.2 Muse Spark hears audio. No, not through the API today.**
+- We tried `input_audio`, `audio_url` and `file` on Chat Completions, and `input_audio` and `input_file` on Responses, with both models.
+- The request is accepted, but the audio is dropped silently. The prompt stays at 60 tokens and the model says no audio was attached.
+- So the engine sends numbers only.
+- **Idea to test later:** images do work, so Muse could look at a spectrogram picture drawn from the real audio.
+
+**1.3 Tool calling. Yes, on both models.**
+- "Make bars 1 to 16 the intro" became `set_section({"start_bar":1,"bars":16,"name":"Intro"})` in 0.8 s (1.1) and 1.2 s (1.3).
+
+**Still to do:** 1.4 Voice Transcribe endpoint, and 1.5 to 1.8 inside Live and Max (transport, markers, clip paths, groove output).
+
 ## Done: Step 0, repo and tooling (Oct 26)
 
 Passed on Ian's Mac:
