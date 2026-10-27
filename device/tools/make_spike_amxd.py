@@ -1,59 +1,16 @@
-"""Build device/spike/Aria Spike.amxd without opening the Max editor.
-
-A .amxd is a small binary header plus the patch as JSON. We start from the blank
-Max Audio Effect that ships with Live, so every setting matches what Live expects,
-then replace its boxes and wires with the Step 1 test boxes.
+"""Build device/spike/Aria Spike.amxd, the build step 1 test device.
 
 Run:  python3.11 device/tools/make_spike_amxd.py
 """
-import json
-import struct
-import sys
 from pathlib import Path
 
-TEMPLATE = Path("/Applications/Ableton Live 12 Suite.app/Contents/App-Resources/Misc/Max Devices/Max Audio Effect.amxd")
+from amxd import msg, obj, template_patch, wire, write_amxd
+
 OUT = Path(__file__).resolve().parent.parent / "spike" / "Aria Spike.amxd"
-FONT = {"fontname": "Arial Bold", "fontsize": 10.0}
-
-
-def read_amxd(path):
-    data = path.read_bytes()
-    chunks, i = {}, 0
-    assert data[:4] == b"ampf", "not a Max for Live device"
-    chunks["type"] = data[8:12]
-    i = 12
-    while i < len(data):
-        tag, n = data[i:i + 4], struct.unpack("<I", data[i + 4:i + 8])[0]
-        chunks[tag] = data[i + 8:i + 8 + n]
-        i += 8 + n
-    return chunks
-
-
-def write_amxd(path, device_type, meta, patch):
-    body = json.dumps(patch, indent="\t").encode() + b"\n\x00"
-    out = b"ampf" + struct.pack("<I", 4) + device_type
-    out += b"meta" + struct.pack("<I", len(meta)) + meta
-    out += b"ptch" + struct.pack("<I", len(body)) + body
-    path.write_bytes(out)
-
-
-def obj(id_, text, rect, inlets, outlets, outlettype=None):
-    return {"box": {**FONT, "id": id_, "maxclass": "newobj", "text": text, "patching_rect": rect,
-                    "numinlets": inlets, "numoutlets": outlets, "outlettype": outlettype or [""] * outlets}}
-
-
-def msg(id_, text, rect):
-    return {"box": {**FONT, "id": id_, "maxclass": "message", "text": text, "patching_rect": rect,
-                    "numinlets": 2, "numoutlets": 1, "outlettype": [""]}}
-
-
-def wire(src, dst, outlet=0, inlet=0):
-    return {"patchline": {"source": [src, outlet], "destination": [dst, inlet]}}
 
 
 def build():
-    chunks = read_amxd(TEMPLATE)
-    patch = json.loads(chunks[b"ptch"].rstrip(b"\x00").decode())
+    chunks, patch = template_patch()
 
     tests = [("health", 46), ("state", 40), ("jump 17", 50), ("marker 9 Verse", 86), ("clippath", 52), ("makeclip", 56)]
     boxes, x = [], 8.0
@@ -80,11 +37,8 @@ def build():
     patch["patcher"]["boxes"] = boxes
     patch["patcher"]["lines"] = lines
     patch["patcher"]["devicewidth"] = 570.0
-    write_amxd(OUT, chunks["type"], chunks[b"meta"], patch)
-    return OUT
+    return write_amxd(OUT, chunks, patch)
 
 
 if __name__ == "__main__":
-    if not TEMPLATE.exists():
-        sys.exit(f"Live's blank Max Audio Effect not found at {TEMPLATE}")
     print(f"Wrote {build()}")

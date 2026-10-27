@@ -1,4 +1,6 @@
 import os
+import threading
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -12,6 +14,25 @@ AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 MAX_FILE_BYTES = 500 * 1024 * 1024
 
 app = FastAPI(title="Aria engine", version=__version__)
+
+
+def exit_with_parent(pid, interval=2.0):
+    """When the Aria device starts the engine, it passes its process id.
+    If that process disappears (Live quit or crashed), stop the engine too."""
+    def watch():
+        while True:
+            time.sleep(interval)
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                os._exit(0)
+            except PermissionError:
+                pass  # still running, owned by someone else
+    threading.Thread(target=watch, daemon=True, name="exit-with-parent").start()
+
+
+if os.environ.get("ARIA_PARENT_PID", "").isdigit():
+    exit_with_parent(int(os.environ["ARIA_PARENT_PID"]))
 
 # Only the Aria UI may call the engine: pages opened from disk (file:// sends
 # Origin "null", and so does jweb) and pages served from this machine.

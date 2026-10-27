@@ -12,7 +12,7 @@
 </head>
 <body>
 <div class="cp-stage aria-strip-stage" data-theme="sky">
-<div class="cp-glass cp-strip">
+<div class="cp-glass cp-strip aria-strip">
 
   <div style="display: flex; flex-direction: column; gap: 8px;">
     <div class="cp-mark">
@@ -21,20 +21,44 @@
     </div>
     <button class="cp-btn cp-btn-primary cp-btn-block" data-action="check-mix">Check mix</button>
     <button class="cp-voice" data-action="ask" data-label="Ask Muse" style="height: 32px; padding: 0 10px 0 8px; align-self: flex-start;" aria-label="Ask Muse"><span class="cp-voice-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="12" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></span><span style="font-size: 12px; font-weight: 600; margin-left: 2px;">Ask</span></button>
-    <a class="cp-meta cp-push" href="#" data-action="open-window">Open window</a>
+    <span class="cp-tag cp-push" data-engine style="align-self: flex-start;">Starting Aria</span>
   </div>
 
   <section class="cp-tile cp-card" style="gap: 6px;">
-    <div class="cp-spread"><span class="cp-cap">Vs pro track</span><span class="cp-tag" data-engine>Checking engine</span></div>
-    <div class="aria-empty" style="min-height: 0; flex: 1; padding: 10px 12px;">
+    <div data-state="idle" class="aria-empty" style="min-height: 0; flex: 1; padding: 10px 12px;">
       <b>Nothing measured yet.</b>
-      <span data-notice role="status">Press Check mix while your song plays.</span>
+      <span data-notice role="status">Press Check mix. Aria listens to 8 bars of your song.</span>
+    </div>
+
+    <div data-state="progress" hidden class="aria-progress">
+      <span class="cp-cap">Mix check</span>
+      <b data-progress-text role="status">Getting ready</b>
+      <div class="aria-bar"><i data-progress-bar></i></div>
+      <span class="cp-meta cp-mono" data-progress-detail></span>
+    </div>
+
+    <div data-state="result" hidden class="aria-result">
+      <div class="cp-spread"><span class="cp-cap">Your mix</span><span class="cp-meta cp-mono" data-result-where></span></div>
+      <dl class="aria-measures">
+        <div><dt>Loudness</dt><dd data-measure="loudness"></dd></div>
+        <div><dt>True peak</dt><dd data-measure="peak"></dd></div>
+        <div><dt>Width B·M·T</dt><dd data-measure="width"></dd></div>
+        <div><dt>Bass</dt><dd data-measure="bass"></dd></div>
+        <div><dt>Mids</dt><dd data-measure="mids"></dd></div>
+        <div><dt>Treble</dt><dd data-measure="treble"></dd></div>
+      </dl>
+    </div>
+
+    <div data-state="error" hidden class="aria-empty aria-error" style="min-height: 0; flex: 1; padding: 10px 12px;">
+      <b>Mix check stopped</b>
+      <span data-error role="alert"></span>
     </div>
   </section>
 
-  <section class="cp-tile cp-card" style="gap: 4px;">
-    <span class="cp-cap">Chorus lift</span>
-    <span class="cp-meta cp-push">Needs a reference and a Mix check.</span>
+  <section class="cp-tile cp-card aria-advice-tile" style="gap: 6px;">
+    <span class="cp-cap" data-advice-title>Advice by Muse Spark</span>
+    <p class="cp-body aria-advice" data-advice>Muse Spark explains your numbers after a Mix check.</p>
+    <button class="cp-btn cp-btn-ghost cp-btn-sm cp-push" data-action="mark" hidden style="align-self: flex-start; padding: 0;">Mark it in Live</button>
   </section>
 
 </div>

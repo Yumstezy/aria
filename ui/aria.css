@@ -41,7 +41,27 @@ a { color: inherit; text-decoration: none; }
 /* Device strip: the jweb view is exactly Live's 169px device height. */
 .aria-strip-stage { min-height: 169px; height: 169px; padding: 0; }
 .aria-strip-stage .cp-strip { border-radius: var(--radius-lg); }
+.aria-strip { grid-template-columns: 140px minmax(0, 1fr) 236px; }
+.aria-strip [data-engine] { white-space: nowrap; font-size: 10.5px; padding: 0 8px; }
+.aria-strip .cp-tile { min-height: 0; }
+.aria-strip [hidden] { display: none !important; }
+
+.aria-progress, .aria-result { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+.aria-progress b { font-size: 14px; line-height: 18px; font-weight: 600; }
+.aria-bar { height: 6px; border-radius: var(--radius-pill); background: var(--well); overflow: hidden; }
+.aria-bar i { display: block; height: 100%; width: 0; background: var(--action); border-radius: inherit; transition: width 250ms linear; }
+
+.aria-measures { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 12px; }
+.aria-measures div { min-width: 0; }
+.aria-measures dt { font-size: 10.5px; line-height: 14px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+.aria-measures dd { margin: 0; font: 500 15px/20px var(--font-mono); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aria-measures dd.is-missing { font: 500 12px/20px var(--font-sans); color: var(--ink-faint); }
+
+.aria-advice { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink); }
+.aria-advice.is-missing { color: var(--ink-muted); }
+.aria-error span { color: var(--hot); }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+.aria-measures dd[data-measure="width"]:not(.is-missing) { font-size: 13px; letter-spacing: -0.02em; }
