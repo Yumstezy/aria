@@ -4,6 +4,10 @@
 import { useRef, useState, type PointerEvent } from "react";
 import { motion } from "motion/react";
 import { describe, soundName, type Finding, type Spectra } from "@/lib/aria";
+import { ChartTooltip } from "@/components/ui/chart-tooltip";
+
+// Short names for the tooltip, so it stays small
+const SHORT: Record<string, string> = { vocals: "Vocal", other: "Synths", bass: "Bass", drums: "Drums", mix: "Mix" };
 
 const W = 640, H = 270, PAD_B = 24, PAD_T = 26, LO = 30, HI = 16000, FLOOR_DB = -60;
 const ORDER = ["drums", "bass", "other", "vocals"];   // drawn back to front
@@ -89,7 +93,8 @@ export function Waves({ spectra, findings, split, onZone }: {
         {waves.map((wv, i) => (
           <motion.g key={wv.n} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: "easeOut", delay: i * 0.06 }}>
             <path d={`${wv.line}L${W},${H - PAD_B}L0,${H - PAD_B}Z`} fill={`var(--part-${wv.n})`} opacity={wv.quiet ? 0.06 : 0.2} />
-            <path d={wv.line} fill="none" stroke={`var(--part-${wv.n})`} strokeWidth={2} opacity={wv.quiet ? 0.35 : 1} />
+            <motion.path d={wv.line} fill="none" stroke={`var(--part-${wv.n})`} strokeWidth={2} opacity={wv.quiet ? 0.35 : 1}
+                         initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, ease: [0.3, 0.8, 0.2, 1], delay: 0.2 + i * 0.06 }} />
             <text x={wv.label.x} y={wv.label.y} textAnchor="middle" fill={`var(--part-${wv.n})`} opacity={wv.quiet ? 0.5 : 1} className="text-[11.5px] font-semibold">{soundName(wv.n)}</text>
           </motion.g>
         ))}
@@ -97,19 +102,12 @@ export function Waves({ spectra, findings, split, onZone }: {
       </svg>
 
       {hover && (
-        <div className="pointer-events-none fixed z-50 min-w-[150px] rounded-[14px] border border-white/12 bg-[rgba(14,14,16,0.92)] px-3 py-2 text-xs text-white shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] backdrop-blur-xl"
-             style={{ left: hover.left + 16, top: hover.top - 16, transform: "translateY(-100%)" }}>
-          <div className="mb-1 font-medium text-white/60">{spectra.hz[hover.i] >= 1000 ? `${(spectra.hz[hover.i] / 1000).toFixed(1)} kHz` : `${spectra.hz[hover.i]} Hz`}</div>
-          {names.slice().reverse().map((n) => {
+        <ChartTooltip x={hover.left} y={hover.top}
+          title={spectra.hz[hover.i] >= 1000 ? `${(spectra.hz[hover.i] / 1000).toFixed(1)} kHz` : `${spectra.hz[hover.i]} Hz`}
+          rows={names.slice().reverse().map((n) => {
             const v = (split ? spectra.parts[n]! : spectra.mix)[hover.i];
-            return (
-              <div key={n} className="flex items-center justify-between gap-3.5 leading-[19px]">
-                <span className="inline-flex items-center gap-1.5 text-white/60"><i className="size-[7px] rounded-full" style={{ background: `var(--part-${n})` }} />{soundName(n)}</span>
-                <b className="font-mono font-medium">{v <= FLOOR_DB ? "silent" : `${v.toFixed(0)} dB`}</b>
-              </div>
-            );
-          })}
-        </div>
+            return { label: SHORT[n] ?? soundName(n), value: v <= FLOOR_DB ? "silent" : `${v.toFixed(0)} dB`, color: getComputedStyle(svgRef.current!).getPropertyValue(`--part-${n}`) };
+          })} />
       )}
 
       <div className="flex flex-wrap gap-3.5 text-xs text-ink-muted">

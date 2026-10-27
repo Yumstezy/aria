@@ -8,6 +8,8 @@ import { Button, Cap, Mark } from "@/components/brand";
 import { Waves } from "@/components/waves";
 import { GradientCard } from "@/components/ui/gradient-card";
 import { TickGauge } from "@/components/tick-gauge";
+import { CountUp } from "@/components/count-up";
+import { Segmented } from "@/components/ui/segmented";
 import { problemsOf, type Problem } from "@/lib/problems";
 import { barsLabel, checkMix, describe, jumpTo, notice, soundName, useAria, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
@@ -47,14 +49,7 @@ export function AriaWindow() {
                 </span>
               )}
               {view === "mixcheck" && result && (
-                <div className="flex gap-0.5 rounded-[14px] border border-white/12 bg-white/8 p-[3px]" role="group" aria-label="View">
-                  {(["Simple", "Detailed"] as const).map((label) => {
-                    const on = (label === "Detailed") === detailed;
-                    return <button key={label} aria-pressed={on} onClick={() => setDetailed(label === "Detailed")}
-                                   className={cn("h-7 min-w-11 rounded-[11px] px-3 text-[12.5px] font-semibold transition-colors duration-200",
-                                                 on ? "bg-white text-[#0b0b0c]" : "text-ink-muted")}>{label}</button>;
-                  })}
-                </div>
+                <Segmented label="View" items={["Simple", "Detailed"] as const} value={detailed ? "Detailed" : "Simple"} onChange={(v) => setDetailed(v === "Detailed")} />
               )}
               <Button variant="primary" disabled={!!progress} onClick={checkMix}>{result ? "Check again" : "Check mix"}</Button>
             </div>
@@ -178,7 +173,7 @@ function Simple({ r, open, setOpen }: { r: Result; open: number; setOpen: (i: nu
         <LiquidGlass as="section" radius="28px" className="flex h-full min-h-[376px] flex-col px-6 py-5">
           <Cap>This check</Cap>
           <div className="mt-4 flex items-end gap-3">
-            <span className="text-[64px] font-extralight leading-none tracking-[-0.04em] tabular-nums">{list.length}</span>
+            <span className="text-[64px] font-extralight leading-none tracking-[-0.04em] tabular-nums"><CountUp value={list.length} /></span>
             <span className="pb-2 text-base font-medium text-ink-muted">{list.length === 0 ? "things stick out" : list.length === 1 ? "thing to fix" : "things to fix"}</span>
           </div>
           <p className="m-0 mt-3 line-clamp-3 text-[13px] leading-[18px] text-ink-muted">{r.advice?.summary ?? r.advice_error}</p>
@@ -223,7 +218,9 @@ function ProblemTile({ p, selected, onSelect }: { p: Problem; selected: boolean;
         <span className="whitespace-nowrap rounded-full bg-black/40 px-2 font-mono text-[11px] leading-[22px] text-white">{p.where}</span>
       </div>
       <div className="mt-3 flex items-baseline gap-1.5">
-        <span className="text-[40px] font-extralight leading-none tracking-[-0.04em] tabular-nums">{p.amount.value}</span>
+        <span className="text-[40px] font-extralight leading-none tracking-[-0.04em] tabular-nums">
+          {p.amount.value.startsWith("+") && "+"}<CountUp value={Math.abs(parseFloat(p.amount.value))} decimals={p.amount.value.includes(".") ? 1 : 0} />
+        </span>
         <span className="text-xs font-medium text-ink-faint">{p.amount.unit}</span>
       </div>
       <p className="m-0 mt-2 line-clamp-1 text-[12.5px] text-ink-muted">{p.short}</p>
