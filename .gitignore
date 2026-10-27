@@ -18,3 +18,6 @@ test-pack/out/
 .DS_Store
 .vscode/
 .idea/
+
+# UI build tooling (ui/dist is committed so running Aria never needs Node)
+ui/node_modules/

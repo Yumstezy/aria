@@ -1,0 +1,31 @@
+{
+  "name": "aria-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Aria's strip and window. Built to single HTML files that Max's jweb loads inside Live.",
+  "scripts": {
+    "dev:strip": "vite --mode strip",
+    "dev:window": "vite --mode window",
+    "build": "tsc --noEmit && vite build --mode strip && vite build --mode window",
+    "watch": "vite build --mode window --watch"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.61.0",
+    "motion": "^14.6.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vite-plugin-singlefile": "^2.3.4"
+  }
+}

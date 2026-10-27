@@ -20,8 +20,9 @@ const Max = require("max-api");
 const ENGINE = { host: "127.0.0.1", port: 8765 };
 const REPO = path.resolve(__dirname, "..");
 const ENGINE_DIR = path.join(REPO, "engine");
-const STRIP_URL = "file://" + encodeURI(path.join(REPO, "ui", "strip.html")) + "?host=max&theme=night";
-const WINDOW_URL = "file://" + encodeURI(path.join(REPO, "ui", "index.html")) + "?host=max&theme=night";
+// The React builds (ui/dist, see ui/vite.config.ts): one self-contained HTML file per screen.
+const STRIP_URL = "file://" + encodeURI(path.join(REPO, "ui", "dist", "strip", "index.html")) + "?theme=night";
+const WINDOW_URL = "file://" + encodeURI(path.join(REPO, "ui", "dist", "window", "index.html")) + "?theme=night";
 const LOG_DIR = path.join(os.homedir(), "Library", "Logs", "Aria");
 const REC_DIR = path.join(os.tmpdir(), "aria");
 const BARS = 8;

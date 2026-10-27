@@ -1,0 +1,55 @@
+/* Aria's look: the design tokens (design/ds/tokens.css) as Tailwind colours, Geist type,
+   and the liquid glass layers. Sky and Night switch on data-theme. */
+@import "tailwindcss";
+@import "../../../design/ds/tokens.css";
+@source "../";
+
+@theme inline {
+  --font-sans: Geist, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, Menlo, monospace;
+  --color-ground: var(--ground);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-action: var(--action);
+  --color-on-action: var(--on-action);
+  --color-hot: var(--hot);
+  --color-watch: var(--watch);
+  --color-good: var(--good);
+  --color-cool: var(--cool);
+  --color-well: var(--well);
+  --color-hairline: var(--hairline);
+}
+
+:root, [data-theme="sky"] {
+  --glass-face: rgba(255, 255, 255, 0.42);
+  --glass-row: rgba(255, 255, 255, 0.55);
+  --glass-edge: inset 1px 1px 1px 0 rgba(255, 255, 255, 0.75), inset -1px -1px 1px 0 rgba(255, 255, 255, 0.45);
+  --glass-glow: 0 4px 4px rgba(12, 30, 60, 0.06), 0 0 24px rgba(255, 255, 255, 0.35);
+  --light-1: #3d7bf0; --light-2: #8fd0ff; --light-3: #a98bff;
+  --part-vocals: #1f5fd0; --part-other: #7a4fd6; --part-bass: #0f8a83; --part-drums: #6b7a90; --part-mix: #1f5fd0;
+}
+[data-theme="night"] {
+  --glass-face: rgba(255, 255, 255, 0.06);
+  --glass-row: rgba(255, 255, 255, 0.07);
+  --glass-edge: inset 1px 1px 1px 0 rgba(255, 255, 255, 0.28), inset -1px -1px 1px 0 rgba(255, 255, 255, 0.12);
+  --glass-glow: 0 4px 4px rgba(0, 0, 0, 0.18), 0 0 24px rgba(255, 255, 255, 0.06);
+  --light-1: #1d4fb8; --light-2: #0f6f9a; --light-3: #5b3db8;
+  --part-vocals: #6cb4ff; --part-other: #b99bff; --part-bass: #4fd1c5; --part-drums: #9aa7b8; --part-mix: #6cb4ff;
+}
+
+html, body, #root { height: 100%; margin: 0; }
+body { font-family: var(--font-sans); color: var(--ink); background: var(--ground); -webkit-font-smoothing: antialiased; }
+
+/* The light behind the glass: soft coloured blobs for it to bend */
+.aria-lights {
+  background:
+    radial-gradient(40% 50% at 18% 22%, color-mix(in srgb, var(--light-1) 70%, transparent), transparent 70%),
+    radial-gradient(35% 45% at 82% 18%, color-mix(in srgb, var(--light-2) 60%, transparent), transparent 70%),
+    radial-gradient(45% 55% at 70% 85%, color-mix(in srgb, var(--light-3) 55%, transparent), transparent 70%),
+    var(--ground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

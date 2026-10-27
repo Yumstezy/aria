@@ -268,7 +268,15 @@ Build order, each a demo beat:
 - **Muse may only attach an EQ fix** to ringing notes, harsh hits and build-ups. It had offered an EQ cut for a buried vocal, which would cut the vocal too.
 - **Checked:** rendered with a real result from Ian's muddy mix, and the bridge's window routing was tested with a stand-in for Max. **Not yet checked inside Live.**
 
-## Now: moving the UI to React (Oct 27)
+## Done (pending a check in Live): the UI in React (Oct 27)
+
+- **`ui/`** is now a Vite, React 19, TypeScript and Tailwind 4 project with `motion` and the shadcn layout.
+- **`npm run build`** makes `ui/dist/strip/index.html` and `ui/dist/window/index.html`: single files of about 570 to 590 KB, with fonts inlined. `device/bridge.js` loads them.
+- **Ported:** the strip, and the window (Home, Mix check Simple with waves and expandable problems, Detailed). Rendered with a real result from the muddy mix in Night.
+- **Ian's liquid glass card** lives in `ui/src/components/ui/liquid-glass.tsx`, typed and using our tokens, with dragging off by default.
+- **Still to do:** confirm it in Live, then delete the old `ui/index.html`, `strip.html`, `app.js`, `window.js` and `aria.css`.
+
+### The React plan
 
 Ian's call: use React for the front end so it can look better, using component libraries (21st.dev, shadcn) and `motion`. It still runs entirely inside Ableton, in Live's built-in web view.
 
