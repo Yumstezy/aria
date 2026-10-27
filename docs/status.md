@@ -300,6 +300,8 @@ Ian's call: use React for the front end so it can look better, using component l
 - With no reference, Check mix shows raw measurements with no verdict.
 - The repo is public from the start, so `.env` and tester audio are gitignored.
 - Ian has Live 12.4 Suite (Max 9.1.4) and a Meta API key.
+- **Check mix records 16 bars (Oct 27, Ian),** so a check covers a whole phrase.
+- **The strip (Oct 27, Ian):** 360 px, with slim stacked buttons (Check, Ask, Open) and a card holding the count to fix, a waves thumbnail and short chips. Four layouts were compared; this is the one Ian chose.
 - **Clarity first (Oct 26):** Aria's core job is finding clashes and problem spots, not loudness. There are two modes: master only, and key tracks with Aria Ear devices. Loudness and true peak appear only in the Detailed view, and Muse never builds advice around them. A reference comparison is optional (Step 8).
 - Devices are generated from Live's blank Max Audio Effect by `device/tools/`, not built in the Max editor.
 - The ML track trains on measurements only (about 2 KB per mix). Audio never goes into the repo.

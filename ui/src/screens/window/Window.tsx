@@ -127,7 +127,7 @@ function Home({ result, engineUp, onOpen }: { result: Result | null; engineUp: b
 function Empty() {
   return (
     <div className="rounded-2xl border-[1.5px] border-dashed border-hairline bg-well p-4 text-[13px] text-ink-muted">
-      <b className="text-ink">No Mix check yet.</b> Play the busiest part of your song and press Check mix. Aria listens to 8 bars.
+      <b className="text-ink">No Mix check yet.</b> Play the busiest part of your song and press Check mix. Aria listens to 16 bars.
     </div>
   );
 }

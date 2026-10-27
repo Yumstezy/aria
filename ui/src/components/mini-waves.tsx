@@ -21,7 +21,7 @@ export function MiniWaves({ spectra, findings, split }: { spectra: Spectra; find
   const involved = new Set(findings.flatMap((f) => (f.kind === "masking" ? [f.masked!] : f.kind === "bass_click" ? ["bass"] : [])));
   const names = split ? ORDER.filter((n) => spectra.parts[n]) : ["mix"];
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="block h-[52px] w-full" preserveAspectRatio="none" aria-hidden="true">
+    <svg viewBox={`0 0 ${W} ${H}`} className="block h-full w-full" preserveAspectRatio="none" aria-hidden="true">
       {findings.filter((f) => f.kind !== "bass_click").map((f, i) => {
         const point = f.kind === "resonance" || f.kind === "harsh";
         const lo = point ? f.hz! * 0.92 : f.hz_range[0], hi = point ? f.hz! * 1.08 : f.hz_range[1];

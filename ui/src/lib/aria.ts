@@ -172,5 +172,5 @@ export function describe(f: Finding): { name: string; where: string; size: strin
 
 export function barsLabel(r: Result) {
   if (!r.start_bar) return "Your recording";
-  return `Bars ${r.start_bar} to ${r.start_bar + (r.recording.bars || 8) - 1}`;
+  return `Bars ${r.start_bar} to ${r.start_bar + (r.recording.bars || 16) - 1}`;
 }

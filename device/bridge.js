@@ -1,6 +1,6 @@
 // Aria's bridge. Runs in [node.script bridge.js @autostart 1].
 // Starts the engine if needed, loads the strip UI into jweb, and runs Check mix:
-// ask Live for tempo, make sure it's playing, record 8 bars of Main with
+// ask Live for tempo, make sure it's playing, record 16 bars of Main with
 // sfrecord~, send the file to the engine, and show the result.
 //
 // Out (outlet 0, through [route jweb live rec]):
@@ -25,7 +25,7 @@ const STRIP_URL = "file://" + encodeURI(path.join(REPO, "ui", "dist", "strip", "
 const WINDOW_URL = "file://" + encodeURI(path.join(REPO, "ui", "dist", "window", "index.html")) + "?theme=night";
 const LOG_DIR = path.join(os.homedir(), "Library", "Logs", "Aria");
 const REC_DIR = path.join(os.tmpdir(), "aria");
-const BARS = 8;
+const BARS = 16;   // 16 bars, so a check covers a whole phrase (Ian, Oct 27)
 const START_TIMEOUT_MS = 20000;
 const LIVE_TIMEOUT_MS = 3000;
 const ANALYZE_TIMEOUT_MS = 45000;
@@ -181,7 +181,7 @@ async function checkMix() {
 
     const started = Date.now();
     while (Date.now() - started < ms) {
-      if (recording.stopped) { toRec(0); throw new UserError("Playback stopped before 8 bars were recorded. Press Check mix while the song plays."); }
+      if (recording.stopped) { toRec(0); throw new UserError(`Playback stopped before ${BARS} bars were recorded. Press Check mix while the song plays.`); }
       const left = Math.max(0, Math.ceil((ms - (Date.now() - started)) / 1000));
       toUI("progress", { step: "record", text: `Listening to bars ${startBar} to ${startBar + BARS - 1}`, detail: `${left} s`, done: Date.now() - started, total: ms });
       await sleep(250);
