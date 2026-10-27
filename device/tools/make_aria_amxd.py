@@ -9,7 +9,7 @@
     v8 live.js ──► route defer ──┤ (everything else)
                        └──► deferlow ──► v8 live.js   (Live API changes from notifications)
     live.thisdevice ──► v8 live.js                    (Live API ready)
-    p window: route front ──► thispatcher (opens it), else ──► jweb (ui/index.html) ──► out to the bridge
+    p window: routepass front ──► thispatcher (opens it), else ──► jweb (ui/index.html) ──► out to the bridge
 
 Run:  python3.11 device/tools/make_aria_amxd.py
 """
@@ -32,7 +32,7 @@ def window_patcher(template):
         "boxes": [
             {"box": {"id": "w-in", "maxclass": "inlet", "numinlets": 0, "numoutlets": 1, "outlettype": [""],
                      "patching_rect": [8.0, 8.0, 30.0, 30.0]}},
-            obj("w-route", "route front", [8.0, 50.0, 70.0, 22.0], 1, 2),
+            obj("w-route", "routepass front", [8.0, 50.0, 90.0, 22.0], 1, 2),   # routepass keeps the word "front" for thispatcher
             obj("w-this", "thispatcher", [8.0, 90.0, 70.0, 22.0], 1, 2),
             {"box": {**FONT, "id": "w-ui", "maxclass": "jweb", "numinlets": 1, "numoutlets": 1, "outlettype": [""],
                      "patching_rect": [100.0, 90.0, 400.0, 280.0],
