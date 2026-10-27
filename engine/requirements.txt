@@ -10,3 +10,9 @@ openai==1.82.0
 # Tests
 pytest==8.3.4
 httpx==0.28.1
+
+# Audio measurement (build step 2)
+numpy==2.2.1
+scipy==1.15.0
+soundfile==0.13.0
+pyloudnorm==0.1.1

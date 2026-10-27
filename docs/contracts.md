@@ -42,6 +42,44 @@ A `confidence` below 0.7 shows the dashed "Not sure" block and the yes or no que
 
 If `sections` is missing, the engine calls its own section finder.
 
+### Without a reference (build step 2)
+
+The device sends only what it recorded:
+
+```json
+{ "mix_path": "/tmp/aria/mix-001.wav", "start_beat": 64.0, "tempo": 150.0, "bars": 8 }
+```
+
+With no reference, the engine compares nothing. It returns what it measured and Muse Spark's advice on those numbers:
+
+```json
+{
+  "recording": { "path": "/tmp/aria/mix-001.wav", "start_beat": 64.0, "tempo": 150.0, "bars": 8 },
+  "reference": null,
+  "measured": {
+    "duration_sec": 12.8, "sample_rate": 48000, "channels": 2,
+    "integrated_lufs": -18.2,
+    "true_peak_dbtp": -5.7,
+    "bands_db": { "bass": -33.1, "mids": -27.1, "treble": -49.1 },
+    "width": { "bass": 0.2, "mids": 0.13, "treble": 0.25 },
+    "unmeasured": {}
+  },
+  "advice": {
+    "summary": "Nothing is clipping, so load a track you want to sound like so Aria can compare.",
+    "notes": [ { "aspect": "true_peak", "text": "True peak is -5.7 dBTP, so it will not clip on export.", "uses": ["true_peak_dbtp"] } ]
+  },
+  "advice_by": "Muse Spark",
+  "advice_error": null
+}
+```
+
+- Any measured value can be `null`. `unmeasured` gives the reason, keyed by field (`"integrated_lufs"`, `"bands_db.treble"`, `"width.mids"`), or `"all"` for a silent recording.
+- `bands_db` is the RMS level of mid plus side in each band, in dBFS. Bass is below 250 Hz, Mids 250 Hz to 2 kHz, Treble above 2 kHz.
+- `width` is the side share of the band's energy: 0 is mono, 1 is all side.
+- `advice` is `null` when there's no key, the call fails, or nothing valid comes back. `advice_error` then says why in plain words. There is no fallback text.
+- Validation drops any advice note that cites a number not in `measured` or the request, or that says "too X" without a reference.
+- Sending `reference_path` returns 501 until build step 4.
+
 ```json
 {
   "verdict": { "to_improve": 3, "total": 6 },
