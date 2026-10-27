@@ -32,6 +32,10 @@ function describeSuggestion(s: Suggestion) {
   if (s.type === "eq_band") return describeEq(a);
   if (s.type === "track_eq") return `"${a.track}": ${describeEq(a)}`;
   if (s.type === "track_volume") return `"${a.track}" ${Number(a.change_db) > 0 ? "up" : "down"} ${Math.abs(Number(a.change_db))} dB`;
+  if (s.type === "track_device") {
+    const knobs = (a.settings ?? []).map((k) => k.option ? `${k.param} ${k.option}` : k.change !== undefined ? `${k.param} ${k.change > 0 ? "+" : ""}${k.change}` : `${k.param} ${k.value}`);
+    return `${a.device} on "${a.track}"${knobs.length ? `: ${knobs.join(", ")}` : ""}`;
+  }
   if (s.type === "add_marker") return `Marker "${a.name}" at bar ${a.bar}`;
   if (s.type === "jump_to") return `Jump to bar ${a.bar}`;
   return s.type;
@@ -50,7 +54,7 @@ export function AskThread({ last, className }: { last?: number; className?: stri
   })();
 
   return (
-    <div ref={scroller} className={cn("flex min-h-0 flex-col gap-2.5 overflow-y-auto", className)}>
+    <div ref={scroller} className={cn("flex min-h-0 flex-col gap-2.5 overflow-y-auto pr-1.5", className)}>
       {ask.log.length === 0 && !ask.pending && (
         <div className="flex flex-col gap-2 py-1">
           <p className="m-0 text-[13px] text-white/60">Ask for a change in plain words. If you ask, it happens right away, with Undo.</p>
@@ -116,15 +120,35 @@ export function AskThread({ last, className }: { last?: number; className?: stri
   );
 }
 
+const VOICE_SOON = "Voice is coming soon. Type for now.";
+
+/** Voice input. Not hooked up yet: the button is in place, and the box says so when it's pressed. */
+export function useVoice(placeholder: string, soonText = VOICE_SOON) {
+  const [soon, setSoon] = useState(false);
+  useEffect(() => { if (soon) { const t = setTimeout(() => setSoon(false), 2500); return () => clearTimeout(t); } }, [soon]);
+  return { placeholder: soon ? soonText : placeholder, press: () => setSoon(true) };
+}
+
+export function VoiceButton({ onPress, small }: { onPress: () => void; small?: boolean }) {
+  return (
+    <button type="button" onClick={onPress} aria-label="Talk to Muse" title="Talk to Muse"
+            className={cn("grid shrink-0 place-items-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/10 transition-colors hover:bg-white/18 hover:text-white",
+                          small ? "size-6" : "size-8")}>
+      <Mic size={small ? 12 : 14} />
+    </button>
+  );
+}
+
 export function AskInput({ autoFocus, className }: { autoFocus?: boolean; className?: string }) {
   const { ask } = useAria();
   const [text, setText] = useState("");
+  const voice = useVoice("Ask Muse to change something");
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => { if (autoFocus) input.current?.focus(); }, [autoFocus]);
   return (
     <form className={cn("flex items-center gap-2", className)} onSubmit={(e) => { e.preventDefault(); if (text.trim()) { askMuse(text); setText(""); } }}>
-      <button type="button" disabled title="Voice is coming next" className="grid size-8 shrink-0 place-items-center rounded-full bg-white/8 text-white/35"><Mic size={14} /></button>
-      <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask Muse to change something"
+      <VoiceButton onPress={voice.press} />
+      <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder={voice.placeholder}
              className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/40" />
       <button type="submit" disabled={!text.trim() || !!ask.pending} aria-label="Send"
               className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-[#0b1a3a] disabled:opacity-35"><ArrowUp size={15} /></button>

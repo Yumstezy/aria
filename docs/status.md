@@ -338,6 +338,9 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
 
 ### The big change: device control
 - **Presets (Oct 27):** Ian's DØWD racks are renamed into `User Library/Aria Presets/`. A catalog of 6,717 presets (DØWD, FabFilter, Valhalla, Ozone) is built by `engine/aria_engine/presets.py`. A Remote Script is the likely way to load racks and plugins (spike S6).
+- **Stock devices (Oct 27, sixth pass).** Ian: "make sure the top 20 most used are implemented just how the EQ 8 is". New tool `track_device` with 20 stock devices plus a plain EQ Eight (list in `docs/contracts.md`). Same steps as EQ Eight: use the one on the track or add it, set knobs by display, Undo. Knob names come from Live's own control-surface bank definitions, read from the Live app. Third-party plugins: Muse says it can't yet and offers the stock device as a suggestion. Checked against the real API: reverb, compressor, glue, delay, width, saturation, set ratio and threshold, limit Main, Pro-Q 4 and Valhalla all come back right. Not yet run in Live.
+- **Strip redesign (Oct 27).** Flat, rounded, 480 x 169: Check mix / Ask / Open on the left, what the check found in the middle (tap the count for the window, a chip to jump to its bar), Muse's last answer and an always-there Ask box on the right. Ask opens the popped-out chat.
+- **Smaller fixes (Oct 27).** Closing the main window leaves a popped-out chat open, and the chat grows into the space. Thin scrollbars that don't grow on hover. A voice button in every Ask box ("Voice is coming soon" for now; Muse Voice Transcribe works, see 1.4). live.js reconnects to Live after a reload instead of saying "Live isn't ready yet".
 - See `docs/device-control.md`. "Cut the mids using Pro-Q 4", "raise it by .4 dB", "add some spacey reverb", with autocomplete of tracks, devices and plugins. Spike on Oct 28.
 
 ## Next

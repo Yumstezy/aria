@@ -1,68 +1,69 @@
-// The device strip on Main. Small and simple like Live's own devices; details in the window.
-// Slim stacked buttons on the left (Check, Ask, Open), and a card with the count to fix, a
-// thumbnail of the waves and short chips on the right. 169 px tall (Live's device height).
-import { useEffect, useRef, useState } from "react";
-import { ArrowUp, ArrowUpRight, Check, Mic, Play, Undo2, X } from "lucide-react";
-import { GradientCard } from "@/components/ui/gradient-card";
+// The device strip on Main. Flat and small like Live's own devices; details in the window.
+// Left: Check mix, Ask (the full chat) and Open. Middle: what the check found. Right: Muse's last
+// answer and an Ask box that's always there. 480 x 169 px (169 is Live's device height).
+import { useState } from "react";
+import { ArrowUp, ArrowUpRight, Check, MessageSquare, Play, Undo2 } from "lucide-react";
 import { MiniWaves } from "@/components/mini-waves";
 import { CountUp } from "@/components/count-up";
-import { askMuse, checkMix, openWindow, outcome, undoLast, useAria } from "@/lib/aria";
-import { problemsOf } from "@/lib/problems";
+import { useVoice, VoiceButton } from "@/components/ask-muse";
+import { askMuse, barsLabel, checkMix, jumpTo, openChat, openWindow, outcome, undoLast, useAria } from "@/lib/aria";
+import { problemsOf, type Problem } from "@/lib/problems";
 import { cn } from "@/lib/utils";
 
-// The shortest honest label for each problem
-function chip(name: string, value: string, unit: string) {
-  const word = name === "Vocal buried" ? "Vocal" : name === "Bass click" ? "Click" : name.split(" ")[0];
-  return unit.startsWith("%") ? word : `${word} ${unit === "dB under" ? "−" : ""}${parseFloat(value).toFixed(0)}`;
+// A plain name and the one number, short enough for three to fit
+function chip(p: Problem) {
+  const name = p.name === "Synths and keys buried" ? "Synths buried" : p.name === "Drums and loops buried" ? "Drums buried" : p.name;
+  if (p.amount.unit.startsWith("%")) return name;
+  return `${name} ${p.amount.unit === "dB under" ? "−" : ""}${Math.abs(parseFloat(p.amount.value)).toFixed(0)}`;
 }
 
-const PILL = "flex h-8 w-full items-center gap-1.5 rounded-xl px-2.5 text-xs font-semibold transition-transform duration-150 active:scale-[0.97] " +
-             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]";
+const BUTTON = "flex h-8 w-full items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 text-[11.5px] font-semibold transition-colors active:scale-[0.98] " +
+               "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--focus-ring)]";
+const QUIET = "bg-[var(--glass-row)] text-ink ring-1 ring-[var(--hairline)] hover:bg-white/12";
+const LABEL = "text-[10.5px] font-semibold uppercase tracking-[0.06em] text-ink-faint";
 
-// Ask, right in the strip: a text box, Muse's last reply, and Undo. No pop-up.
-function StripAsk({ onClose }: { onClose: () => void }) {
+// Muse's last answer in one line, with the last change and Undo
+function LastAnswer() {
+  const { ask } = useAria();
+  const last = ask.log[ask.log.length - 1];
+  if (ask.pending) return <p className="m-0 line-clamp-3 text-[11px] leading-[14px] text-ink-muted" role="status">Muse is on it: “{ask.pending}”</p>;
+  if (!last) return <p className="m-0 text-[11px] leading-[14px] text-ink-faint">Ask for any change, like “compress the vocal”. Undo is always there.</p>;
+  const changed = last.done.filter((d) => d.ok && d.type !== "jump_to" && d.type !== "check_mix" && d.type !== "undo");
+  if (!changed.length) {
+    const o = outcome(last);
+    return <p className={cn("m-0 line-clamp-4 text-[11px] leading-[14px]", o.bad ? "text-hot" : "text-ink-muted")} title={o.text} role="status">{o.text}</p>;
+  }
+  const text = changed[changed.length - 1].text;
+  return (
+    <div className="flex min-w-0 flex-col items-start gap-1" role="status">
+      <span className="flex min-w-0 gap-1 text-[11px] leading-[14px] text-ink-muted" title={text}>
+        <Check size={11} className="mt-px shrink-0 text-good" /><span className="line-clamp-3">{text}</span>
+      </span>
+      <button onClick={undoLast} className="inline-flex h-[18px] shrink-0 items-center gap-0.5 rounded-full px-2 text-[10.5px] font-semibold text-ink ring-1 ring-[var(--hairline)] hover:bg-white/10">
+        <Undo2 size={10} />Undo
+      </button>
+    </div>
+  );
+}
+
+function AskBox() {
   const { ask } = useAria();
   const [text, setText] = useState("");
-  const input = useRef<HTMLInputElement>(null);
-  useEffect(() => { input.current?.focus(); }, []);
-  const last = ask.log[ask.log.length - 1];
-  const changed = last?.done.filter((d) => d.ok) ?? [];
-  const canUndo = changed.some((d) => d.type !== "jump_to" && d.type !== "check_mix");
+  const voice = useVoice("Ask Muse", "Voice soon");
   return (
-    <div className="flex h-full flex-col gap-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-faint">Ask Muse</span>
-        <button onClick={onClose} aria-label="Back to the result" className="grid size-6 place-items-center rounded-full text-white/60 hover:bg-white/10"><X size={13} /></button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-hidden text-xs leading-4" role="status">
-        {ask.pending ? <span className="text-ink-muted">Muse is on it…</span>
-          : last ? (
-            <>
-              <p className={`m-0 line-clamp-2 ${outcome(last).bad ? "text-hot" : ""}`}>{outcome(last).text}</p>
-              {changed.length > 0 && (
-                <div className="mt-1 flex items-center gap-1.5">
-                  <span className="inline-flex min-w-0 items-center gap-1 truncate rounded-full bg-[#5fdba6]/20 px-1.5 text-[10.5px] leading-[18px] text-[#bff7dc]"><Check size={10} className="shrink-0" /><span className="truncate">{changed[changed.length - 1].text}</span></span>
-                  {canUndo && <button onClick={undoLast} className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-white px-1.5 text-[10.5px] font-semibold leading-[18px] text-[#0b1a3a]"><Undo2 size={10} />Undo</button>}
-                </div>
-              )}
-              {last.notes.length > 0 && <p className="m-0 mt-0.5 truncate text-[10.5px] text-ink-faint">{last.notes[last.notes.length - 1]}</p>}
-            </>
-          ) : <span className="text-ink-muted">Ask for a change, like "make the vocal easier to hear".</span>}
-      </div>
-      <form className="flex items-center gap-1.5 rounded-full bg-black/30 py-1 pl-3 pr-1 ring-1 ring-white/15"
-            onSubmit={(e) => { e.preventDefault(); if (text.trim()) { askMuse(text); setText(""); } }}>
-        <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask Muse"
-               className="min-w-0 flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/45" />
-        <button type="submit" disabled={!text.trim() || !!ask.pending} aria-label="Send"
-                className="grid size-6 shrink-0 place-items-center rounded-full bg-white text-[#0b1a3a] disabled:opacity-35"><ArrowUp size={13} /></button>
-      </form>
-    </div>
+    <form className="flex h-7 items-center gap-1.5 rounded-full bg-black/25 pl-0.5 pr-0.5 ring-1 ring-[var(--hairline)] focus-within:ring-white/30"
+          onSubmit={(e) => { e.preventDefault(); if (text.trim()) { askMuse(text); setText(""); } }}>
+      <VoiceButton small onPress={voice.press} />
+      <input value={text} onChange={(e) => setText(e.target.value)} placeholder={voice.placeholder} aria-label="Ask Muse"
+             className="min-w-0 flex-1 bg-transparent text-[11.5px] text-ink outline-none placeholder:text-ink-faint" />
+      <button type="submit" disabled={!text.trim() || !!ask.pending} aria-label="Send"
+              className="grid size-6 shrink-0 place-items-center rounded-full bg-action text-on-action disabled:opacity-30"><ArrowUp size={12} /></button>
+    </form>
   );
 }
 
 export function Strip() {
   const { engine, progress, result, error } = useAria();
-  const [asking, setAsking] = useState(false);
   const busy = !!progress;
   const engineDown = engine.state === "down" || engine.state === "error";
   const chain = result?.chain;
@@ -72,69 +73,76 @@ export function Strip() {
   const share = progress?.total ? Math.min(1, (progress.done ?? 0) / progress.total) : 1;
 
   return (
-    <div className="aria-lights flex h-[169px] gap-2.5 p-2.5">
-      <div className="flex w-[92px] shrink-0 flex-col gap-1.5">
-        <div className="flex items-center gap-1.5 px-1 pb-1">
-          <svg viewBox="0 0 26 26" width={16} height={16} aria-hidden="true"><rect width="26" height="26" rx="8" fill="var(--action)" /><path d="M8 10v6M11.5 7v12M15 9v8M18.5 11v4" stroke="var(--on-action)" strokeWidth="2" strokeLinecap="round" /></svg>
+    <div className="flex h-[169px] gap-2 bg-ground p-2 text-ink">
+      <div className="flex w-[88px] shrink-0 flex-col gap-1">
+        <div className="flex h-6 items-center gap-1.5 px-0.5">
+          <svg viewBox="0 0 26 26" width={15} height={15} aria-hidden="true"><rect width="26" height="26" rx="7" fill="var(--action)" /><path d="M8 10v6M11.5 7v12M15 9v8M18.5 11v4" stroke="var(--on-action)" strokeWidth="2" strokeLinecap="round" /></svg>
           <b className="text-xs tracking-tight">Aria</b>
         </div>
-        <button onClick={checkMix} disabled={busy} className={cn(PILL, "bg-action text-on-action disabled:opacity-60")}>
-          <Play size={11} fill="currentColor" />{busy ? "Checking" : result ? "Again" : "Check"}
+        <button onClick={checkMix} disabled={busy} className={cn(BUTTON, "bg-action text-on-action hover:brightness-110 disabled:opacity-60")}>
+          <Play size={10} fill="currentColor" />{busy ? "Checking" : "Check mix"}
         </button>
-        <button onClick={() => setAsking(!asking)} aria-pressed={asking}
-                className={cn(PILL, asking ? "bg-white text-[#0b1a3a]" : "bg-white/8 text-ink-muted ring-1 ring-white/10")}><Mic size={12} />Ask</button>
-        <button onClick={openWindow} className={cn(PILL, "bg-white/8 text-ink-muted ring-1 ring-white/10")}><ArrowUpRight size={13} />Open</button>
+        <button onClick={openChat} className={cn(BUTTON, QUIET)}><MessageSquare size={12} />Ask</button>
+        <button onClick={openWindow} className={cn(BUTTON, QUIET)}><ArrowUpRight size={13} />Open</button>
       </div>
 
-      <GradientCard className="min-w-0 flex-1 px-3 py-2.5">
-        <div className="flex h-full flex-col">
-          {asking ? <StripAsk onClose={() => setAsking(false)} /> : error ? (
+      <div className="flex min-w-0 flex-1 flex-col rounded-2xl bg-[var(--glass-row)] p-2.5 ring-1 ring-[var(--hairline)]">
+        <div className="flex min-h-0 flex-1 flex-col">
+          {error ? (
             <>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-faint">Mix check</span>
-              <p className="m-0 mt-1 line-clamp-4 text-xs leading-4 text-hot">{error}</p>
+              <span className={LABEL}>Mix check</span>
+              <p className="m-0 mt-0.5 line-clamp-3 text-[11.5px] leading-[15px] text-hot">{error}</p>
             </>
           ) : busy ? (
             <>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-faint">Mix check</span>
-              <span className="mt-auto text-sm font-semibold">
+              <span className={LABEL}>Mix check</span>
+              <span className="mt-auto text-[12.5px] font-semibold">
                 {progress!.step === "record" ? "Listening to 16 bars" : progress!.step === "analyze" ? "Splitting and asking Muse" : "Getting ready"}
+                <span className="ml-1.5 font-mono text-[11px] font-normal text-ink-faint">{progress!.step === "record" ? progress!.detail : ""}</span>
               </span>
-              <span className="font-mono text-[11px] text-ink-faint">{progress!.step === "record" ? progress!.detail : ""}</span>
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/15">
-                <i className="block h-full rounded-full bg-white transition-[width] duration-200 ease-linear" style={{ width: `${share * 100}%` }} />
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/12">
+                <i className="block h-full rounded-full bg-action transition-[width] duration-200 ease-linear" style={{ width: `${share * 100}%` }} />
               </div>
             </>
           ) : result ? (
             <>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-[26px] font-extralight leading-none tracking-[-0.04em]"><CountUp value={list.length} /></span>
-                <span className="text-xs font-medium text-ink-muted">{list.length ? "to fix" : "Clear"}</span>
+                <button onClick={openWindow} title="See the details" className="flex items-baseline gap-1 rounded hover:text-white">
+                  <span className="text-[17px] font-semibold leading-none tracking-[-0.02em]"><CountUp value={list.length} /></span>
+                  <span className="text-[11.5px] font-medium text-ink-muted">{list.length === 1 ? "thing to fix" : list.length ? "things to fix" : "Nothing to fix"}</span>
+                </button>
+                {warning ? <span className="ml-auto truncate text-[10.5px] font-semibold text-hot" title={engineDown ? engine.text : undefined}>{warning}</span>
+                  : <span className="ml-auto truncate text-[10.5px] text-ink-faint">{barsLabel(result)}</span>}
               </div>
-              {warning && <span className="text-[11px] font-semibold text-hot" title={engineDown ? engine.text : undefined}>{warning}</span>}
-              <div className="mt-auto flex flex-col gap-1">
-                {result.clarity.spectra && (
-                  <div className="h-11"><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode === "split"} /></div>
-                )}
-                <div className="flex gap-1 overflow-hidden">
-                  {list.slice(0, 3).map((p, i) => (
-                    <span key={i} className="whitespace-nowrap rounded-full bg-black/35 px-1.5 font-mono text-[10.5px] leading-[18px] text-white" title={p.short}>
-                      {chip(p.name, p.amount.value, p.amount.unit)}
-                    </span>
-                  ))}
-                  {list.length === 0 && <span className="text-[11px] text-ink-muted">Nothing sticks out here.</span>}
-                </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {list.slice(0, 3).map((p, i) => (
+                  <button key={i} onClick={() => jumpTo(p.bar)} title={`${p.short} Jump to bar ${p.bar}.`}
+                          className="shrink-0 whitespace-nowrap rounded-full bg-black/30 px-2 text-[10.5px] font-medium leading-[18px] text-ink ring-1 ring-[var(--hairline)] hover:bg-white/12">
+                    {chip(p)}
+                  </button>
+                ))}
               </div>
+              {result.clarity.spectra && (
+                <div className="mt-1 min-h-0 flex-1"><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode === "split"} /></div>
+              )}
             </>
           ) : (
             <>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-faint">Mix check</span>
-              <p className="m-0 mt-auto text-xs leading-4 text-ink-muted">
-                {engineDown ? "The Aria engine isn't running." : engine.state === "starting" ? "Starting Aria…" : "Play the busiest part of your song, then press Check."}
+              <span className={LABEL}>Mix check</span>
+              {warning && <span className="text-[10.5px] font-semibold text-hot" title={engine.text}>{warning}</span>}
+              <p className="m-0 mt-auto text-[11.5px] leading-[15px] text-ink-muted">
+                {engineDown ? "The Aria engine isn't running." : engine.state === "starting" ? "Starting Aria…" : "Play the busiest part, then press Check mix."}
               </p>
             </>
           )}
         </div>
-      </GradientCard>
+      </div>
+
+      <div className="flex w-[150px] shrink-0 flex-col gap-1.5 rounded-2xl bg-[var(--glass-row)] p-2 ring-1 ring-[var(--hairline)]">
+        <span className={cn(LABEL, "px-0.5")}>Ask Muse</span>
+        <div className="min-h-0 flex-1 overflow-hidden px-0.5"><LastAnswer /></div>
+        <AskBox />
+      </div>
     </div>
   );
 }

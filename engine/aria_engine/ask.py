@@ -19,6 +19,35 @@ CUT_Q = 0.71      # a plain cut with no bump at the corner
 SHAPES = ["bell", "low_cut", "high_cut", "low_shelf", "high_shelf", "notch"]
 NO_GAIN = ("low_cut", "high_cut", "notch")
 RECENT = 3        # earlier exchanges Muse sees, so "it" and "that" make sense
+MAX_SETTINGS = 8
+
+# Live's stock devices Aria can add or adjust (beside EQ Eight, which has its own tools), with the
+# knobs Muse uses most. Names are Live's own (its control-surface bank definitions); units are what
+# Live displays: dB, % , Hz, and times in ms.
+STOCK = {
+    "EQ Eight": "add it here only with no settings (a plain EQ Eight); set its bands with track_eq or eq_band",
+    "Compressor": "Threshold (dB), Ratio (n for n:1), Attack (ms), Release (ms), Knee (dB), Output (dB), Makeup (On/Off), Dry/Wet (%)",
+    "Glue Compressor": "Threshold (dB), Ratio (2, 4 or 10), Attack (ms: 0.01 to 30), Release (menu, as an option: 0.1 s, 0.2 s, 0.4 s, 0.6 s, 0.8 s, 1.2 s or Auto), Makeup (dB), Range (dB), Dry/Wet (%)",
+    "Multiband Dynamics": "Amount (%), Output (dB), Above Threshold (Low/Mid/High) (dB), Above Ratio (Low/Mid/High), Low-Mid Crossover (Hz), Mid-High Crossover (Hz)",
+    "Limiter": "Input Gain (dB), Ceiling (dB), Release (ms), Lookahead (menu)",
+    "Gate": "Threshold (dB), Return (dB), Attack (ms), Hold (ms), Release (ms), Floor (dB)",
+    "Reverb": "Decay Time (ms), Predelay (ms), Room Size, Stereo Image (degrees), Diffusion, Dry/Wet (%)",
+    "Hybrid Reverb": "Decay (ms), Size (%), Predelay (ms), Width (%), Damping (%), Blend (%), Dry/Wet (%)",
+    "Delay": "L 16th / R 16th (menu: 1 to 16 sixteenths), L Time / R Time (ms when not synced), Feedback (%), Ping Pong (On/Off), Filter Freq (Hz), Dry/Wet (%)",
+    "Echo": "L 16th (menu), Feedback (%), HP Freq (Hz), LP Freq (Hz), Reverb Level (%), Stereo Width (%), Dry Wet (%)",
+    "Saturator": "Drive (dB), Type (menu: Analog Clip, Soft Sine, Medium Curve, Hard Curve, Sinoid Fold, Digital Clip), Output (dB), Dry/Wet (%)",
+    "Overdrive": "Drive (%), Tone (%), Filter Freq (Hz), Dry/Wet (%)",
+    "Roar": "Drive (dB), Shaper 1 Amt (%), Comp Amt (%), Output (dB), Dry/Wet (%)",
+    "Drum Buss": "Drive (%), Crunch (%), Boom Amt (%), Boom Freq (Hz), Transients, Damping Freq (Hz), Output (dB), Dry/Wet (%)",
+    "Utility": "Gain (dB), Stereo Width (%: 0 mono, 100 normal, up to 400), Mono (On/Off), Bass Mono (On/Off), Bass Freq (Hz), Balance (pan)",
+    "Auto Filter": "Filter Type (menu: Lowpass, Highpass, Bandpass, Notch), Frequency (Hz), Resonance (%), Drive (dB), LFO Amount (%), Dry/Wet (%)",
+    "Auto Pan": "Amount (%), Frequency (Hz) or Sync Rate (menu), Phase (degrees)",
+    "Chorus-Ensemble": "Rate (Hz), Amount (%), Feedback (%), Width (%), Dry/Wet (%)",
+    "Phaser-Flanger": "Mode (menu: Phaser, Flanger, Doubler), Amount (%), Feedback (%), Mod Freq (Hz), Dry/Wet (%)",
+    "Redux": "Sample Rate (Hz), Bit Depth, Dry/Wet (%)",
+    "Channel EQ": "Highpass On (On/Off), Low Gain (dB), Mid Gain (dB), Mid Freq (Hz), High Gain (dB), Output (dB)",
+}
+GAIN_KNOB = re.compile(r"gain|output|volume|makeup|ceiling", re.I)
 
 # One EQ Eight band, shared by eq_band and track_eq
 EQ_PROPS = {
@@ -52,6 +81,21 @@ TOOLS = [
         "name": "track_eq", "description": "Set one band on Live's EQ Eight on one of the producer's tracks (Aria adds one if needed). Use the exact track name from context.tracks.",
         "parameters": {"type": "object", "properties": {"track": {"type": "string"}, **EQ_PROPS}, "required": ["track", "freq_hz"]}}},
     {"type": "function", "function": {
+        "name": "track_device",
+        "description": "Add one of Live's stock devices to a track (or Main), or adjust the one already there, and set its knobs. "
+                       "Aria uses the device of that kind already on the track if there is one. Use track_eq or eq_band for EQ Eight.",
+        "parameters": {"type": "object", "properties": {
+            "track": {"type": "string", "description": "Exact track name from context.tracks, or Main for the whole mix."},
+            "device": {"type": "string", "enum": list(STOCK)},
+            "settings": {"type": "array", "maxItems": MAX_SETTINGS, "description": "Knobs to set. Leave empty to add the device as it comes.",
+                         "items": {"type": "object", "properties": {
+                             "param": {"type": "string", "description": "The knob's name, as listed for the device."},
+                             "value": {"type": "number", "description": "Set it to this, in the units listed (dB, %, Hz, ms)."},
+                             "option": {"type": "string", "description": "For a menu or switch: the item, like Analog Clip, On or Off."},
+                             "change": {"type": "number", "description": "Move it by this much from where it is now (\"raise it by 0.4 dB\")."}},
+                             "required": ["param"]}}},
+            "required": ["track", "device"]}}},
+    {"type": "function", "function": {
         "name": "check_mix", "description": "Run a new Mix check: Aria records 16 bars of Main and analyzes them.",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
@@ -60,7 +104,7 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "suggest", "description": "Offer a change the producer did NOT ask for. It is shown with Do it / Not now and only runs if they say yes.",
         "parameters": {"type": "object", "properties": {
-            "action": {"type": "string", "enum": ["jump_to", "add_marker", "eq_band", "track_volume", "track_eq"]},
+            "action": {"type": "string", "enum": ["jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device"]},
             "args": {"type": "object"},
             "why": {"type": "string", "maxLength": MAX_WHY}}, "required": ["action", "args", "why"]}}},
 ]
@@ -102,6 +146,22 @@ For a buried sound or mud, act on the producer's own tracks (context.tracks, by 
 Match parts to tracks by name: a vocal is a track named like Vocal, Vox or Voice; synths and keys are tracks
 named like Synth, Keys, Pad, Lead or Chords; prefer a group track when there is one. If no track clearly
 matches, don't guess: name the tracks you see and ask which one.
+Other effects use Live's stock devices, which every producer has, with track_device. Knobs and units:
+{STOCK_LINES}
+Use the device already on the track when there is one (context.tracks lists each track's devices).
+Everyday starting points when they give no numbers (say what you used):
+- compress a vocal: Compressor Threshold -18 dB, Ratio 3, Attack 10 ms, Release 100 ms
+- glue the drums or the mix: Glue Compressor Threshold -15 dB, Ratio 2, Attack 10 ms, Makeup 2 dB
+- reverb, space, spacey: Reverb Decay Time 2500 ms (4000 ms for big or spacey), Predelay 20 ms, Dry/Wet 20%
+- delay or echo: Delay L 16th 3, R 16th 4, Feedback 30%, Dry/Wet 15%
+- warmth, saturation, grit: Saturator Drive 4 dB, Type Analog Clip, Dry/Wet 50%
+- wider: Utility Stereo Width 130%. Mono the bass: Utility Bass Mono On, Bass Freq 120 Hz
+- limit Main: Limiter Ceiling -1 dB
+"Raise it by .4 dB" or "a bit more" on a knob Aria set: change that knob with change, on the same track and device.
+Third-party plugins (FabFilter Pro-Q, Valhalla, Ozone, Serum and others) are not supported yet: Aria can't add or
+change them. Say so in one short sentence, and offer to add the stock device that does the same job, with "suggest"
+of track_device and no settings (Pro-Q is EQ Eight, Pro-C is Compressor, Pro-L is Limiter, Valhalla is Reverb or
+Hybrid Reverb). Don't make up a setting they didn't ask for.
 If you can't do what they ask with these tools, say so plainly and don't call a tool.
 
 context.recent holds the last few exchanges (what they asked, what you did). Use it for "it", "that" and "again":
@@ -111,7 +171,8 @@ A request can ask for several things ("make it louder and cut the low end"). Cal
 answer. Your reply describes only the tool calls you made in this answer: never say you did, will do or are "sorting"
 something you didn't call a tool for. If you can't do a part, say which part and why.
 
-Reply in one or two short sentences. No emojis, no em dashes."""
+Reply in one or two short sentences. No emojis, no em dashes.""".replace(
+    "{STOCK_LINES}", "\n".join(f"- {name}: {knobs}" for name, knobs in STOCK.items()))
 
 
 def _numbers(text):
@@ -157,9 +218,36 @@ def match_track(name, tracks):
     return near[0] if len(near) == 1 else None
 
 
+def _track(name, tracks, main_ok=False):
+    if main_ok and str(name or "").strip().lower() in ("main", "master"):
+        return "Main"
+    return match_track(name, tracks)
+
+
+def _setting(st):
+    """One knob setting, cleaned, or None."""
+    if not isinstance(st, dict) or not str(st.get("param", "")).strip():
+        return None
+    param = str(st["param"]).strip()[:40]
+    given = [k for k in ("value", "option", "change") if st.get(k) is not None]
+    if len(given) != 1:
+        return None
+    k = given[0]
+    if k == "option":
+        return {"param": param, "option": str(st["option"]).strip()[:32]}
+    v = float(st[k])
+    # Loudness knobs move a few dB at a time, like track_volume
+    if GAIN_KNOB.search(param) and (v > 6 if k == "value" else abs(v) > 6):
+        return None
+    return {"param": param, k: round(v, 2)}
+
+
 def why_dropped(name, args, tracks=()):
     """One plain sentence on why a call was dropped, for the producer."""
-    if name in ("track_volume", "track_eq") and isinstance(args, dict) and not match_track(args.get("track"), tracks):
+    if name == "track_device" and isinstance(args, dict) and args.get("device") not in STOCK:
+        return f'Aria can add Live\'s own devices, not "{args.get("device")}" yet.'
+    if name in ("track_volume", "track_eq", "track_device") and isinstance(args, dict) and \
+            not _track(args.get("track"), tracks, main_ok=name == "track_device"):
         shown = ", ".join(f'"{t}"' for t in tracks[:8]) or "none"
         return f'No track called "{args.get("track")}" in this set. Tracks: {shown}.'
     return f"Muse asked for {name.replace('_', ' ')} with values outside Aria's limits, so Aria skipped it."
@@ -171,6 +259,17 @@ def check_action(name, args, tracks=()):
     if not isinstance(args, dict):
         return None
     try:
+        if name == "track_device":
+            track = _track(args.get("track"), tracks, main_ok=True)
+            if not track or args.get("device") not in STOCK:
+                return None
+            raw = args.get("settings") or []
+            if not isinstance(raw, list) or len(raw) > MAX_SETTINGS:
+                return None
+            settings = [_setting(st) for st in raw]
+            if any(st is None for st in settings) or (args["device"] == "EQ Eight" and settings):
+                return None
+            return {"track": track, "device": args["device"], "settings": settings}
         if name in ("track_volume", "track_eq"):
             track = match_track(args.get("track"), tracks)
             if not track:
@@ -219,7 +318,7 @@ def interpret(message, context, request):
         if name == "suggest":
             inner = check_action(args.get("action"), args.get("args"), tracks)
             why = str(args.get("why", "")).strip()[:MAX_WHY]
-            if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band", "track_volume", "track_eq") and why:
+            if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device") and why:
                 suggestions.append({"type": args["action"], "args": inner, "why": why})
             else:
                 dropped += 1

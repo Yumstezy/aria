@@ -257,11 +257,15 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
   - `window_mode {mode: "full" | "left" | "right", screen: {x, y, w, h}}`: size and place the window. Left and right dock to that screen edge and float over Live. Saved in `~/Library/Application Support/Aria/window.json`.
   - `open_chat {screen}`: pop Ask Muse out. The main window shrinks to what to fix, with the chat stacked under it on the docked edge.
   - `close_chat`: close the chat; the main window takes its full docked height again.
-  - `close_window`: close the window (and the chat).
+  - `close_window`: close the main window only. A popped-out chat stays and takes the full docked height.
 - Device to UI:
   - `ask_pending {request | null}`
   - `ask_log [exchange]`: the whole history, sent on `ready` and on every change. The bridge owns it and saves it in `~/Library/Application Support/Aria/ask-history.json` (last 100).
   - An exchange is `{request, reply, done: [{type, args, ok, text}], suggestions: [{type, args, why, answered?}], problems: [text], error, notes: [text], at}`.
+
+Actions Muse may call: `jump_to`, `add_marker`, `eq_band`, `track_volume`, `track_eq`, `track_device`, `check_mix`, `undo`, and `suggest` for any of the first six.
+
+`track_device {track, device, settings: [{param, value | option | change}]}`: add one of Live's stock devices to a track (`track` may be `Main`), or adjust the one of that kind already there, and set its knobs. `device` is one of EQ Eight (added plain, with no settings), Compressor, Glue Compressor, Multiband Dynamics, Limiter, Gate, Reverb, Hybrid Reverb, Delay, Echo, Saturator, Overdrive, Roar, Drum Buss, Utility, Auto Filter, Auto Pan, Chorus-Ensemble, Phaser-Flanger, Redux, Channel EQ. Each setting names a knob by Live's own name and gives exactly one of: `value` (in the units Live displays: dB, %, Hz, times in ms), `option` (a menu item or On/Off) or `change` (a step from where it is now). Up to 8 settings. Gain, output, volume, makeup and ceiling knobs go up at most 6 dB at a time. The device sets each knob by its display (`str_for_value`) and replies `device_done {ok, added, text}`; Undo puts every knob back and removes a device Aria added.
 
 `POST /muse/ask` returns `{reply, actions, suggestions, dropped, problems, error}`. `problems` gives one plain sentence per dropped call. When calls were dropped and none ran, `reply` is null, so a reply never claims a change that didn't happen.
 

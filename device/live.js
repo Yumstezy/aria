@@ -65,8 +65,15 @@ function chain() {
            devices: devices.map(function (id) { return one(new LiveAPI("id " + id), "name"); }) };
 }
 
+// After live.js reloads (autowatch), Live doesn't bang again: connect on first use instead
+function ensureSong() {
+  if (song) return true;
+  try { bang(); } catch (e) { post("Live API not ready: " + e + "\n"); }
+  return !!song;
+}
+
 function state() {
-  if (!song) { send("live_error", { text: "Live isn't ready yet." }); return; }
+  if (!ensureSong()) { send("live_error", { text: "Live isn't ready yet." }); return; }
   send("live_state", {
     tempo: one(song, "tempo"),
     signature: [one(song, "signature_numerator"), one(song, "signature_denominator")],
@@ -82,7 +89,8 @@ function state() {
 function trackList() {
   return ids(song.get("tracks")).map(function (id, i) {
     const t = new LiveAPI("id " + id);
-    return { name: String(one(t, "name")), index: i, group: one(t, "is_foldable") === 1 };
+    return { name: String(one(t, "name")), index: i, group: one(t, "is_foldable") === 1,
+             devices: ids(t.get("devices")).map(function (d) { return String(one(new LiveAPI("id " + d), "name")); }) };
   });
 }
 
@@ -99,6 +107,7 @@ function markerList() {
 }
 
 function play() {
+  if (!ensureSong()) return;
   if (one(song, "is_playing") !== 1) song.call("start_playing");
 }
 
@@ -109,6 +118,7 @@ function play() {
 let pendingStart = null;
 
 function jump(bar) {
+  if (!ensureSong()) return;
   const beats = (bar - 1) * beatsPerBar();
   song.set("current_song_time", beats);
   if (one(song, "is_playing") === 1) return;
@@ -173,6 +183,7 @@ function nameMarker(cue) {
 // set_or_delete_cue toggles, so calling it on an existing marker would delete it.
 function marker(bar) {
   const name = Array.prototype.slice.call(arguments, 1).join(" ") || "Aria";
+  if (!ensureSong()) { send("marker_done", { ok: false, text: "Live isn't ready yet." }); return; }
   const beats = (bar - 1) * beatsPerBar();
   pendingMarker = { bar: bar, beats: beats, name: name, isNew: false };
 
@@ -239,12 +250,23 @@ function findEq(track) {
   return null;
 }
 
-// Parse a parameter's display string: "3.10 kHz" -> 3100, "-4.0 dB" -> -4, "0.71" -> 0.71
-function displayed(param, value) {
-  const t = String(param.call("str_for_value", value));
+// Parse a parameter's display string: "3.10 kHz" -> 3100, "-4.0 dB" -> -4, "0.71" -> 0.71.
+// Times come out in ms ("1.20 s" -> 1200), and "-inf dB" / "inf : 1" as the far ends, so the
+// number always rises or falls with the knob.
+function amount(t) {
+  t = String(t);
+  if (/-\s*(inf|\u221e)/i.test(t)) return -1e9;
+  if (/inf|\u221e/i.test(t)) return 1e9;
   const m = t.match(/-?\d+(\.\d+)?/);
   if (!m) return null;
-  return parseFloat(m[0]) * (/k/i.test(t) ? 1000 : 1);
+  const n = parseFloat(m[0]);
+  if (/khz/i.test(t)) return n * 1000;
+  if (/\d\s*s\b/.test(t) && !/ms\b/.test(t)) return n * 1000;
+  return n;
+}
+
+function displayed(param, value) {
+  return amount(param.call("str_for_value", value));
 }
 
 // Find the raw value whose display matches the target (the display is monotonic in the value)
@@ -400,6 +422,124 @@ function applyEq(device, added, freq, gain, q, index, opts) {
                     text: (added ? "Added an EQ Eight on " + where + ". " : "On " + where + ": ") + "band " + band + " " + what + "." });
 }
 
+// ---------- Live's stock devices: add one or adjust the one there, set its knobs, with Undo ----------
+// Same steps as EQ Eight: use the device already on the track, else add it, then set each knob by
+// what Live displays, so "-18 dB" lands on -18.0 dB. Knob names are Live's own (from Live's
+// control-surface bank definitions); a near name still matches ("Dry Wet" for "Dry/Wet").
+
+const STOCK = {
+  "EQ Eight": [EQ_CLASS], "Compressor": ["Compressor2"], "Glue Compressor": ["GlueCompressor"], "Multiband Dynamics": ["MultibandDynamics"],
+  "Limiter": ["Limiter"], "Gate": ["Gate"], "Reverb": ["Reverb"], "Hybrid Reverb": ["Hybrid"], "Delay": ["Delay"],
+  "Echo": ["Echo"], "Saturator": ["Saturator"], "Overdrive": ["Overdrive"], "Roar": ["Roar"], "Drum Buss": ["DrumBuss"],
+  "Utility": ["StereoGain"], "Auto Filter": ["AutoFilter2", "AutoFilter"], "Auto Pan": ["AutoPan"],
+  "Chorus-Ensemble": ["Chorus2"], "Phaser-Flanger": ["PhaserNew"], "Redux": ["Redux2"], "Channel EQ": ["ChannelEq"]
+};
+// Names Live's browser may use, newest first (Auto Pan became Auto Pan-Tremolo in Live 12)
+const INSERT_AS = { "Auto Pan": ["Auto Pan-Tremolo", "Auto Pan"] };
+let pendingDevice = null;
+
+const key = function (name) { return String(name).toLowerCase().replace(/[^a-z0-9]/g, ""); };
+
+function findStock(track, name) {
+  const devs = ids(track.get("devices"));
+  for (let i = 0; i < devs.length; i++) {
+    const d = new LiveAPI("id " + devs[i]);
+    if (STOCK[name].indexOf(String(one(d, "class_name"))) >= 0 || key(one(d, "class_display_name")) === key(name)) return d;
+  }
+  return null;
+}
+
+function device(trackIndex, nameText, settingsText) {
+  const name = decodeURIComponent(String(nameText));
+  if (!STOCK[name]) { send("device_done", { ok: false, text: "Aria can't add " + name + " yet." }); return; }
+  const settings = JSON.parse(decodeURIComponent(settingsText || "%5B%5D"));
+  const track = trackAt(trackIndex);
+  const found = findStock(track, name);
+  if (found) { applyDevice(found, false, trackIndex, name, settings); return; }
+  pendingDevice = { index: trackIndex, name: name, settings: settings, tries: (INSERT_AS[name] || [name]).slice() };
+  insertNext();
+}
+
+function insertNext() {
+  const p = pendingDevice, track = trackAt(p.index);
+  const devs = ids(track.get("devices"));
+  // On Main, just before Aria so Aria still hears the result; elsewhere at the end
+  const at = p.index < 0 ? Math.max(0, devs.indexOf(Number(new LiveAPI("this_device").id))) : devs.length;
+  const as = p.tries.shift();
+  try { track.call("insert_device", as, at); } catch (e) { post("insert_device " + as + " failed: " + e + "\n"); }
+  outlet(0, "defer", "device_continue");
+}
+
+function device_continue() {
+  const p = pendingDevice;
+  const found = findStock(trackAt(p.index), p.name);
+  if (!found && p.tries.length) { insertNext(); return; }
+  pendingDevice = null;
+  if (!found) { send("device_done", { ok: false, text: "Aria couldn't add a " + p.name + ". Put one on that track, then ask again." }); return; }
+  applyDevice(found, true, p.index, p.name, p.settings);
+}
+
+function knob(params, want) {
+  const k = key(want);
+  const alias = { mix: "drywet", wet: "drywet", amount: "drywet" }[k];
+  const exact = params.filter(function (p) { return p.k === k; })[0] || (alias && params.filter(function (p) { return p.k === alias; })[0]);
+  if (exact) return exact;
+  const near = params.filter(function (p) { return p.k && (p.k.indexOf(k) >= 0 || k.indexOf(p.k) >= 0); });
+  near.sort(function (a, b) { return a.k.length - b.k.length; });
+  return near[0] || null;
+}
+
+// A menu or switch: the item whose words match, else the one whose number is closest ("4" for a 4:1 ratio)
+function menuValue(param, setting) {
+  const items = param.get("value_items");
+  if (!Array.isArray(items) || !items.length) return -1;
+  let want = setting.option !== undefined ? String(setting.option) : String(setting.value);
+  if (want === "true") want = "on";
+  if (want === "false") want = "off";
+  for (let i = 0; i < items.length; i++) if (key(items[i]) === key(want)) return i;
+  for (let i = 0; i < items.length; i++) if (key(items[i]).indexOf(key(want)) === 0) return i;
+  const n = amount(want);
+  if (n === null) return -1;
+  let best = -1, gap = Infinity;
+  items.forEach(function (it, i) { const v = amount(it); if (v !== null && Math.abs(v - n) < gap) { gap = Math.abs(v - n); best = i; } });
+  return best;
+}
+
+function applyDevice(dev, added, index, name, settings) {
+  const params = ids(dev.get("parameters")).map(function (id) {
+    const p = new LiveAPI("id " + id);
+    return { api: p, name: String(one(p, "name")), k: key(one(p, "name")) };
+  });
+  const keep = [], done = [], missed = [];
+  settings.forEach(function (st) {
+    const m = knob(params, st.param);
+    if (!m) { missed.push(st.param); return; }
+    const p = m.api, before = one(p, "value");
+    keep.push({ id: Number(p.id), value: before });
+    if (one(p, "is_quantized") === 1) {
+      const v = menuValue(p, st);
+      if (v < 0) { keep.pop(); missed.push(st.param + " " + (st.option || st.value)); return; }
+      p.set("value", v);
+    } else {
+      const now = displayed(p, before);
+      const target = st.change !== undefined ? (now === null ? null : now + st.change) : amount(st.value);
+      if (target === null) { keep.pop(); missed.push(st.param); return; }
+      setByDisplay(p, target);
+    }
+    done.push(m.name + " " + String(p.call("str_for_value", one(p, "value"))));
+  });
+  if (!added && !keep.length) {
+    send("device_done", { ok: false, text: "Aria couldn't find " + missed.join(", ") + " on the " + name + ". Its knobs: " +
+                          params.map(function (p) { return p.name; }).slice(0, 40).join(", ") + "." });
+    return;
+  }
+  undoStack.push({ kind: "device", params: keep, deviceId: added ? Number(dev.id) : null, name: name, track: index });
+  const where = index < 0 ? "Main" : "\"" + one(trackAt(index), "name") + "\"";
+  let text = (added ? "Added a " + name + " on " + where : "On the " + name + " on " + where) + (done.length ? ": " + done.join(", ") + "." : ".");
+  if (missed.length) text += " Couldn't set " + missed.join(", ") + ".";
+  send("device_done", { ok: true, added: added, text: text });
+}
+
 // ---------- Undo: reverse the last change Aria made ----------
 
 function undo() {
@@ -412,6 +552,13 @@ function undo() {
       if (at >= 0) track.call("delete_device", at);
     }
     send("undo_done", { ok: true, text: u.deviceId ? "Removed the EQ Eight Aria added." : "Put EQ band " + u.band + " back how it was." });
+  } else if (u.kind === "device") {
+    u.params.forEach(function (p) { new LiveAPI("id " + p.id).set("value", p.value); });
+    if (u.deviceId) {
+      const track = trackAt(u.track), at = ids(track.get("devices")).indexOf(u.deviceId);
+      if (at >= 0) track.call("delete_device", at);
+    }
+    send("undo_done", { ok: true, text: u.deviceId ? "Removed the " + u.name + " Aria added." : "Put the " + u.name + " back how it was." });
   } else if (u.kind === "params") {
     u.params.forEach(function (p) { new LiveAPI("id " + p.id).set("value", p.value); });
     send("undo_done", { ok: true, text: "Put \"" + one(trackAt(u.track), "name") + "\" volume back." });

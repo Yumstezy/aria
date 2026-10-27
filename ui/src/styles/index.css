@@ -69,3 +69,11 @@ html.see-through, html.see-through body { background: transparent; }
   --hairline: rgba(255, 255, 255, 0.14); --hot: #ffb07a;
   --part-vocals: #ffffff; --part-other: #d4c4ff; --part-bass: #7ff0e0; --part-drums: rgba(255, 255, 255, 0.45); --part-mix: #ffffff;
 }
+
+/* Scrollbars: a thin pill that stays thin on hover, no track or arrows (Live's web view is Chromium) */
+* { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.18) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.18); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active { background: rgb(255 255 255 / 0.32); }

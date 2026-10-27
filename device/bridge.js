@@ -47,6 +47,7 @@ let busy = false;
 let windowLoaded = false;
 let chatLoaded = false;
 let chatOpen = false;
+let mainOpen = false;
 let lastResult = null;    // so a window opened later shows the latest Check mix
 const waiters = {};       // live.js reply name -> resolve function
 let askLog = loadHistory();   // every Ask Muse exchange; the strip and window both show it
@@ -208,6 +209,7 @@ Max.addHandler("live_state", (s) => { const w = waiters.live_state; delete waite
 Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete waiters.marker_done; if (w) w(decode(s)); });
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
+Max.addHandler("device_done", (s) => { const w = waiters.device_done; delete waiters.device_done; if (w) w(decode(s)); });
 Max.addHandler("volume_done", (s) => { const w = waiters.volume_done; delete waiters.volume_done; if (w) w(decode(s)); });
 Max.addHandler("live_error", (s) => toUI("error", decode(s)));
 Max.addHandler("live_playing", (on) => {
@@ -324,6 +326,13 @@ function placeStack(side, sc) {
   sizeWindow("chat", "aria-chat-ui", { x: top.x, y: top.y + COMPACT_H + 8, w: SIDE_W, h: dockHeight(sc) - COMPACT_H - 8 }, true);
 }
 
+// The chat alone (the main window was closed): it takes the full docked height on its side.
+function placeChatAlone(prefs) {
+  const sc = prefs.screen || FALLBACK_SCREEN;
+  const side = prefs.side === "left" ? "left" : "right";
+  sizeWindow("chat", "aria-chat-ui", { x: dockX(side, sc), y: dockTop(sc), w: SIDE_W, h: dockHeight(sc) }, true);
+}
+
 function savePrefs(prefs) {
   try {
     fs.mkdirSync(path.dirname(WINDOW_FILE), { recursive: true });
@@ -337,8 +346,12 @@ function showWindow(url) {
   // Load the page every time, so the window always shows the latest UI files.
   // The page says "ready" when it loads, and the bridge replays the latest result.
   windowLoaded = true;
+  mainOpen = true;
   Max.outlet("window", "url", url);
-  placeWindow(loadWindowPrefs());
+  const prefs = loadWindowPrefs();
+  // The chat is still out: stack again, the window on top
+  if (chatOpen && prefs.mode !== "full") placeStack(prefs.mode === "left" ? "left" : "right", prefs.screen || FALLBACK_SCREEN);
+  else placeWindow(prefs);
   Max.outlet("window", "front");
 }
 
@@ -352,6 +365,7 @@ Max.addHandler("open_chat", (s) => {
   if (!windowLoaded) { windowLoaded = true; Max.outlet("window", "url", WINDOW_URL); }
   if (!chatLoaded) { chatLoaded = true; Max.outlet("chat", "url", WINDOW_URL + "&view=chat"); }
   chatOpen = true;
+  mainOpen = true;
   placeStack(side, screen);
   Max.outlet("window", "front");
   Max.outlet("chat", "front");
@@ -361,12 +375,14 @@ Max.addHandler("open_chat", (s) => {
 Max.addHandler("close_chat", () => {
   chatOpen = false;
   Max.outlet("chat", "wclose");
-  placeWindow(loadWindowPrefs());
+  if (mainOpen) placeWindow(loadWindowPrefs());
 });
 
+// Closes only the main window. A popped-out chat stays, and grows into the space.
 Max.addHandler("close_window", () => {
-  if (chatOpen) { chatOpen = false; Max.outlet("chat", "wclose"); }
+  mainOpen = false;
   Max.outlet("window", "wclose");
+  if (chatOpen) placeChatAlone(loadWindowPrefs());
 });
 
 Max.addHandler("window_mode", (s) => {
@@ -395,6 +411,7 @@ Max.addHandler("add_marker", async (s) => {
 async function apply(action, tracks = []) {
   const a = action.args || {};
   const trackIndex = (name) => {
+    if (/^(main|master)$/i.test(String(name).trim())) return -1;
     const t = tracks.find((x) => x.name.toLowerCase() === String(name).toLowerCase());
     if (!t) throw new UserError(`There's no track called "${name}" in this set.`);
     return t.index;
@@ -404,11 +421,14 @@ async function apply(action, tracks = []) {
       return await askLive("volume", "volume_done", trackIndex(a.track), a.change_db);
     case "track_eq":
       return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track), a.shape || "bell", a.steep ? 1 : 0);
+    case "track_device":
+      return await askLive("device", "device_done", trackIndex(a.track), encodeURIComponent(a.device), encodeURIComponent(JSON.stringify(a.settings || [])));
     case "jump_to":
       toLive("jump", a.bar);
       return { ok: true, text: `Moved the playhead to bar ${a.bar}.` };
     case "add_marker": {
       const m = await askLive("marker", "marker_done", a.bar, a.name);
+      if (m.ok === false) return m;
       return { ok: true, text: `Marker "${m.name}" at bar ${m.bar}.` };
     }
     case "eq_band":

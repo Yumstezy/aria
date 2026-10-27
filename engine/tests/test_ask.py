@@ -123,3 +123,40 @@ def test_reply_never_carries_em_dashes():
 def test_muse_sees_only_the_last_few_exchanges():
     recent = [{"asked": f"ask {i}", "did": [], "replied": None} for i in range(6)]
     assert [r["asked"] for r in ask.friendly({"recent": recent})["recent"]] == ["ask 3", "ask 4", "ask 5"]
+
+
+def test_stock_devices_come_back_cleaned_on_a_track_or_main():
+    out = ask.ask("compress the vocal and limit the mix", {**CONTEXT, "tracks": [{"name": "NEW VOCAL"}]}, client=client_for(msg(
+        "Added a Compressor on the vocal and a Limiter on Main.",
+        call("track_device", track="new vocal", device="Compressor",
+             settings=[{"param": "Threshold", "value": -18}, {"param": "Makeup", "option": "On"}]),
+        call("track_device", track="Main", device="Limiter", settings=[{"param": "Ceiling", "value": -1}]))))
+    assert out["actions"] == [
+        {"type": "track_device", "args": {"track": "NEW VOCAL", "device": "Compressor",
+                                          "settings": [{"param": "Threshold", "value": -18.0}, {"param": "Makeup", "option": "On"}]}},
+        {"type": "track_device", "args": {"track": "Main", "device": "Limiter", "settings": [{"param": "Ceiling", "value": -1.0}]}}]
+
+
+def test_a_relative_change_moves_a_knob_from_where_it_is():
+    out = ask.interpret(msg(None, call("track_device", track="Bass", device="Utility",
+                                       settings=[{"param": "Gain", "change": 0.4}])), {"tracks": ["Bass"]}, "raise it by .4 dB")
+    assert out["actions"][0]["args"]["settings"] == [{"param": "Gain", "change": 0.4}]
+
+
+def test_plugins_and_big_gain_jumps_are_dropped_with_a_reason():
+    ctx = {"tracks": ["Bass"]}
+    out = ask.interpret(msg("Done.", call("track_device", track="Bass", device="Pro-Q 4")), ctx, "add pro q 4")
+    assert out["actions"] == [] and "Live's own devices" in out["problems"][0]
+    loud = ask.interpret(msg(None, call("track_device", track="Bass", device="Utility", settings=[{"param": "Gain", "value": 12}])), ctx, "louder")
+    assert loud["actions"] == [] and loud["dropped"] == 1
+    both = ask.interpret(msg(None, call("track_device", track="Bass", device="Utility",
+                                        settings=[{"param": "Gain", "value": 2, "change": 1}])), ctx, "x")
+    assert both["actions"] == []
+
+
+def test_muse_sees_every_stock_device_and_its_knobs():
+    assert "{STOCK_LINES}" not in ask.PROMPT
+    for name in ask.STOCK:
+        assert f"- {name}: " in ask.PROMPT
+    tool = next(t for t in ask.TOOLS if t["function"]["name"] == "track_device")
+    assert tool["function"]["parameters"]["properties"]["device"]["enum"] == list(ask.STOCK)

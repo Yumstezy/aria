@@ -43,7 +43,8 @@ export interface Result {
 export interface Progress { step: string; text: string; detail?: string; done?: number; total?: number }
 export type EngineState = "starting" | "up" | "down" | "error";
 
-export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "track_volume" | "track_eq" | "check_mix" | "undo"; args: Record<string, number | string> }
+export interface Setting { param: string; value?: number; option?: string; change?: number }
+export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "track_volume" | "track_eq" | "track_device" | "check_mix" | "undo"; args: Record<string, number | string> & { settings?: Setting[] } }
 export interface Done extends Action { ok: boolean; text: string }
 export interface Suggestion { type: Action["type"]; args: Action["args"]; why: string; answered?: "yes" | "no" }
 export interface Exchange {
