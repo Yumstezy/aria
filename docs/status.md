@@ -56,7 +56,23 @@ Run with `engine/spikes/muse_spike.py`. The measurements in it are a test fixtur
 
 Step 1 passes: all eight questions have an answer and a chosen path.
 
-## Now: Step 2, bare bones round trip (Oct 26 to 27)
+## Done: Step 2, bare bones round trip (Oct 26)
+
+Passed on Ian's Mac in Live 12.4:
+- **The engine starts by itself:** dragging `device/Aria.amxd` onto Main starts it with no terminal open.
+- **Check mix works:** it recorded 8 bars, measured them, and Muse Spark advised, 7 times on two projects.
+- **Verified against a third-party meter:** Youlean Loudness Meter 2 on the same Main read -6.9 LUFS integrated and -7.3 short term. Aria read -6.6 LUFS over 8 bars. Youlean's true peak max was +1.6 over a longer window; Aria read +1.0 dBTP for its 8 bars.
+- **Muse's advice on that mix:** "Your true peak will clip on export, so pull the master down before anything else." That's an objective finding, made without a reference track.
+
+Found and fixed along the way:
+- **Aria only hears what's before it in the chain.** It first read -13.5 LUFS against Youlean's -6.7 because it sat before other devices on Main. `live.js` now reports Aria's track and the devices after it, and the strip shows "Move Aria last" or "Not on Main". Ian's chain is now `masteringableton → Washed Out → Youlean → Endless Smile → Aria`.
+- **The meter is calibrated:** EBU Tech 3341 test 1 reads -23.0 LUFS, and that's now a test.
+- **Recordings are float32,** so overs above 0 dBFS inside Live aren't capped at 0.
+- **The strip is laid out at the real 700 px device width.**
+
+Still to confirm: "Mark bar N in Live" names the marker "Aria check", using the observer approach from 1.6.
+
+### Original Step 2 plan
 
 Pass: on Ian's Mac, with no terminal open, dragging Aria onto Main starts the engine. Check mix then shows real measurements and real Muse Spark advice in the strip, three times in a row, under 15 s from the end of the recording.
 
@@ -165,12 +181,22 @@ Pass condition (from `docs/build-steps.md`): `uvicorn` serves `/health`, `pytest
 4. Open `ui/index.html` in Chrome. It should look like `design/screens/01-home.png`, but with empty states instead of numbers, and show "Engine connected".
 5. Stop the engine and reload the page. It should say the engine isn't running.
 
+## Next
+- **Ian:**
+  - Confirm the marker naming.
+  - Decide whether Aria may compare loudness and true peak with published streaming targets (for example -14 LUFS) when there's no reference.
+  - Collect test-pack audio: a reference track he owns, a bounce of his own song, and mixes with planted problems.
+- **ML teammate:** follow `ml/README.md`. Ian provides the EDM mixes. Send Claude his GitHub username to invite him.
+- **Claude:** Step 3, sections, once there's a reference track in `test-pack/`.
+
 ## Decisions so far
 - The build started Oct 26.
 - The build order follows `docs/rubric.md`. Ask Muse driving Live is core (Step 6). Groove match stays (Step 9).
 - With no reference, Check mix shows raw measurements with no verdict.
 - The repo is public from the start, so `.env` and tester audio are gitignored.
-- Ian has Live 12 Suite and a Meta API key.
+- Ian has Live 12.4 Suite (Max 9.1.4) and a Meta API key.
+- Devices are generated from Live's blank Max Audio Effect by `device/tools/`, not built in the Max editor.
+- The ML track trains on measurements only (about 2 KB per mix). Audio never goes into the repo.
 
 ## Blockers
 - None yet.

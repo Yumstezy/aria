@@ -159,6 +159,7 @@ async function checkMix() {
       live = await askLive("state", "live_state");
     }
 
+    Max.post(`check_mix: tempo ${live.tempo}, beat ${live.song_beat}, chain ${JSON.stringify(live.chain)}`);
     const ms = Math.round(BARS * live.beats_per_bar * 60000 / live.tempo);
     const startBar = Math.floor(live.song_beat / live.beats_per_bar) + 1;
     fs.mkdirSync(REC_DIR, { recursive: true });

@@ -58,7 +58,9 @@ function chain() {
   const after = devices.slice(devices.indexOf(Number(me.id)) + 1).map(function (id) {
     return one(new LiveAPI("id " + id), "name");
   });
-  return { on_main: Number(track.id) === Number(main.id), track: one(track, "name"), after: after };
+  return { on_main: Number(track.id) === Number(main.id), track: one(track, "name"), after: after,
+           track_path: track.unquotedpath, track_id: Number(track.id), main_id: Number(main.id),
+           devices: devices.map(function (id) { return one(new LiveAPI("id " + id), "name"); }) };
 }
 
 function state() {
