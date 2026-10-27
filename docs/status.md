@@ -228,13 +228,34 @@ Why: on Ian's "muddy mix" master mode said nothing stuck out, while Ian heard a 
 - **Master mode now skips frames more than 30 dB under the loudest.** It had reported ringing notes from a near-silent stretch.
 - **License:** prototype only and disclosed in the README (decided with Ian).
 
+Ian confirmed the "Mud" call on his new track (bars 65 to 72). The phantom "Vocal buried" there was Demucs bleed, now fixed. Ian's view: a trained model may judge these better than hand-tuned rules, so the ML data gets sorted on Oct 27.
+
+## Now: the rest of the UX (from Oct 26, late)
+
+Build order, each a demo beat:
+
+1. **The Aria window, opened from the strip.**
+   - A floating window inside Live: a second `jweb` loading `ui/index.html`.
+   - Home shows the latest result.
+   - **Mix check Simple view:**
+     - a verdict hero ("3 things to fix")
+     - Fix first, with Muse's words
+     - one card per finding, in plain words with the numbers as detail
+     - "Where it happens" bars you can click to jump there
+   - **Detailed view:** loudness, true peak, band levels, width, and the split stems' levels. The numbers live here only.
+2. **Fix it for me, with Undo.**
+   - When Muse's fix is an `eq_band` cut (ringing notes, harsh hits), Aria finds or adds an EQ Eight at the end of Main and sets one band.
+   - It keeps the old values for Undo.
+   - A/B toggles the band so the producer can hear the difference.
+3. **Ask Muse pop-up** (build Step 6).
+   - Type a request, and Muse Spark calls tools from the action menu: `jump_to`, `add_markers`, `eq_band` and the section tools.
+   - The device applies them with Undo. If the producer asked, it happens right away. If Muse suggests something itself, it waits for a yes.
+   - Voice through Muse Voice Transcribe comes after typed requests work.
+4. **Then Aria Ear** (exact per-track clashes, build Step 4), and checking a whole bounced song.
+
 ## Next
-- **Ian:**
-  - Reload Aria and Check mix the muddy track in Live. The strip should show "Vocal buried", "Mud" and "Bass click".
-  - Listen to BRILL bars 128 to 143.
-  - Confirm the marker name.
-- **Claude:** Step 4, Aria Ear (exact per-track clashes, reusing `stems.py`). Also a "check the whole song" option (drop a bounce), since 8 bars is a small sample.
-- **ML teammate:** `ml/README.md`.
+- **Ian:** the ML data on Oct 27 with the ML teammate (`ml/README.md`). Confirm the "Aria check" marker name.
+- **Claude:** item 1 above.
 
 ## Decisions so far
 - The build started Oct 26.
