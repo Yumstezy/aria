@@ -48,6 +48,19 @@ function onPlaying(args) {
   if (args[0] === "is_playing") outlet(0, "live_playing", args[1]);
 }
 
+// Where Aria sits. It hears only what the devices before it pass on, so it must be
+// last on Main to hear what listeners hear (a limiter after it can add 7 dB).
+function chain() {
+  const me = new LiveAPI("this_device");
+  const track = new LiveAPI("id " + me.get("canonical_parent")[1]);
+  const main = new LiveAPI("live_set master_track");
+  const devices = ids(track.get("devices"));
+  const after = devices.slice(devices.indexOf(Number(me.id)) + 1).map(function (id) {
+    return one(new LiveAPI("id " + id), "name");
+  });
+  return { on_main: Number(track.id) === Number(main.id), track: one(track, "name"), after: after };
+}
+
 function state() {
   if (!song) { send("live_error", { text: "Live isn't ready yet." }); return; }
   send("live_state", {
@@ -55,7 +68,8 @@ function state() {
     signature: [one(song, "signature_numerator"), one(song, "signature_denominator")],
     beats_per_bar: beatsPerBar(),
     playing: one(song, "is_playing") === 1,
-    song_beat: one(song, "current_song_time")
+    song_beat: one(song, "current_song_time"),
+    chain: chain()
   });
 }
 

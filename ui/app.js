@@ -108,6 +108,16 @@
     var why = m.unmeasured || {};
     stripState('result');
     text('[data-result-where]', r.start_bar ? 'Bars ' + r.start_bar + ' to ' + (r.start_bar + (r.recording.bars || 8) - 1) : 'Your recording');
+    // Aria hears only what comes before it. Say so when that isn't the whole mix.
+    var c = r.chain;
+    var warn = c && (!c.on_main ? 'Not on Main' : c.after.length ? 'Move Aria last' : '');
+    var where = $('[data-result-where]');
+    if (where) {
+      where.className = warn ? 'cp-tag cp-tag-hot' : 'cp-meta cp-mono';
+      if (warn) where.textContent = warn;
+      where.title = !c ? '' : !c.on_main ? 'Aria is on "' + c.track + '", so it only hears that track. Put it on Main.'
+        : c.after.length ? 'Aria hears your mix before ' + c.after.join(', ') + '. Drag Aria to the end of Main to measure what listeners hear.' : '';
+    }
     setMeasure('loudness', fmt(m.integrated_lufs, 'LUFS'), why.integrated_lufs || why.all);
     setMeasure('peak', fmt(m.true_peak_dbtp, 'dBTP'), why.all);
     ['bass', 'mids', 'treble'].forEach(function (b) {

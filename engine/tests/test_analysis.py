@@ -5,6 +5,13 @@ from aria_engine import analysis
 from tones import RATE, sine, write
 
 
+def test_ebu_3341_case_1_reads_minus_23_lufs(tmp_path):
+    # EBU Tech 3341 test 1: stereo 1 kHz sine at -23.0 dBFS must read -23.0 LUFS (+/- 0.1).
+    tone = sine(1000, 10 ** (-23.0 / 20), seconds=20.0)
+    m = analysis.measure(write(tmp_path / "ebu1.wav", tone, tone))
+    assert m["integrated_lufs"] == pytest.approx(-23.0, abs=0.1)
+
+
 def test_true_peak_of_half_scale_sine(tmp_path):
     tone = sine(1000, 0.5)
     m = analysis.measure(write(tmp_path / "t.wav", tone, tone))

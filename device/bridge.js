@@ -165,7 +165,8 @@ async function checkMix() {
     const file = path.join(REC_DIR, `mix-${Date.now()}.aif`);
 
     recording = { stopped: false };
-    toRec("samptype", "int24");
+    // Float, so overs above 0 dBFS inside Live are recorded as they are, not capped.
+    toRec("samptype", "float32");
     toRec("open", file);
     toRec("record", ms);
 
@@ -189,7 +190,7 @@ async function checkMix() {
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
     }
-    toUI("mix_result", { ...res.json, start_bar: startBar });
+    toUI("mix_result", { ...res.json, start_bar: startBar, chain: live.chain });
   } catch (e) {
     recording = null;
     toUI("error", { text: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
