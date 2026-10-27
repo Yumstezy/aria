@@ -100,6 +100,21 @@ With no reference, the engine compares nothing. It returns what it measured and 
 - **`buildup`:** a 1/3-octave band between 120 Hz and 1 kHz whose average from `bars[0]` is `size_db` higher against its neighbours, and in itself.
 - **`harsh`:** bursts between 2 and 6 kHz at least 6 dB above that band's usual margin, `bursts_per_bar` times per bar.
 - At most 3 findings, strongest first. An empty list means nothing stuck out. It is never padded.
+
+With Demucs installed (build step 3b), `mode` is `"split"`, `split_by` names the model, and split findings come first (at most 4 findings in total):
+
+```json
+{ "kind": "masking", "masked": "vocals", "by": "the rest", "range": "presence", "hz_range": [1000, 4000],
+  "gap_db": -7.5, "share": 0.68, "bars": [9, 16] }
+{ "kind": "bass_click", "starts": 28, "clicky_share": 1.0, "size_db": 15.0, "hz_range": [2000, 10000], "bars": [9, 15] }
+```
+
+- **`masking`:** `masked` sits `gap_db` under `by` (another sound, or `"the rest"`, meaning everything else together) in `range`, for `share` of the time it plays there.
+  - Sounds are `vocals`, `drums`, `bass` and `other` (synths, pads, keys, non-drum loops).
+  - Split mode checks only what decides clarity: vocals in mid and presence, `other` in the low-mids (mud), and bass in low and low-mid.
+  - Sounds more than 20 dB under the mix in a range count as absent, not buried.
+- **`bass_click`:** a sharp top-end burst at bass note starts that don't land on a drum hit, on `clicky_share` of the `starts`. It's reported only when 85% or more of the starts have it.
+- `split_error` explains why split mode didn't run, for example a silent recording. Master findings are still returned.
 - `unmeasured` replaces `findings` content when the recording is too short.
 
 Advice is now about the findings:

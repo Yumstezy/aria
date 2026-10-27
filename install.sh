@@ -21,6 +21,8 @@ fi
 echo "Installing engine dependencies"
 .venv/bin/pip install --quiet --upgrade pip
 .venv/bin/pip install --quiet -r requirements.txt
+echo "Installing split mode (Meta's Demucs, about 800 MB, prototype only: see README)"
+.venv/bin/pip install --quiet -r requirements-split.txt
 
 if [ ! -f .env ]; then
   cp .env.example .env

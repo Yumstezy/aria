@@ -12,7 +12,7 @@ import re
 
 from openai import OpenAI, OpenAIError
 
-KINDS = {"resonance", "buildup", "harsh"}
+KINDS = {"resonance", "buildup", "harsh", "masking", "bass_click"}
 TIMEOUT_SEC = 20
 MAX_TOKENS = 1500
 # A cut Muse may suggest, within the action menu in docs/contracts.md (eq_band gain -6 to +6 dB)
@@ -33,7 +33,13 @@ You get JSON:
   - "resonance": a narrow peak at "hz" standing "size_db" above its neighbouring frequencies for "share" of the time
   - "buildup": the range "hz_range" growing "size_db" louder than its neighbours from the first of "bars"
   - "harsh": short bursts at "hz", "size_db" above that band's usual level, "bursts_per_bar" times per bar
-  "bars" is [first, last]. "share" is a fraction (0.97 means 97 percent of the time).
+  - "masking": the sound "masked" sits "gap_db" under "by" in the "range" ("hz_range"), for "share" of the time it plays.
+    "by" may be "the rest" (everything else together). Sound names come from splitting the mix:
+    "vocals"; "drums" (drums and percussion loops); "bass"; "other" (synths, pads, keys, non-drum loops).
+    "other" covered in the low-mid range is muddy low-mids.
+  - "bass_click": a click at the start of bass notes, on "clicky_share" of "starts" note starts,
+    "size_db" above the bass's usual top end
+  "bars" is [first, last]. "share" and "clicky_share" are fractions (0.97 means 97 percent).
 - "measured": loudness and band levels, for background.
 
 Rules:
@@ -41,13 +47,16 @@ Rules:
 - There is no reference track. Never say "too bright", "too muddy" or similar. Say what sticks out and by how much.
 - Producer words first, numbers as detail: "a ringing note around 340 Hz", then "9.7 dB above the frequencies around it".
 - Say what it means for a listener in a few words.
-- For each finding, one concrete fix. If it's an EQ cut, also give it as "fix": {"type": "eq_band", "freq_hz": number inside the finding's range, "gain_db": a cut from -6 to -0.5, "q": 0.3 to 12}.
+- For each finding, one concrete fix:
+  - resonance or harsh: an EQ cut, also given as "fix": {"type": "eq_band", "freq_hz": number inside the finding's range, "gain_db": a cut from -6 to -0.5, "q": 0.3 to 12}.
+  - masking: make room, in words. Bring the covered sound up, dip the covering sound in that range, or sidechain it. "fix" is null, because Aria can't change a split sound directly.
+  - bass_click: in words. Check the bass sample's start, add a few milliseconds of fade-in on the bass notes, or soften the attack. "fix" is null.
 - If there are no findings, say nothing stuck out in these bars, and that Key tracks mode (Aria Ear on the main tracks) can show which sounds clash.
 - Short sentences. No emojis, no exclamation marks, no em dashes.
 
 Answer with JSON only:
 {"summary": "one sentence, the most useful thing to know",
- "notes": [{"finding": 0, "kind": "resonance|buildup|harsh", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
+ "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
 
 
 def _numbers(text):
@@ -74,8 +83,9 @@ def _allowed_numbers(measured, context, findings):
     add(context)
     for f in findings:
         add(f)
-        if "share" in f:
-            add(round(f["share"] * 100))                     # 0.97 -> "97 percent"
+        for k in ("share", "clicky_share"):
+            if k in f:
+                add(round(f[k] * 100))                       # 0.97 -> "97 percent"
         for hz in [f.get("hz")] + list(f.get("hz_range") or []):
             if hz:
                 add(round(hz, -1))                           # 339 Hz -> "around 340 Hz"

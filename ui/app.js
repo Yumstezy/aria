@@ -109,9 +109,29 @@
   }
 
   // Everyday names for what the engine found (DESIGN.md: plain words first, numbers as detail).
-  var KIND_WORD = { resonance: 'Ringing note', buildup: 'Build-up', harsh: 'Harsh hits' };
+  var KIND_WORD = { resonance: 'Ringing note', buildup: 'Build-up', harsh: 'Harsh hits', bass_click: 'Bass click' };
+  var SOUND_WORD = { vocals: 'Vocal', bass: 'Bass', drums: 'Drums', other: 'Synths', 'the rest': 'the rest of the mix' };
 
   function hz(v) { return v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz'; }
+  function hzRange(r) {
+    return r[0] >= 1000 ? r[0] / 1000 + '–' + r[1] / 1000 + ' kHz' : r[1] >= 1000 ? r[0] + ' Hz–' + r[1] / 1000 + ' kHz' : r[0] + '–' + r[1] + ' Hz';
+  }
+
+  // One row per finding: [what, where in frequency, how much, hover text]
+  function describe(f) {
+    if (f.kind === 'masking') {
+      var what = f.masked === 'other' && f.range === 'low-mid' ? 'Mud' : (SOUND_WORD[f.masked] || f.masked) + ' buried';
+      return [what, hzRange(f.hz_range), f.gap_db.toFixed(1) + ' dB',
+        (SOUND_WORD[f.masked] || f.masked) + ' sits ' + Math.abs(f.gap_db).toFixed(1) + ' dB under ' + (SOUND_WORD[f.by] || f.by) +
+        ' in ' + hzRange(f.hz_range) + ', ' + Math.round(f.share * 100) + '% of the time it plays.'];
+    }
+    if (f.kind === 'bass_click') {
+      return [KIND_WORD.bass_click, 'note starts', '+' + Math.round(f.size_db) + ' dB',
+        'A click on ' + Math.round(f.clicky_share * 100) + '% of ' + f.starts + ' bass note starts.'];
+    }
+    return [KIND_WORD[f.kind] || f.kind, f.kind === 'buildup' ? hz(f.hz_range[0]) + ' to ' + hz(f.hz_range[1]) : hz(f.hz),
+      '+' + Number(f.size_db).toFixed(1) + ' dB', ''];
+  }
 
   function renderFindings(findings) {
     var list = $('[data-findings]');
@@ -122,10 +142,9 @@
       var li = document.createElement('li');
       var btn = document.createElement('button');
       btn.className = 'aria-finding';
-      btn.title = 'Bars ' + f.bars[0] + (f.bars[1] !== f.bars[0] ? ' to ' + f.bars[1] : '') + '. Click to jump there.';
-      var where = f.kind === 'buildup' ? hz(f.hz_range[0]) + ' to ' + hz(f.hz_range[1]) : hz(f.hz);
-      [['aria-finding-kind', KIND_WORD[f.kind] || f.kind], ['aria-finding-hz', where],
-       ['aria-finding-size', '+' + Number(f.size_db).toFixed(1) + ' dB'],
+      var d = describe(f);
+      btn.title = (d[3] ? d[3] + ' ' : '') + 'Bars ' + f.bars[0] + (f.bars[1] !== f.bars[0] ? ' to ' + f.bars[1] : '') + '. Click to jump there.';
+      [['aria-finding-kind', d[0]], ['aria-finding-hz', d[1]], ['aria-finding-size', d[2]],
        ['aria-finding-bars', 'bar ' + f.bars[0]]].forEach(function (p) {
         var span = document.createElement('span');
         span.className = p[0];

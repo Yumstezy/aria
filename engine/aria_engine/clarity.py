@@ -19,6 +19,7 @@ STEPS_PER_OCTAVE = 12        # fine log-frequency grid
 F_LO, F_HI = 40.0, 16000.0
 NEIGHBOURHOOD_OCT = 1.0      # smoothing width for "its neighbourhood"
 FLOOR_DB = -80.0             # below this a band has no real content
+QUIET_DB = 30.0              # frames this far under the loudest frame are left out
 
 # Thresholds (all in dB relative to the mix itself)
 RESONANCE_MIN_DB = 6.0       # peak above its smoothed neighbourhood, averaged over time
@@ -85,6 +86,13 @@ def analyze(audio, rate, tempo=None, start_beat=None, beats_per_bar=4.0, include
         return {"findings": [], "unmeasured": "The recording is too short for a clarity check."}
     freqs, times, z = stft(mono, fs=rate, nperseg=N_FFT, noverlap=N_FFT - HOP, boundary=None, padded=False)
     power = np.abs(z) ** 2
+    # Skip near-silent stretches. On Ian's muddy mix, ringing notes were reported from
+    # bars 30 to 45 dB under the song's loud part.
+    frame_db = 10 * np.log10(power.sum(axis=0) + 1e-20)
+    keep = frame_db >= frame_db.max() - QUIET_DB
+    if keep.sum() < 4:
+        return {"findings": [], "unmeasured": "The recording is too quiet for a clarity check."}
+    power, times = power[:, keep], times[keep]
     centres, edges = _bands(rate)
     db = _band_db(power, freqs, edges)                     # (bands, frames)
 

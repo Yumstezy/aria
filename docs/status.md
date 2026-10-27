@@ -210,13 +210,31 @@ Ian supplied a good mix as a comparison: "BRILL x 4times4 - Drugs In The Club (E
 - **Left in the good mix:** harsh hits at 2.7 kHz in bars 75 to 120, and 160 Hz at bar 89. Ian to listen: intentional brightness, or a real issue?
 - **BELIEVE IT's findings persist across windows:** 508 Hz rings through bars 57 to 88, and 2.0 to 2.2 kHz hits through bars 17 to 40 and 98 to 136. Ian to listen.
 
+## Done: Step 3b, split mode with Meta's Demucs (Oct 26)
+
+Why: on Ian's "muddy mix" master mode said nothing stuck out, while Ian heard a quiet vocal, overpowering loops, a click on the bass and mud.
+
+- **`split.py`** separates the recording with `htdemucs` on the CPU. Apple's GPU backend fails on this model. The model loads at engine start.
+- **`stems.py`** measures masking between sounds, including against "the rest" of the mix, and bass clicks. It's reused for Aria Ear in Step 4.
+- **Evaluation on Ian's files,** 16 bars at a time with stems cached, local only:
+  - **Muddy mix:** 3 of 3 windows flagged. The bass click shows on 98 to 100% of note starts in every window. Synths are covered in the low-mids (mud), and the vocal sits 5 to 7 dB under the rest in 1 to 4 kHz (bars 1 to 31).
+  - **Good mix (BRILL x 4times4):** 6 of 10 windows clear. **Ian to listen** to bars 128 to 143, where the vocal sits 11.4 dB under the rest: intended or not?
+- **Tuning lessons:**
+  - Sounds that are absent (separation bleed) looked "50 dB buried", so a sound now counts only within 20 dB of the mix.
+  - Air (4 to 12 kHz) belongs to hi-hats in any mix, so it's dropped.
+  - Drums over synths in presence appeared in both songs, so split mode only checks vocals (mid, presence), synths (low-mid) and bass (low, low-mid).
+  - A click is judged against the note's own level: -50 dB, since real bass starts sit about -40 and a test sine's fade splatter at -67. It's also judged on consistency, with 85% or more of starts needed.
+- **A real 8-bar Check mix on the muddy mix** took **8 to 9 s** end to end with Muse. Muse said: "The vocals get covered in bars 9 to 16 and the bass notes start with a click", with fixes in words. That matches all three things Ian heard.
+- **Master mode now skips frames more than 30 dB under the loudest.** It had reported ringing notes from a near-silent stretch.
+- **License:** prototype only and disclosed in the README (decided with Ian).
+
 ## Next
 - **Ian:**
-  - Reload Aria and try Check mix on a busy section.
-  - Listen at bar 98 of BELIEVE IT for the 2.1 kHz hits.
-  - Confirm the "Aria check" marker name.
-- **Claude:** Step 4, Aria Ear and track clashes (key tracks mode).
-- **ML teammate:** `ml/README.md`. Send Claude his GitHub username.
+  - Reload Aria and Check mix the muddy track in Live. The strip should show "Vocal buried", "Mud" and "Bass click".
+  - Listen to BRILL bars 128 to 143.
+  - Confirm the marker name.
+- **Claude:** Step 4, Aria Ear (exact per-track clashes, reusing `stems.py`). Also a "check the whole song" option (drop a bounce), since 8 bars is a small sample.
+- **ML teammate:** `ml/README.md`.
 
 ## Decisions so far
 - The build started Oct 26.
@@ -227,6 +245,7 @@ Ian supplied a good mix as a comparison: "BRILL x 4times4 - Drugs In The Club (E
 - **Clarity first (Oct 26):** Aria's core job is finding clashes and problem spots, not loudness. There are two modes: master only, and key tracks with Aria Ear devices. Loudness and true peak appear only in the Detailed view, and Muse never builds advice around them. A reference comparison is optional (Step 8).
 - Devices are generated from Live's blank Max Audio Effect by `device/tools/`, not built in the Max editor.
 - The ML track trains on measurements only (about 2 KB per mix). Audio never goes into the repo.
+- **Split mode (Oct 26):** Meta's Demucs for the prototype only, disclosed. Its weights' license is unclear. Revisit before any paid release: Aria Ear, a clearly licensed model, or our own model trained on consented producer stems.
 
 ## Blockers
 - None yet.

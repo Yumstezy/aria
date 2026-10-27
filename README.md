@@ -19,6 +19,14 @@ This sets up the engine and starts it on http://127.0.0.1:8765. Put your Meta Mo
 - Tests: `cd engine && .venv/bin/pytest`
 - UI without Live: open `ui/index.html` (window) or `ui/strip.html` (device strip) in Chrome. Add `?theme=night` for the dark theme.
 
+## Meta models used
+
+- **Muse Spark** (`muse-spark-1.3`, Meta Model API): turns Aria's measurements into plain advice and a concrete fix, and drives Live through tool calling.
+- **Muse Voice Transcribe** (`muse-voice-transcribe-1.0`): hold-to-talk requests for Ask Muse.
+- **Demucs** (`htdemucs`, Meta AI research): split mode separates the recording into vocals, drums, bass and other, so Aria can measure which sound covers which.
+  - **License note:** the Demucs code is MIT, but its author says the license of the trained weights is not clear (they were trained partly on MUSDB, which is for research use). Aria uses it in this hackathon prototype only, for non-commercial use. The weights download from Meta on first use and are not part of this repo.
+  - Split mode runs on the CPU (Apple's GPU backend doesn't support this model) and adds about 5 s to an 8-bar Check mix.
+
 ## Read first
 
 - `CLAUDE.md`: what we're building and the rules, especially "No invented data"

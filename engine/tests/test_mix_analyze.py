@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
 
-from aria_engine import muse
+import numpy as np
+
+from aria_engine import muse, split
 from aria_engine.app import app
 from tones import sine, write
 
@@ -56,3 +58,22 @@ def test_reference_is_not_silently_ignored(tmp_path):
     path = write(tmp_path / "mix.wav", sine(1000, 0.5), sine(1000, 0.5))
     res = client.post("/mix/analyze", json={"mix_path": path, "reference_path": path})
     assert res.status_code == 501
+
+
+def test_split_mode_puts_stem_findings_first(tmp_path, monkeypatch):
+    rng = np.random.default_rng(0)
+    rate = 44100
+    def band(seed, lo, hi, db):
+        from scipy.signal import butter, sosfilt
+        x = sosfilt(butter(4, [lo, hi], btype="band", fs=rate, output="sos"), np.random.default_rng(seed).standard_normal(rate * 16))
+        return np.column_stack([x, x]) / np.std(x) * 10 ** (db / 20)
+    fake_stems = {"vocals": band(1, 800, 3500, -30), "drums": band(2, 1000, 4000, -20),
+                  "bass": band(3, 40, 140, -15), "other": band(4, 160, 380, -22)}
+    monkeypatch.setattr(split, "available", lambda: True)
+    monkeypatch.setattr(split, "separate", lambda audio, r: (fake_stems, rate))
+    monkeypatch.setattr(muse, "advise", lambda *a, **k: (None, "skipped in test"))
+    path = write(tmp_path / "mix.wav", sine(1000, 0.5), sine(1000, 0.5))
+    body = client.post("/mix/analyze", json={"mix_path": path, "tempo": 120.0, "start_beat": 0.0}).json()
+    assert body["clarity"]["mode"] == "split"
+    assert body["clarity"]["findings"][0]["kind"] == "masking"
+    assert body["clarity"]["findings"][0]["masked"] == "vocals"

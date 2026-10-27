@@ -1,5 +1,6 @@
 import os
 import threading
+from contextlib import asynccontextmanager
 import time
 from pathlib import Path
 from typing import Optional
@@ -9,12 +10,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import soundfile as sf
 
-from aria_engine import __version__, analysis, clarity, muse
+from aria_engine import __version__, analysis, clarity, muse, split, stems
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 MAX_FILE_BYTES = 500 * 1024 * 1024
 
-app = FastAPI(title="Aria engine", version=__version__)
+@asynccontextmanager
+async def lifespan(app):
+    split.warm_up()   # load Demucs in the background so the first Check mix isn't slow
+    yield
+
+
+app = FastAPI(title="Aria engine", version=__version__, lifespan=lifespan)
 
 
 def exit_with_parent(pid, interval=2.0):
@@ -80,6 +87,31 @@ def _audio_file(path_str):
     return path
 
 
+SPLIT_TOP_N = 4
+
+
+def find_clarity(audio, rate, tempo, start_beat, beats_per_bar):
+    """Master mode always. Split mode on top when Demucs is installed (build step 3b)."""
+    timing = dict(tempo=tempo, start_beat=start_beat, beats_per_bar=beats_per_bar)
+    found = clarity.analyze(audio, rate, **timing)
+    found["mode"] = "master"
+    if not split.available():
+        return found
+    stem_audio, stem_rate = split.separate(audio, rate)
+    if stem_audio is None:
+        found["split_error"] = stem_rate
+        return found
+    split_found = stems.masking(stem_audio, stem_rate, relevant=stems.SPLIT_RELEVANT, **timing)
+    split_found += stems.bass_clicks(stem_audio["bass"], stem_audio["drums"], stem_rate, **timing)
+    for f in split_found:
+        f.pop("score", None)
+    # Split findings first: they're the relationships producers hear (buried vocal, mud, clicks).
+    found["findings"] = (split_found + found["findings"])[:SPLIT_TOP_N]
+    found["mode"] = "split"
+    found["split_by"] = "Demucs (Meta AI research), htdemucs"
+    return found
+
+
 @app.post("/mix/analyze")
 def mix_analyze(req: MixRequest):
     path = _audio_file(req.mix_path)
@@ -92,9 +124,7 @@ def mix_analyze(req: MixRequest):
     except (RuntimeError, sf.LibsndfileError) as e:
         raise HTTPException(400, f"Can't read {path.name} as audio: {e}")
     measured = analysis.measure_array(audio, rate)
-    found = clarity.analyze(audio, rate, tempo=req.tempo, start_beat=req.start_beat,
-                            beats_per_bar=req.beats_per_bar or 4.0)
-    found["mode"] = "master"
+    found = find_clarity(audio, rate, req.tempo, req.start_beat, req.beats_per_bar or 4.0)
 
     context = {k: v for k, v in {"bars": req.bars, "tempo": req.tempo}.items() if v is not None}
     if "all" in measured["unmeasured"]:
