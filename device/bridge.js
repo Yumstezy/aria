@@ -12,6 +12,7 @@
 
 const fs = require("fs");
 const http = require("http");
+const net = require("net");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
@@ -187,6 +188,40 @@ function stopEngine() {
 }
 
 ["SIGTERM", "SIGINT", "exit"].forEach((sig) => process.on(sig, () => { stopEngine(); if (sig !== "exit") process.exit(0); }));
+
+// ---------- Aria's Remote Script (device/remote): adds plugins, which Max for Live can't ----------
+
+const REMOTE = { host: "127.0.0.1", port: 8766 };
+const REMOTE_TIMEOUT_MS = 8000;
+const REMOTE_OFF = "Aria can't add plugins until its helper is on: in Live, Settings > Link, Tempo & MIDI > Control Surface, pick Aria.";
+let installedPlugins = null;   // names from Live's browser, read once per session
+
+function remote(cmd) {
+  return new Promise((resolve, reject) => {
+    const sock = net.createConnection(REMOTE);
+    let buf = "";
+    const fail = (text) => { sock.destroy(); reject(new UserError(text)); };
+    sock.setTimeout(REMOTE_TIMEOUT_MS, () => fail("Live took too long to add the plugin."));
+    sock.on("error", () => fail(REMOTE_OFF));
+    sock.on("connect", () => sock.write(JSON.stringify(cmd) + "\n"));
+    sock.on("data", (d) => {
+      buf += d;
+      const nl = buf.indexOf("\n");
+      if (nl < 0) return;
+      sock.end();
+      try { resolve(JSON.parse(buf.slice(0, nl))); } catch (e) { reject(new UserError("Aria's helper in Live sent something odd.")); }
+    });
+  });
+}
+
+async function pluginNames() {
+  if (installedPlugins) return installedPlugins;
+  try {
+    const r = await remote({ cmd: "plugins" });
+    if (r.ok) installedPlugins = r.plugins;
+  } catch (e) { return null; }   // helper off: Muse is told plugins can't be added
+  return installedPlugins;
+}
 
 // ---------- live.js ----------
 
@@ -423,6 +458,15 @@ async function apply(action, tracks = []) {
       return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track), a.shape || "bell", a.steep ? 1 : 0);
     case "track_device":
       return await askLive("device", "device_done", trackIndex(a.track), encodeURIComponent(a.device), encodeURIComponent(JSON.stringify(a.settings || [])));
+    case "track_plugin": {
+      // Use the one on the track, else have the Remote Script load it, then set its knobs like a stock device
+      const idx = trackIndex(a.track), settings = encodeURIComponent(JSON.stringify(a.settings || []));
+      const first = await askLive("device", "device_done", idx, encodeURIComponent(a.plugin), settings, 0);
+      if (!first.missing) return first;
+      const loaded = await remote({ cmd: "load", track: idx, name: a.plugin });
+      if (!loaded.ok) return { ok: false, text: loaded.text };
+      return await askLive("device", "device_done", idx, encodeURIComponent(loaded.name), settings, 1);
+    }
     case "jump_to":
       toLive("jump", a.bar);
       return { ok: true, text: `Moved the playhead to bar ${a.bar}.` };
@@ -454,6 +498,7 @@ async function askContext() {
     playhead_bar: live ? Math.floor(live.song_beat / live.beats_per_bar) + 1 : null,
     markers: live ? live.markers : [],
     tracks: live ? live.tracks : [],
+    plugins: await pluginNames(),   // installed third-party plugins; null when Aria's helper in Live is off
     // The last few exchanges, so "it" and "that" make sense. What was done, as Aria reported it.
     recent: askLog.slice(-3).map((x) => ({ asked: x.request, did: x.done.map((d) => d.text), replied: x.reply })),
   };
@@ -509,7 +554,22 @@ Max.addHandler("ask", async (s) => {
       try { done.push({ ...action, ...(await apply(action, context.tracks)) }); }
       catch (e) { done.push({ ...action, ok: false, text: e.message }); }
     }
-    askLog.push({ request: text, reply: res.json.reply, done, suggestions: res.json.suggestions,
+    // A plugin just loaded for a request that also wants it set: ask Muse again, now that Live shows its knobs
+    let reply = res.json.reply;
+    const fresh = done.filter((d) => d.type === "track_plugin" && d.ok && d.added && d.args.then_set);
+    if (fresh.length) {
+      const again = await askContext();
+      again.follow_up = { added: fresh.map((d) => ({ track: d.args.track, plugin: d.args.plugin })), did: done.map((d) => d.text) };
+      const res2 = await request("POST", "/muse/ask", { text, context: again }, ANALYZE_TIMEOUT_MS);
+      if (res2.status === 200 && res2.json) {
+        for (const action of res2.json.actions.filter((x) => x.type === "track_plugin")) {
+          try { done.push({ ...action, ...(await apply(action, again.tracks)) }); }
+          catch (e) { done.push({ ...action, ok: false, text: e.message }); }
+        }
+        reply = res2.json.reply || reply;
+      }
+    }
+    askLog.push({ request: text, reply, done, suggestions: res.json.suggestions,
                   problems: res.json.problems || [], error: res.json.error, notes: [], at: Date.now() });
   } catch (e) {
     askLog.push({ request: text, reply: null, done: [], suggestions: [], problems: [], notes: [], at: Date.now(),

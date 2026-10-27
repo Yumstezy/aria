@@ -160,3 +160,31 @@ def test_muse_sees_every_stock_device_and_its_knobs():
         assert f"- {name}: " in ask.PROMPT
     tool = next(t for t in ask.TOOLS if t["function"]["name"] == "track_device")
     assert tool["function"]["parameters"]["properties"]["device"]["enum"] == list(ask.STOCK)
+
+
+INSTALLED = ["FabFilter Pro-Q 4", "FabFilter Pro-Q 3", "ValhallaRoom", "ValhallaVintageVerb", "Ozone 12 Equalizer"]
+
+
+def test_plugin_names_match_how_producers_say_them():
+    assert ask.match_plugin("pro q 4", INSTALLED) == "FabFilter Pro-Q 4"
+    assert ask.match_plugin("Pro-Q", INSTALLED) is None              # 3 or 4: don't guess
+    assert ask.mentioned_plugins("add pro q 4 and cut the lows", INSTALLED) == ["FabFilter Pro-Q 4"]
+    assert ask.mentioned_plugins("put valhalla on the vocal", INSTALLED) == ["ValhallaRoom", "ValhallaVintageVerb"]
+    assert ask.mentioned_plugins("add some reverb to the vocal", INSTALLED) == []
+
+
+def test_friendly_shows_only_named_plugins_and_says_when_the_helper_is_off():
+    assert ask.friendly({"plugins": INSTALLED}, "add ozone eq to main")["plugins"] == ["Ozone 12 Equalizer"]
+    assert ask.friendly({"plugins": INSTALLED}, "make the vocal brighter")["plugins"] == []
+    off = ask.friendly({"plugins": None}, "add pro q 4")
+    assert off["plugins"] is None and off["plugin_helper"] == "off"
+
+
+def test_track_plugin_needs_a_plugin_muse_was_shown():
+    ok = ask.check_action("track_plugin", {"track": "synth test", "plugin": "pro q 4", "then_set": True}, ["SYNTH TEST"], INSTALLED)
+    assert ok == {"track": "SYNTH TEST", "plugin": "FabFilter Pro-Q 4", "settings": [], "then_set": True}
+    set_now = ask.check_action("track_plugin", {"track": "Main", "plugin": "ValhallaRoom",
+                                                "settings": [{"param": "Mix", "value": 20}], "then_set": True}, ["SYNTH TEST"], INSTALLED)
+    assert set_now["then_set"] is False                                  # knobs already given: nothing to come back for
+    assert ask.check_action("track_plugin", {"track": "SYNTH TEST", "plugin": "Serum"}, ["SYNTH TEST"], INSTALLED) is None
+    assert "plugin list" in ask.why_dropped("track_plugin", {"track": "SYNTH TEST", "plugin": "Serum"}, ["SYNTH TEST"], INSTALLED)

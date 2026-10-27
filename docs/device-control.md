@@ -31,6 +31,8 @@ Not every producer owns FabFilter, Ozone or Valhalla. Every producer has Live's 
 
 **Racks and plugins need Live's browser.** Max for Live can't reach the browser. A Live **Remote Script**, the small Python control-surface script Live loads at startup, can: `browser.load_item()` puts a rack, a preset or a third-party plugin on the selected track, the same as a double-click. The bridge would talk to it over a local socket. The producer turns it on once, in Live's Settings > Link, Tempo & MIDI > Control Surface: "Aria". This is spike **S6**, and it decides how far `add_device` goes.
 
+**Built Oct 27 (not yet run in Live):** `device/remote/Aria/__init__.py`, copied into `~/Music/Ableton/User Library/Remote Scripts/Aria` by `device/remote/install.sh` (also run by `install.sh`). It listens on 127.0.0.1:8766 for `plugins` (every loadable device under Plugins in the browser, VST3 preferred over AU over VST) and `load` (select the track, select its last device, `browser.load_item`, wait up to 4 s for the device, on Main move it before Aria). Muse's tool is `track_plugin` (see `docs/contracts.md`).
+
 If S2 and S6 both fail, the answer to "use Pro-Q 4" when it isn't on the track is: *"Drop Pro-Q 4 on LEADS and ask again. I'll set it up."* Once it's on the track, Aria controls it like any other device.
 
 ## Presets on Ian's Mac (found Oct 27)

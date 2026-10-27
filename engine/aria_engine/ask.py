@@ -62,6 +62,13 @@ EQ_PROPS = {
 }
 
 # The action menu Muse may use today, with the limits the device enforces too.
+SETTING_ITEM = {"type": "object", "properties": {
+    "param": {"type": "string", "description": "The knob's name, as listed for the device."},
+    "value": {"type": "number", "description": "Set it to this, in the units listed (dB, %, Hz, ms)."},
+    "option": {"type": "string", "description": "For a menu or switch: the item, like Analog Clip, On or Off."},
+    "change": {"type": "number", "description": "Move it by this much from where it is now (\"raise it by 0.4 dB\")."}},
+    "required": ["param"]}
+
 TOOLS = [
     {"type": "function", "function": {
         "name": "jump_to", "description": "Move Live's playhead to the start of a bar.",
@@ -88,13 +95,21 @@ TOOLS = [
             "track": {"type": "string", "description": "Exact track name from context.tracks, or Main for the whole mix."},
             "device": {"type": "string", "enum": list(STOCK)},
             "settings": {"type": "array", "maxItems": MAX_SETTINGS, "description": "Knobs to set. Leave empty to add the device as it comes.",
-                         "items": {"type": "object", "properties": {
-                             "param": {"type": "string", "description": "The knob's name, as listed for the device."},
-                             "value": {"type": "number", "description": "Set it to this, in the units listed (dB, %, Hz, ms)."},
-                             "option": {"type": "string", "description": "For a menu or switch: the item, like Analog Clip, On or Off."},
-                             "change": {"type": "number", "description": "Move it by this much from where it is now (\"raise it by 0.4 dB\")."}},
-                             "required": ["param"]}}},
+                         "items": SETTING_ITEM}},
             "required": ["track", "device"]}}},
+    {"type": "function", "function": {
+        "name": "track_plugin",
+        "description": "Put a third-party plugin the producer named on a track (or Main), or adjust the one already there, and set its knobs. "
+                       "Aria loads it from Live's plugin list if it isn't on the track yet.",
+        "parameters": {"type": "object", "properties": {
+            "track": {"type": "string", "description": "Exact track name from context.tracks, or Main for the whole mix."},
+            "plugin": {"type": "string", "description": "The plugin's name exactly as in context.plugins or context.tracks[].plugins."},
+            "settings": {"type": "array", "maxItems": MAX_SETTINGS,
+                         "description": "Knobs to set, by the names in that track's plugins[].knobs only. Empty when the plugin isn't on the track yet.",
+                         "items": SETTING_ITEM},
+            "then_set": {"type": "boolean", "description": "True when they also asked for a change on this plugin and it isn't on the track yet: "
+                                                          "once it's loaded, Aria asks you again with its knob names."}},
+            "required": ["track", "plugin"]}}},
     {"type": "function", "function": {
         "name": "check_mix", "description": "Run a new Mix check: Aria records 16 bars of Main and analyzes them.",
         "parameters": {"type": "object", "properties": {}}}},
@@ -104,7 +119,7 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "suggest", "description": "Offer a change the producer did NOT ask for. It is shown with Do it / Not now and only runs if they say yes.",
         "parameters": {"type": "object", "properties": {
-            "action": {"type": "string", "enum": ["jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device"]},
+            "action": {"type": "string", "enum": ["jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device", "track_plugin"]},
             "args": {"type": "object"},
             "why": {"type": "string", "maxLength": MAX_WHY}}, "required": ["action", "args", "why"]}}},
 ]
@@ -162,12 +177,22 @@ change moves a knob from where it is now, so use it only when context.tracks sho
 If the device isn't there yet, Aria adds a fresh one with Live's own defaults (a fresh Compressor's Threshold is
 0 dB, which does nothing). So for "compress it and raise the threshold by 2 dB", start from the everyday starting
 point and apply their move to it, as values (Threshold -16 dB, Ratio 3, Attack 10 ms, Release 100 ms), and say so.
-Third-party plugins (FabFilter Pro-Q, Valhalla, Ozone, Serum and others) are not supported yet: Aria can't add or
-change them. Say so in one short sentence, and offer the same job with Live's stock tools in a "suggest"
-(Pro-Q is EQ Eight, Pro-C is Compressor, Pro-L is Limiter, Valhalla is Reverb or Hybrid Reverb).
-If they also said what to do with it ("pro q and cut the lows at 400 Hz"), the suggest carries that move:
-suggest track_eq with low_cut at 400 Hz, or track_device with their settings. Only with no move named, suggest
-track_device with no settings. Don't make up a setting they didn't ask for.
+Third-party plugins (FabFilter Pro-Q, Valhalla, Ozone, Serum and others): use them only when the producer names one.
+context.plugins lists the installed plugins their words name. context.tracks[].plugins lists the plugins already on
+each track, with the knob names Live shows for each.
+- To add one or set it, use track_plugin with the plugin's exact name from those lists. Aria adds it if it isn't on
+  the track. Set knobs only by names in that track's plugins[].knobs, in the units Live shows.
+- If the plugin isn't on the track yet, you can't know its knob names: add it with no settings. If they also asked
+  for a change on it ("pro q 4 and cut the lows at 400 Hz"), set then_set true: once it's loaded Aria asks you again.
+- context.follow_up means Aria just added those plugins for this same request. Now set their knobs for what they
+  asked, with track_plugin and the knob names in context.tracks[].plugins. Call nothing else. If the knobs you need
+  aren't listed, say Live isn't showing them yet and to press Configure on the plugin in Live.
+- If the plugin they name isn't in context.plugins or on the track, or context.plugin_helper is "off", say so in one
+  short sentence (helper off: "Turn on Aria in Live's Settings, Link Tempo and MIDI, Control Surface"), and offer
+  the same job with Live's stock tools in a "suggest" (Pro-Q is EQ Eight, Pro-C is Compressor, Pro-L is Limiter,
+  Valhalla is Reverb or Hybrid Reverb). If they named a move, the suggest carries it (track_eq low_cut at 400 Hz, or
+  track_device with their settings); with no move named, track_device with no settings.
+Don't make up a setting they didn't ask for.
 If you can't do what they ask with these tools, say so plainly and don't call a tool.
 
 context.recent holds the last few exchanges (what they asked, what you did). Use it for "it", "that" and "again":
@@ -204,6 +229,8 @@ def _allowed(context, request, actions):
                 add(x)
 
     add(context)
+    for n in plugin_names(context):
+        add(_numbers(n))
     for n in _numbers(request):
         add(n)
     for a in actions:
@@ -230,6 +257,45 @@ def _track(name, tracks, main_ok=False):
     return match_track(name, tracks)
 
 
+def _key(text):
+    return re.sub(r"[^a-z0-9]", "", str(text or "").lower())
+
+
+def plugin_names(context):
+    """Plugins Muse may use: the installed ones it was shown, and the ones already on a track."""
+    names = list(context.get("plugins") or [])
+    for t in context.get("tracks") or []:
+        if isinstance(t, dict):
+            names += [p["name"] for p in t.get("plugins") or [] if isinstance(p, dict) and p.get("name")]
+    return names
+
+
+def match_plugin(name, names):
+    """The plugin this name means: same letters and digits, else the one name containing it or contained in it."""
+    want = _key(name)
+    if not want:
+        return None
+    for n in names:
+        if _key(n) == want:
+            return n
+    near = {n for n in names if _key(n) and (want in _key(n) or _key(n) in want)}
+    return near.pop() if len(near) == 1 else None
+
+
+def mentioned_plugins(request, names, limit=12):
+    """Installed plugins the request names: "pro q 4" finds "FabFilter Pro-Q 4", "valhalla" finds ValhallaRoom."""
+    text = _key(request)
+    words = [_key(w) for w in re.findall(r"[A-Za-z]{5,}", request or "")]
+    out = []
+    for n in names:
+        k = _key(n)
+        parts = str(n).split()
+        rest = _key(" ".join(parts[1:])) if len(parts) > 1 else ""
+        if (k and k in text) or (len(rest) >= 4 and rest in text) or any(w in k for w in words):
+            out.append(n)
+    return out[:limit]
+
+
 def _setting(st):
     """One knob setting, cleaned, or None."""
     if not isinstance(st, dict) or not str(st.get("param", "")).strip():
@@ -248,23 +314,34 @@ def _setting(st):
     return {"param": param, k: round(v, 2)}
 
 
-def why_dropped(name, args, tracks=()):
+def why_dropped(name, args, tracks=(), plugins=()):
     """One plain sentence on why a call was dropped, for the producer."""
+    if name == "track_plugin" and isinstance(args, dict) and not match_plugin(args.get("plugin"), plugins):
+        return f'Aria can\'t find "{args.get("plugin")}" in Live\'s plugin list.'
     if name == "track_device" and isinstance(args, dict) and args.get("device") not in STOCK:
         return f'Aria can add Live\'s own devices, not "{args.get("device")}" yet.'
-    if name in ("track_volume", "track_eq", "track_device") and isinstance(args, dict) and \
-            not _track(args.get("track"), tracks, main_ok=name == "track_device"):
+    if name in ("track_volume", "track_eq", "track_device", "track_plugin") and isinstance(args, dict) and \
+            not _track(args.get("track"), tracks, main_ok=name in ("track_device", "track_plugin")):
         shown = ", ".join(f'"{t}"' for t in tracks[:8]) or "none"
         return f'No track called "{args.get("track")}" in this set. Tracks: {shown}.'
     return f"Muse asked for {name.replace('_', ' ')} with values outside Aria's limits, so Aria skipped it."
 
 
-def check_action(name, args, tracks=()):
+def check_action(name, args, tracks=(), plugins=()):
     """Return the cleaned args if this call is on the menu and in range, else None.
-    Track tools must name a track that exists in the set."""
+    Track tools must name a track that exists in the set; track_plugin, a plugin Muse was shown."""
     if not isinstance(args, dict):
         return None
     try:
+        if name == "track_plugin":
+            track, plugin = _track(args.get("track"), tracks, main_ok=True), match_plugin(args.get("plugin"), plugins)
+            raw = args.get("settings") or []
+            if not track or not plugin or not isinstance(raw, list) or len(raw) > MAX_SETTINGS:
+                return None
+            settings = [_setting(st) for st in raw]
+            if any(st is None for st in settings):
+                return None
+            return {"track": track, "plugin": plugin, "settings": settings, "then_set": bool(args.get("then_set")) and not settings}
         if name == "track_device":
             track = _track(args.get("track"), tracks, main_ok=True)
             if not track or args.get("device") not in STOCK:
@@ -314,6 +391,7 @@ def interpret(message, context, request):
     """Turn Muse's reply into {reply, actions, suggestions, dropped, problems}. Exposed for tests."""
     actions, suggestions, dropped, problems = [], [], 0, []
     tracks = [t["name"] if isinstance(t, dict) else str(t) for t in context.get("tracks") or []]
+    plugins = plugin_names(context)
     for call in getattr(message, "tool_calls", None) or []:
         name = call.function.name
         try:
@@ -322,18 +400,18 @@ def interpret(message, context, request):
             dropped += 1
             continue
         if name == "suggest":
-            inner = check_action(args.get("action"), args.get("args"), tracks)
+            inner = check_action(args.get("action"), args.get("args"), tracks, plugins)
             why = str(args.get("why", "")).strip()[:MAX_WHY]
-            if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device") and why:
+            if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device", "track_plugin") and why:
                 suggestions.append({"type": args["action"], "args": inner, "why": why})
             else:
                 dropped += 1
-                problems.append(why_dropped(str(args.get("action")), args.get("args"), tracks))
+                problems.append(why_dropped(str(args.get("action")), args.get("args"), tracks, plugins))
             continue
-        cleaned = check_action(name, args, tracks)
+        cleaned = check_action(name, args, tracks, plugins)
         if cleaned is None:
             dropped += 1
-            problems.append(why_dropped(name, args, tracks))
+            problems.append(why_dropped(name, args, tracks, plugins))
         else:
             actions.append({"type": name, "args": cleaned})
 
@@ -353,9 +431,15 @@ def interpret(message, context, request):
 PART_NAMES = {"vocals": "vocal", "other": "synths and keys", "drums": "drums and loops", "bass": "bass", "the rest": "the rest of the mix"}
 
 
-def friendly(context):
-    """Context for Muse with everyday part names. Numbers are untouched."""
+def friendly(context, request=""):
+    """Context for Muse with everyday part names. Numbers are untouched.
+    Of the installed plugins, Muse sees only the ones the request names; None means Aria's helper in Live is off."""
     out = dict(context)
+    if context.get("plugins") is None:
+        out["plugins"] = None
+        out["plugin_helper"] = "off"
+    else:
+        out["plugins"] = mentioned_plugins(request, context["plugins"])
     out["recent"] = (context.get("recent") or [])[-RECENT:]
     out["findings"] = [{k: PART_NAMES.get(v, v) if k in ("masked", "by") else v for k, v in f.items()}
                        for f in context.get("findings") or []]
@@ -365,7 +449,7 @@ def friendly(context):
 def ask(request, context, client=None):
     """Returns {reply, actions, suggestions, dropped, problems, error}."""
     request = (request or "").strip()
-    context = friendly(context or {})
+    context = friendly(context or {}, request)
     if not request:
         return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "problems": [], "error": "Say what you'd like Muse to do."}
     key = os.environ.get("MODEL_API_KEY", "").strip()

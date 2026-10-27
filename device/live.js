@@ -90,8 +90,24 @@ function trackList() {
   return ids(song.get("tracks")).map(function (id, i) {
     const t = new LiveAPI("id " + id);
     return { name: String(one(t, "name")), index: i, group: one(t, "is_foldable") === 1,
-             devices: ids(t.get("devices")).map(function (d) { return String(one(new LiveAPI("id " + d), "name")); }) };
+             devices: ids(t.get("devices")).map(function (d) { return String(one(new LiveAPI("id " + d), "name")); }),
+             plugins: pluginsOn(t) };
   });
+}
+
+// Third-party plugins on a track, with the knob names Live shows for them (Muse sets knobs by these)
+const PLUGIN_CLASSES = ["PluginDevice", "AuPluginDevice"];
+const PLUGIN_KNOBS = 48;
+
+function pluginsOn(track) {
+  const out = [];
+  ids(track.get("devices")).forEach(function (id) {
+    const d = new LiveAPI("id " + id);
+    if (PLUGIN_CLASSES.indexOf(String(one(d, "class_name"))) < 0) return;
+    const knobs = ids(d.get("parameters")).slice(1, PLUGIN_KNOBS + 1).map(function (pid) { return String(one(new LiveAPI("id " + pid), "name")); });
+    out.push({ name: String(one(d, "name")), knobs: knobs });
+  });
+  return out;
 }
 
 function trackAt(index) {
@@ -449,11 +465,27 @@ function findStock(track, name) {
   return null;
 }
 
-function device(trackIndex, nameText, settingsText) {
+// A third-party plugin on the track whose name matches ("Pro-Q 4" finds "FabFilter Pro-Q 4"), newest first
+function findPlugin(track, name) {
+  const devs = ids(track.get("devices")), want = key(name);
+  for (let i = devs.length - 1; i >= 0; i--) {
+    const d = new LiveAPI("id " + devs[i]), k = key(one(d, "name"));
+    if (PLUGIN_CLASSES.indexOf(String(one(d, "class_name"))) >= 0 && k && (k.indexOf(want) >= 0 || want.indexOf(k) >= 0)) return d;
+  }
+  return null;
+}
+
+// addedFlag is 1 when the bridge just had Live load this plugin, so Undo removes it
+function device(trackIndex, nameText, settingsText, addedFlag) {
   const name = decodeURIComponent(String(nameText));
-  if (!STOCK[name]) { send("device_done", { ok: false, text: "Aria can't add " + name + " yet." }); return; }
   const settings = JSON.parse(decodeURIComponent(settingsText || "%5B%5D"));
   const track = trackAt(trackIndex);
+  if (!STOCK[name]) {
+    const plug = findPlugin(track, name);
+    if (!plug) { send("device_done", { ok: false, missing: true, text: name + " isn't on that track." }); return; }
+    applyDevice(plug, Number(addedFlag) === 1, trackIndex, String(one(plug, "name")), settings);
+    return;
+  }
   const found = findStock(track, name);
   if (found) { applyDevice(found, false, trackIndex, name, settings); return; }
   pendingDevice = { index: trackIndex, name: name, settings: settings, tries: (INSERT_AS[name] || [name]).slice() };
@@ -528,15 +560,18 @@ function applyDevice(dev, added, index, name, settings) {
     }
     done.push(m.name + " " + String(p.call("str_for_value", one(p, "value"))));
   });
+  // A big plugin may show Live only "Device On" until the producer picks knobs with Configure
+  const hidden = params.length <= 1 ? " Live isn't showing its knobs to Aria. Press Configure on the " + name +
+                 " in Live, move the knobs you want Aria to use, then ask again." : "";
   if (!added && !keep.length) {
-    send("device_done", { ok: false, text: "Aria couldn't find " + missed.join(", ") + " on the " + name + ". Its knobs: " +
+    send("device_done", { ok: false, text: hidden ? hidden.trim() : "Aria couldn't find " + missed.join(", ") + " on the " + name + ". Its knobs: " +
                           params.map(function (p) { return p.name; }).slice(0, 40).join(", ") + "." });
     return;
   }
   undoStack.push({ kind: "device", params: keep, deviceId: added ? Number(dev.id) : null, name: name, track: index });
   const where = index < 0 ? "Main" : "\"" + one(trackAt(index), "name") + "\"";
   let text = (added ? "Added " + (/^[AEIO]/i.test(name) ? "an " : "a ") + name + " on " + where : "On the " + name + " on " + where) + (done.length ? ": " + done.join(", ") + "." : ".");
-  if (missed.length) text += " Couldn't set " + missed.join(", ") + ".";
+  if (missed.length) text += " Couldn't set " + missed.join(", ") + "." + hidden;
   send("device_done", { ok: true, added: added, text: text });
 }
 
