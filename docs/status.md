@@ -2,7 +2,7 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
-## In progress: Step 1, Day 1 tests (Oct 26)
+## Done: Step 1, Day 1 tests (Oct 26)
 
 Run with `engine/spikes/muse_spike.py`. The measurements in it are a test fixture and the audio is a generated test tone, so neither reaches the app.
 
@@ -36,40 +36,70 @@ Run with `engine/spikes/muse_spike.py`. The measurements in it are a test fixtur
 - **It only accepts mono 16-bit PCM WAV at 16 or 24 kHz.** 44.1 kHz, 48 kHz, 24-bit and float are all rejected with HTTP 400. Live records at 44.1 or 48 kHz, so the engine converts the recording to 16 kHz mono before sending.
 - Voice can move up from stretch whenever Ask Muse is solid.
 
-**1.5 to 1.8: the device files and guide are ready.**
-- `device/spike/bridge_spike.js` and `device/spike/live_spike.js`. The bridge's HTTP code was tested against the running engine: it answered in 6 ms.
-- Waiting on Ian to build the test device with `docs/max-guide-step1.md` and run the tests.
+**1.5 Device talks to the engine. Yes.** `node.script` POSTs and GETs to 127.0.0.1:8765 in 1 to 34 ms inside Live 12.4.
 
-### Plan for the rest of Step 1
+**1.6 Markers. Adding works. Naming isn't confirmed yet.**
+- Moving the playhead (`current_song_time`) and `set_or_delete_cue` both work. Ian saw the playhead jump and the marker appear.
+- **Live applies Live API changes a moment after the call.** Reading straight back returns the old value.
+- **Max timers (`Task`) fired late inside the device.** Several fired in one burst seconds later. So the check never got to name the marker.
+- Chosen path: no timers. Use Live API observers, which notify the device when something changes: watch `cue_points`, then name the new cue when it appears. Confirm naming in Step 2.
 
-Pass condition: all eight questions have a written yes or no and a chosen path.
+**1.7 Clip file paths. Yes.** `live_set view detail_clip` → `file_path` gave `/Users/ianbarrie/Downloads/BELIEVE IT STEMS/6 SOFT TRANCE SYNTH.wav`. MIDI clips are correctly refused.
 
-**1.4 Muse Voice Transcribe (Claude, no Max needed)**
-- Find the endpoint in Meta's docs.
-- Make a test recording with the Mac's built-in `say` command ("make bars one to sixteen the intro"), send it, and check the transcript.
-- If there's no usable endpoint, voice stays stretch and Ask Muse is typed only.
+**1.8 Create an audio clip from a file. Yes, in Arrangement.** `Track.create_audio_clip(path, beat)` added a clip at beat 416 on Live 12.4. Groove match writes the fixed loop straight into the set. The drag-it-in fallback isn't needed.
 
-**1.5 to 1.8 inside Live (Claude writes the code and a guide, Ian builds the test device)**
+**Other findings**
+- **The Max editor wouldn't open from Live on Ian's Mac** (Max ran with no window). Max's settings were reset; the old ones are in `~/Library/Application Support/Cycling '74/Max 9/Settings.backup-2026-10-26`.
+- We don't need the editor anyway. `device/tools/make_spike_amxd.py` builds the `.amxd` from Live's own blank Max Audio Effect, and Live loads it fine.
+- Everything the device prints also lands in `~/Library/Application Support/Cycling '74/Max 9/Logs/MaxPlugLib.log`, so Claude can read test results without screenshots.
+- `node.script` output didn't show in a message box in the test device, but v8 output did. The real device sends Node output to `jweb`, so check that route in Step 2.
 
-Claude writes these files in `device/spike/`:
-- `bridge_spike.js`, for `node.script`: calls the engine's `/health` and prints the reply in the Max window. This answers 1.5.
-- `live_spike.js`, for Max's `v8` object, which has the Live API built in. It answers the other three:
-  - **1.6 Markers:** add a cue point at a given bar and name it. It checks for an existing marker first, because `set_or_delete_cue` deletes one that's already there.
-  - **1.7 Clip file paths:** read `file_path` from the selected audio clip.
-  - **1.8 Groove output:** try to create a new audio clip from a wav file on a track (`create_audio_clip`, which needs a recent Live 12).
-- `docs/max-guide-step1.md`: a click-by-click guide for Ian:
-  - create a Max Audio Effect on the master track
-  - place about 6 objects
-  - add one button per test
-  - save the device as `device/spike/Aria Spike.amxd`
-  - for each test: what to click, and what you should see in the Max window if it worked
+Step 1 passes: all eight questions have an answer and a chosen path.
 
-Ian runs the tests in Live 12.4 (Max 9.1.4) and reports what the Max window says. Claude writes the answers here.
+## Now: Step 2, bare bones round trip (Oct 26 to 27)
 
-**What happens with the answers**
-- If 1.5 fails, the device and engine talk through a JSON file the device checks instead of HTTP.
-- If 1.8 fails, Groove match writes the fixed loop to `test-pack/out/` for you to drag in.
-- Everything that passes becomes the base of the real `Aria.amxd` in Step 2.
+Pass: on Ian's Mac, with no terminal open, dragging Aria onto Main starts the engine. Check mix then shows real measurements and real Muse Spark advice in the strip, three times in a row, under 15 s from the end of the recording.
+
+### What's being built
+
+**Engine** (`engine/`)
+- Adds numpy, scipy, soundfile and pyloudnorm for measuring audio.
+- `aria_engine/analysis.py` measures a wav:
+  - integrated loudness (LUFS)
+  - true peak (dBTP, 4x oversampled)
+  - Bass (below 250 Hz), Mids (250 Hz to 2 kHz) and Treble (above 2 kHz) levels in dB
+  - width per band (side energy share, 0 is mono)
+  - Anything it can't measure, like silence, comes back as null with a reason.
+- `aria_engine/muse.py`: the Muse Spark client.
+  - `muse-spark-1.3`, minimal reasoning, JSON only.
+  - Measured numbers only. With no reference, it may not call anything too bright or too quiet.
+  - The reply is validated. No key, a failure, an empty reply or invalid JSON all mean `advice: null` plus the reason. No canned text.
+- `POST /mix/analyze`: takes the recorded wav's path and returns the measurements and Muse's advice. With no reference, it compares nothing. The new response shape goes into `docs/contracts.md`.
+- Tests on generated test tones, which stay in tests. Muse calls are faked in tests, so no network is needed.
+
+**Device** (`device/`)
+- `bridge.js` (`node.script`) runs the show:
+  - Starts the engine if it isn't running, and stops it when Live quits.
+  - Points the strip's `jweb` at `ui/strip.html`.
+  - On Check mix: asks `live.js` for tempo and position, starts playback if Live is stopped, records 8 bars of Main with `sfrecord~`, then sends the wav to the engine.
+  - Uses Node timers, not Max timers (see 1.6).
+- `live.js` (`v8`) does the Live API work:
+  - tempo, time signature, play state and position
+  - start playback
+  - move the playhead
+  - add named markers, using observers
+- `Aria.amxd`, built by `device/tools/make_aria_amxd.py` from Live's blank device. It passes audio through untouched and shows the strip in `jweb`.
+
+**UI** (`ui/strip.html`, `ui/app.js`)
+- Check mix shows progress: "Recording 8 bars", then "Measuring", then "Muse Spark is writing".
+- Then the real measurements (Loudness, True peak, Bass, Mids, Treble, Width) and Muse's advice. If there's no advice, it says why.
+- Night theme in the device for now. Following Live's theme comes later.
+
+### Manual checks for Ian
+1. Quit anything running the engine, then drag `device/Aria.amxd` onto Main. Within a few seconds the strip should say the engine is connected.
+2. Load a song and press **Check mix**. Live plays, the strip counts through 8 bars, then shows the numbers and Muse's advice.
+3. Do it three times in a row.
+4. Remove Aria from Main. The engine should stop.
 
 ## Done: Step 0, repo and tooling (Oct 26)
 
@@ -134,10 +164,6 @@ Pass condition (from `docs/build-steps.md`): `uvicorn` serves `/health`, `pytest
 3. In a second terminal: `cd engine && .venv/bin/pytest`. All tests pass.
 4. Open `ui/index.html` in Chrome. It should look like `design/screens/01-home.png`, but with empty states instead of numbers, and show "Engine connected".
 5. Stop the engine and reload the page. It should say the engine isn't running.
-
-## Next
-- Ian builds the test device from `docs/max-guide-step1.md` and sends the Max Console lines for 1.5 to 1.8.
-- Then Step 2, the bare bones round trip. It now includes **engine auto-start**: Aria starts the engine when it loads and stops it when Live quits, so no terminal is needed (see `docs/build-steps.md`).
 
 ## Decisions so far
 - The build started Oct 26.
