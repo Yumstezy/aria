@@ -99,9 +99,14 @@ def _in_measured_range(n, findings):
     return any(f.get("hz_range") and f["hz_range"][0] <= n <= f["hz_range"][1] for f in findings)
 
 
+# An EQ cut on the master only helps a problem that lives in the master itself. A buried
+# vocal or a clicking bass in split mode isn't fixable by cutting the whole mix.
+EQ_FIXABLE = {"resonance", "harsh", "buildup"}
+
+
 def _valid_fix(fix, finding):
     """An eq_band cut inside the finding's frequency range and the action menu's limits."""
-    if not isinstance(fix, dict) or fix.get("type") != "eq_band":
+    if not isinstance(fix, dict) or fix.get("type") != "eq_band" or finding.get("kind") not in EQ_FIXABLE:
         return None
     try:
         freq, gain, q = float(fix["freq_hz"]), float(fix["gain_db"]), float(fix["q"])

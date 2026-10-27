@@ -21,6 +21,7 @@ const ENGINE = { host: "127.0.0.1", port: 8765 };
 const REPO = path.resolve(__dirname, "..");
 const ENGINE_DIR = path.join(REPO, "engine");
 const STRIP_URL = "file://" + encodeURI(path.join(REPO, "ui", "strip.html")) + "?host=max&theme=night";
+const WINDOW_URL = "file://" + encodeURI(path.join(REPO, "ui", "index.html")) + "?host=max&theme=night";
 const LOG_DIR = path.join(os.homedir(), "Library", "Logs", "Aria");
 const REC_DIR = path.join(os.tmpdir(), "aria");
 const BARS = 8;
@@ -32,12 +33,18 @@ const FILE_SETTLE_MS = 500;
 let engineChild = null;   // only an engine this device started, never one started by hand
 let engineState = { state: "starting", text: "Starting Aria" };
 let busy = false;
+let windowLoaded = false;
+let lastResult = null;    // so a window opened later shows the latest Check mix
 const waiters = {};       // live.js reply name -> resolve function
 
 const encode = (obj) => encodeURIComponent(JSON.stringify(obj));
 const decode = (s) => JSON.parse(decodeURIComponent(s));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const toUI = (name, payload) => Max.outlet("jweb", name, encode(payload));
+// Both the strip and the window get every UI message.
+const toUI = (name, payload) => {
+  Max.outlet("jweb", name, encode(payload));
+  if (windowLoaded) Max.outlet("window", name, encode(payload));
+};
 const toLive = (...args) => Max.outlet("live", ...args);
 const toRec = (...args) => Max.outlet("rec", ...args);
 
@@ -191,7 +198,8 @@ async function checkMix() {
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
     }
-    toUI("mix_result", { ...res.json, start_bar: startBar, chain: live.chain });
+    lastResult = { ...res.json, start_bar: startBar, chain: live.chain };
+    toUI("mix_result", lastResult);
   } catch (e) {
     recording = null;
     toUI("error", { text: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
@@ -204,9 +212,17 @@ async function checkMix() {
 
 Max.addHandler("ready", async () => {
   toUI("engine", engineState);
+  if (lastResult) toUI("mix_result", lastResult);
   try { await ensureEngine(); } catch (e) { setEngine("error", e.message); }
 });
 Max.addHandler("check_mix", () => checkMix());
+Max.addHandler("open_window", () => {
+  if (!windowLoaded) {
+    windowLoaded = true;
+    Max.outlet("window", "url", WINDOW_URL);
+  }
+  Max.outlet("window", "front");
+});
 Max.addHandler("jump_to", (s) => toLive("jump", decode(s).bar));
 Max.addHandler("add_marker", async (s) => {
   const { bar, name } = decode(s);

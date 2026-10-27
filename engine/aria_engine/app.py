@@ -7,6 +7,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
 from pydantic import BaseModel
 import soundfile as sf
 
@@ -101,6 +102,10 @@ def find_clarity(audio, rate, tempo, start_beat, beats_per_bar):
     if stem_audio is None:
         found["split_error"] = stem_rate
         return found
+    # Each part's level against the whole mix, for the Detailed view
+    mix_power = sum(np.mean(np.asarray(a, dtype=np.float64) ** 2) for a in stem_audio.values())
+    found["stems"] = {name: round(float(10 * np.log10(np.mean(np.asarray(a, dtype=np.float64) ** 2) / mix_power + 1e-12)), 1)
+                      for name, a in stem_audio.items()}
     split_found = stems.masking(stem_audio, stem_rate, relevant=stems.SPLIT_RELEVANT, **timing)
     split_found += stems.bass_clicks(stem_audio["bass"], stem_audio["drums"], stem_rate, **timing)
     for f in split_found:

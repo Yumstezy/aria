@@ -70,6 +70,7 @@
   }
 
   function showProgress(p) {
+    if (window.AriaWindow) window.AriaWindow.progress(p);
     stripState('progress');
     text('[data-progress-text]', p.text || '');
     text('[data-progress-detail]', p.detail || '');
@@ -94,6 +95,7 @@
         : c.after.length ? 'Aria hears your mix before ' + c.after.join(', ') + '. Drag Aria to the end of Main to measure what listeners hear.' : '';
     }
     renderFindings((r.clarity || {}).findings || []);
+    if (window.AriaWindow) window.AriaWindow.render(r);
 
     text('[data-advice-title]', r.advice ? 'Advice by Muse Spark' : 'No advice');
     text('[data-advice]', r.advice ? r.advice.summary : r.advice_error || 'Muse Spark did not answer.');
@@ -233,6 +235,7 @@
     }
   }
 
-  window.Aria = { send: send, on: on, notice: notice, setTheme: setTheme, checkEngine: checkEngine, inMax: inMax, showResult: showResult };
+  window.Aria = { send: send, on: on, notice: notice, setTheme: setTheme, checkEngine: checkEngine, inMax: inMax, showResult: showResult,
+                  describe: describe, hzRange: hzRange };
   document.addEventListener('DOMContentLoaded', init);
 })();

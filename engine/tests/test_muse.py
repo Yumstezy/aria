@@ -101,3 +101,13 @@ def test_rounded_frequency_from_a_finding_is_allowed():
 def test_frequency_outside_every_finding_is_still_dropped():
     advice, error = advise({"summary": "Something at 800 Hz sticks out.", "notes": []})
     assert advice is None and error
+
+
+def test_eq_fix_on_a_buried_vocal_is_dropped():
+    findings = [{"kind": "masking", "masked": "vocals", "by": "the rest", "range": "presence",
+                 "hz_range": [1000, 4000], "gap_db": -7.7, "share": 0.68, "bars": [9, 16]}]
+    advice, _ = muse.advise(MEASURED, CONTEXT, findings=findings, client=reply({
+        "summary": "The vocals sit 7.7 dB under the rest.",
+        "notes": [{"finding": 0, "kind": "masking", "text": "Bring the vocals up.",
+                   "fix": {"type": "eq_band", "freq_hz": 2000, "gain_db": -3, "q": 1}}]}))
+    assert advice["notes"][0]["fix"] is None

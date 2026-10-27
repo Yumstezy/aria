@@ -253,9 +253,27 @@ Build order, each a demo beat:
    - Voice through Muse Voice Transcribe comes after typed requests work.
 4. **Then Aria Ear** (exact per-track clashes, build Step 4), and checking a whole bounced song.
 
+### Item 1 built (Oct 26, late): the Aria window
+
+- **"Open window" on the strip** opens a floating window inside Live: a `p window` subpatcher with its own `jweb` loading `ui/index.html`.
+- **The bridge** sends every update to both the strip and the window, and replays the latest result when the window opens.
+- **Home** shows the latest verdict.
+- **Mix check Simple:**
+  - a verdict hero with Muse's summary
+  - Fix first with Muse's words, and "Hear it in Live"
+  - a card per finding (click its numbers to jump there)
+  - "Where it happens", one block per recorded bar (click to jump)
+- **Mix check Detailed:** loudness, true peak, bands and width, each split part's level against the mix, and everything Muse said.
+- **The engine** returns each split part's level (`clarity.stems`).
+- **Muse may only attach an EQ fix** to ringing notes, harsh hits and build-ups. It had offered an EQ cut for a buried vocal, which would cut the vocal too.
+- **Checked:** rendered with a real result from Ian's muddy mix, and the bridge's window routing was tested with a stand-in for Max. **Not yet checked inside Live.**
+
 ## Next
-- **Ian:** the ML data on Oct 27 with the ML teammate (`ml/README.md`). Confirm the "Aria check" marker name.
-- **Claude:** item 1 above.
+- **Ian:**
+  - Re-add `device/Aria.amxd`: the device file changed, because it now has the window.
+  - Check mix, then "Open window", and look at Simple and Detailed.
+  - The ML data on Oct 27.
+- **Claude:** item 2, Fix it for me with Undo on EQ Eight.
 
 ## Decisions so far
 - The build started Oct 26.

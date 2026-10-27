@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="aria.css">
 <script src="../design/ds/components/bundle.js"></script>
 <script src="app.js"></script>
+<script src="window.js"></script>
 </head>
 <body>
 <div class="cp-stage" data-theme="sky">
@@ -20,8 +21,8 @@
     <b>Aria</b>
   </div>
   <nav class="cp-nav" aria-label="Tools">
-    <a href="#" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg>Home</a>
-    <a href="#" data-action="nav" data-label="Mix check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 15c3 0 3-7 6-7s3 9 6 9 3-6 6-6"></path></svg>Mix check</a>
+    <a href="#" data-nav="home" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"></path></svg>Home</a>
+    <a href="#" data-nav="mixcheck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 15c3 0 3-7 6-7s3 9 6 9 3-6 6-6"></path></svg>Mix check</a>
     <a href="#" data-action="nav" data-label="Live analyzer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20V11M9 20V5M14 20v-8M19 20V8"></path></svg>Live analyzer</a>
     <a href="#" data-action="nav" data-label="Groove match"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="8" r="1.8"></circle><circle cx="10" cy="8" r="1.8"></circle><circle cx="15" cy="8" r="1.8"></circle><circle cx="20" cy="8" r="1.8"></circle><circle cx="6.5" cy="16" r="1.8"></circle><circle cx="11.5" cy="16" r="1.8"></circle><circle cx="16.5" cy="16" r="1.8"></circle></svg>Groove match</a>
     <a href="#" data-action="nav" data-label="Reference"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="6" width="5" height="12" rx="1.5"></rect><rect x="10" y="6" width="11" height="12" rx="1.5"></rect></svg>Reference</a>
@@ -36,37 +37,89 @@
   <header class="cp-spread">
     <div>
       <span class="cp-cap" data-session>This session</span>
-      <h1 class="cp-title" style="margin-top: 4px;">Home</h1>
+      <h1 class="cp-title" style="margin-top: 4px;" data-title>Home</h1>
     </div>
     <div class="cp-row" style="gap: 10px;">
       <span class="aria-notice" data-notice role="status" hidden></span>
       <span class="cp-tag" data-engine>Checking engine</span>
+      <div class="cp-seg" role="group" aria-label="View" data-view="mixcheck" hidden><button data-seg="simple" aria-pressed="true">Simple</button><button data-seg="detailed" aria-pressed="false">Detailed</button></div>
       <button class="cp-btn cp-btn-primary" data-action="check-mix">Check mix</button>
     </div>
   </header>
 
-  <div class="cp-bento">
-    <!-- First run. The results tiles (section map, Fix first, tool status) come back once the engine sends real data. -->
+  <!-- Home -->
+  <div class="cp-bento" data-view="home">
     <section class="cp-tile cp-hero span-7 aria-start" style="min-height: 340px; gap: 12px;">
       <span class="cp-cap">Get started</span>
-      <h2 class="aria-start-title">Make your mix sound like the track you love</h2>
-      <p class="cp-body" style="color: var(--on-tile-muted);">Aria compares your song with a reference, section by section, and Muse Spark tells you what to fix.</p>
+      <h2 class="aria-start-title">Make every sound in your mix easy to hear</h2>
+      <p class="cp-body" style="color: var(--on-tile-muted);">Aria listens to your song, finds what's buried, muddy or clicking, and Muse Spark tells you how to fix it.</p>
       <ol class="cp-steps cp-push">
         <li class="cp-step" data-step="engine"><i></i>Start the Aria engine</li>
-        <li class="cp-step"><i></i>Pick a track you want to sound like</li>
-        <li class="cp-step"><i></i>Play your song in Live</li>
-        <li class="cp-step"><i></i>Press Check mix</li>
+        <li class="cp-step"><i></i>Put Aria last on your Main track</li>
+        <li class="cp-step"><i></i>Play the busiest part of your song</li>
+        <li class="cp-step" data-step="check"><i></i>Press Check mix</li>
       </ol>
     </section>
 
-    <section class="cp-tile cp-card span-5" style="min-height: 340px; gap: 12px;">
-      <span class="cp-cap">The track you want to sound like</span>
-      <button class="aria-drop cp-push" style="flex: 1;" data-action="drop" data-label="Loading a reference">
-        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="var(--action)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"></path></svg>
-        <span class="cp-tile-title">Drop a track here</span>
-        <span class="cp-meta">or drag a clip from Live</span>
-      </button>
+    <section class="cp-tile cp-solid span-5" style="min-height: 340px; gap: 10px;">
+      <span class="cp-cap">Latest Mix check</span>
+      <div data-home-latest hidden style="display: contents;">
+        <h2 class="cp-tile-title" style="font-size: 20px; line-height: 25px;" data-home-verdict></h2>
+        <p class="cp-body is-quiet" data-home-line></p>
+        <div class="cp-row cp-push"><button class="cp-btn cp-btn-primary" data-nav="mixcheck">Open results</button></div>
+      </div>
+      <p class="cp-body is-quiet" data-home-empty>Nothing yet. Your latest result shows up here after you press Check mix.</p>
     </section>
+  </div>
+
+  <!-- Mix check -->
+  <div data-view="mixcheck" hidden>
+    <div class="aria-empty" data-mix-empty>
+      <b>No Mix check yet.</b>
+      Play the busiest part of your song and press Check mix. Aria listens to 8 bars.
+    </div>
+
+    <div data-mix-body hidden>
+      <div class="cp-bento" data-simple>
+        <section class="cp-tile cp-hero span-7" style="min-height: 228px; gap: 10px;">
+          <span class="cp-cap">What Aria heard</span>
+          <span class="aria-verdict" data-verdict></span>
+          <span class="aria-verdict-line" data-verdict-line></span>
+          <div class="cp-score cp-push" data-score></div>
+        </section>
+        <section class="cp-tile cp-solid span-5" style="min-height: 228px; gap: 8px;" data-fixfirst>
+          <span class="cp-cap">Fix first</span>
+          <h2 class="cp-tile-title" style="font-size: 20px; line-height: 25px;" data-fix-title></h2>
+          <p class="cp-body is-quiet" style="margin: 0;" data-fix-line></p>
+          <div class="cp-row cp-push">
+            <button class="cp-btn cp-btn-primary" data-action="fix-it" data-label="Fix it for me" hidden>Fix it for me</button>
+            <button class="cp-btn cp-btn-ghost" data-hear>Hear it in Live</button>
+          </div>
+        </section>
+        <div class="cp-bento span-12" style="display: contents;" data-cards></div>
+        <section class="cp-tile cp-card span-12" style="gap: 12px;">
+          <div class="cp-spread"><span class="cp-cap">Where it happens</span><span class="cp-meta">Click a bar to hear it</span></div>
+          <div class="cp-where" data-where></div>
+        </section>
+      </div>
+
+      <div class="cp-bento" data-detailed hidden>
+        <section class="cp-tile cp-card span-7" style="gap: 12px;">
+          <span class="cp-cap">The numbers</span>
+          <div class="aria-numbers" data-numbers></div>
+          <p class="cp-meta">Loudness and peak are here for reference. Aria's advice is about clarity.</p>
+        </section>
+        <section class="cp-tile cp-card span-5" style="gap: 12px;" data-parts-tile>
+          <span class="cp-cap">Each part against the mix</span>
+          <div class="aria-numbers" data-parts></div>
+          <p class="cp-meta" data-split-by></p>
+        </section>
+        <section class="cp-tile cp-card span-12" style="gap: 8px;">
+          <span class="cp-cap">Everything Muse Spark said</span>
+          <ul class="aria-notes" data-notes></ul>
+        </section>
+      </div>
+    </div>
   </div>
 </main>
 

@@ -2,13 +2,14 @@
 
     plugin~ ──────────────► plugout~        audio passes through untouched
        └──► sfrecord~ 2                      records Main while Check mix runs
-    jweb (strip UI) ──► node.script bridge.js ──► route jweb live rec
+    jweb (strip UI) ──► node.script bridge.js ──► route jweb window live rec
                                  ▲                 │      │     └──► sfrecord~
                                  │                 │      └──► v8 live.js
                                  │                 └──► jweb
     v8 live.js ──► route defer ──┤ (everything else)
                        └──► deferlow ──► v8 live.js   (Live API changes from notifications)
     live.thisdevice ──► v8 live.js                    (Live API ready)
+    p window: route front ──► thispatcher (opens it), else ──► jweb (ui/index.html) ──► out to the bridge
 
 Run:  python3.11 device/tools/make_aria_amxd.py
 """
@@ -18,6 +19,30 @@ from amxd import FONT, obj, template_patch, wire, write_amxd
 
 OUT = Path(__file__).resolve().parent.parent / "Aria.amxd"
 STRIP_W, STRIP_H = 700.0, 169.0
+WINDOW_W, WINDOW_H = 1200.0, 860.0
+
+
+def window_patcher(template):
+    """The Aria window: a floating window with its own jweb (ui/index.html).
+    "front" opens it; everything else goes to the page. The page's messages come back out."""
+    inner = {k: v for k, v in template.items() if k not in ("boxes", "lines", "project")}
+    inner.update({
+        "rect": [120.0, 90.0, 120.0 + WINDOW_W, 90.0 + WINDOW_H],
+        "openinpresentation": 1, "toolbarvisible": 0, "statusbarvisible": 0, "devicewidth": 0.0,
+        "boxes": [
+            {"box": {"id": "w-in", "maxclass": "inlet", "numinlets": 0, "numoutlets": 1, "outlettype": [""],
+                     "patching_rect": [8.0, 8.0, 30.0, 30.0]}},
+            obj("w-route", "route front", [8.0, 50.0, 70.0, 22.0], 1, 2),
+            obj("w-this", "thispatcher", [8.0, 90.0, 70.0, 22.0], 1, 2),
+            {"box": {**FONT, "id": "w-ui", "maxclass": "jweb", "numinlets": 1, "numoutlets": 1, "outlettype": [""],
+                     "patching_rect": [100.0, 90.0, 400.0, 280.0],
+                     "presentation": 1, "presentation_rect": [0.0, 0.0, WINDOW_W, WINDOW_H], "rendermode": 0, "url": ""}},
+            {"box": {"id": "w-out", "maxclass": "outlet", "numinlets": 1, "numoutlets": 0,
+                     "patching_rect": [100.0, 400.0, 30.0, 30.0]}},
+        ],
+        "lines": [wire("w-in", "w-route"), wire("w-route", "w-this", 0, 0), wire("w-route", "w-ui", 1, 0), wire("w-ui", "w-out")],
+    })
+    return inner
 
 
 def build():
@@ -28,10 +53,14 @@ def build():
                     "presentation": 1, "presentation_rect": [0.0, 0.0, STRIP_W, STRIP_H],
                     "rendermode": 0, "url": ""}}
 
+    window = obj("window", "p window", [8.0, 500.0, 70.0, 22.0], 1, 1)
+    window["box"]["patcher"] = window_patcher(patch["patcher"])
+
     boxes = [
         jweb,
+        window,
         obj("bridge", "node.script bridge.js @autostart 1 @watch 1", [8.0, 300.0, 230.0, 22.0], 1, 2),
-        obj("route-out", "route jweb live rec", [8.0, 340.0, 130.0, 22.0], 1, 4),
+        obj("route-out", "route jweb window live rec", [8.0, 340.0, 160.0, 22.0], 1, 5),
         obj("dump", "print aria-node", [250.0, 340.0, 90.0, 22.0], 1, 0),
         obj("live", "v8 live.js", [150.0, 380.0, 80.0, 22.0], 1, 1),
         obj("route-defer", "route defer", [150.0, 420.0, 70.0, 22.0], 1, 2),
@@ -50,8 +79,10 @@ def build():
         wire("bridge", "route-out"),
         wire("bridge", "dump", 1, 0),
         wire("route-out", "ui", 0, 0),
-        wire("route-out", "live", 1, 0),
-        wire("route-out", "rec", 2, 0),
+        wire("route-out", "window", 1, 0),
+        wire("route-out", "live", 2, 0),
+        wire("route-out", "rec", 3, 0),
+        wire("window", "bridge"),
         # Live API: replies, deferred changes, ready signal
         wire("live", "route-defer"),
         wire("route-defer", "deferlow", 0, 0),
