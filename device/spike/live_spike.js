@@ -32,6 +32,32 @@ function report(text) {
   outlet(0, text);
 }
 
+// Live applies Live API changes a moment later, so reading back right away
+// returns the old value. Wait before each check. Keep tasks so they aren't collected.
+const LIVE_SETTLE_MS = 150;
+const pending = [];
+function later(fn) {
+  const t = new Task(function () { pending.splice(pending.indexOf(t), 1); fn(); }, this);
+  pending.push(t);
+  t.schedule(LIVE_SETTLE_MS);
+}
+
+function cueAt(beats) {
+  let found = null;
+  ids(song().get("cue_points")).forEach(function (id) {
+    const cue = new LiveAPI("id " + id);
+    if (Math.abs(one(cue, "time") - beats) < 0.01) found = cue;
+  });
+  return found;
+}
+
+function cueList() {
+  return ids(song().get("cue_points")).map(function (id) {
+    const cue = new LiveAPI("id " + id);
+    return one(cue, "name") + " @ beat " + Math.round(one(cue, "time") * 100) / 100;
+  }).join(", ") || "none";
+}
+
 function state() {
   const s = song();
   report("state: tempo " + one(s, "tempo") +
@@ -43,8 +69,10 @@ function state() {
 function jump(bar) {
   const beats = barToBeats(bar);
   song().set("current_song_time", beats);
-  const now = one(song(), "current_song_time");
-  report((Math.abs(now - beats) < 0.01 ? "jump PASS" : "jump FAIL") + ": asked for bar " + bar + " (" + beats + " beats), playhead now at " + now);
+  later(function () {
+    const now = one(song(), "current_song_time");
+    report((Math.abs(now - beats) < 0.01 ? "jump PASS" : "jump FAIL") + ": asked for bar " + bar + " (" + beats + " beats), playhead now at " + now);
+  });
 }
 
 // 1.6 Add a named marker at a bar. set_or_delete_cue toggles, so it would delete
@@ -52,29 +80,31 @@ function jump(bar) {
 function marker(bar) {
   const name = Array.prototype.slice.call(arguments, 1).join(" ") || "Aria";
   const beats = barToBeats(bar);
-  const s = song();
 
-  let existing = null;
-  ids(s.get("cue_points")).forEach(function (id) {
-    const cue = new LiveAPI("id " + id);
-    if (Math.abs(one(cue, "time") - beats) < 0.01) existing = cue;
-  });
-
-  if (!existing) {
-    s.set("current_song_time", beats);
-    s.call("set_or_delete_cue");
-    ids(song().get("cue_points")).forEach(function (id) {
-      const cue = new LiveAPI("id " + id);
-      if (Math.abs(one(cue, "time") - beats) < 0.01) existing = cue;
+  function nameIt(cue, how) {
+    cue.set("name", name);
+    later(function () {
+      report("1.6 PASS (" + how + "): marker at bar " + bar + " named \"" + one(cue, "name") + "\"");
     });
   }
 
-  if (!existing) {
-    report("1.6 FAIL: no marker at bar " + bar + " after set_or_delete_cue");
-    return;
-  }
-  existing.set("name", name);
-  report("1.6 PASS: marker at bar " + bar + " named \"" + one(existing, "name") + "\"");
+  const existing = cueAt(beats);
+  if (existing) { nameIt(existing, "renamed existing"); return; }
+
+  song().set("current_song_time", beats);
+  later(function () {
+    const now = one(song(), "current_song_time");
+    if (Math.abs(now - beats) >= 0.01) {
+      report("1.6 FAIL: playhead didn't reach bar " + bar + " (at beat " + now + "), so no marker was added");
+      return;
+    }
+    song().call("set_or_delete_cue");
+    later(function () {
+      const cue = cueAt(beats);
+      if (cue) nameIt(cue, "new");
+      else report("1.6 FAIL: no marker at bar " + bar + " after set_or_delete_cue. Markers now: " + cueList());
+    });
+  });
 }
 
 function selectedAudioClip() {
@@ -104,19 +134,25 @@ function makeclip() {
   const before = ids(track.get("arrangement_clips")).length;
   const end = one(song(), "song_length");
   try { track.call("create_audio_clip", sel.path, end); } catch (e) { post("arrangement call threw: " + e + "\n"); }
-  const after = ids(track.get("arrangement_clips")).length;
-  if (after > before) {
-    report("1.8 PASS (Arrangement): new clip on \"" + one(track, "name") + "\" at beat " + end);
-    return;
-  }
+  later(function () {
+    const after = ids(track.get("arrangement_clips")).length;
+    if (after > before) {
+      report("1.8 PASS (Arrangement): new clip on \"" + one(track, "name") + "\" at beat " + end);
+      return;
+    }
 
-  // Session: the highlighted slot, if it's empty.
-  const slot = new LiveAPI("live_set view highlighted_clip_slot");
-  if (slot.id && slot.id !== "0" && !one(slot, "has_clip")) {
+    // Session: the highlighted slot, if it's empty.
+    const slot = new LiveAPI("live_set view highlighted_clip_slot");
+    if (!slot.id || slot.id === "0" || one(slot, "has_clip")) {
+      report("1.8 FAIL: no new Arrangement clip, and no empty Session slot highlighted to try instead");
+      return;
+    }
     try { slot.call("create_audio_clip", sel.path); } catch (e) { post("session call threw: " + e + "\n"); }
-    if (one(slot, "has_clip")) { report("1.8 PASS (Session): new clip in the highlighted slot"); return; }
-  }
-  report("1.8 FAIL: create_audio_clip did not add a clip in Arrangement or Session. Check the Max Console for errors.");
+    later(function () {
+      if (one(slot, "has_clip")) report("1.8 PASS (Session): new clip in the highlighted slot");
+      else report("1.8 FAIL: create_audio_clip did not add a clip in Arrangement or Session");
+    });
+  });
 }
 
 post("live_spike.js loaded. Click the test messages.\n");

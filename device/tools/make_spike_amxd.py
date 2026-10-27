@@ -62,7 +62,7 @@ def build():
         x += w + 8
 
     boxes += [
-        obj("bridge", "node.script bridge_spike.js @autostart 1", [8.0, 40.0, 222.0, 22.0], 1, 2),
+        obj("bridge", "node.script bridge_spike.js @autostart 1 @watch 1", [8.0, 40.0, 222.0, 22.0], 1, 2),
         obj("live", "v8 live_spike.js", [240.0, 40.0, 100.0, 22.0], 1, 1),
         obj("prepend", "prepend set", [8.0, 72.0, 70.0, 22.0], 2, 1),
         msg("results", "Click a test above. Results show here and in the Max Console.", [8.0, 102.0, 470.0, 52.0]),

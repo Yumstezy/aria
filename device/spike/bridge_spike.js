@@ -22,11 +22,13 @@ Max.addHandler("health", async () => {
   try {
     const res = await get("/health");
     const ms = Date.now() - started;
-    Max.post(`1.5 PASS: engine answered HTTP ${res.status} in ${ms} ms: ${res.body}`);
-    await Max.outlet("health", res.status, ms);
+    const text = `1.5 PASS: engine answered HTTP ${res.status} in ${ms} ms`;
+    Max.post(`${text}: ${res.body}`);
+    await Max.outlet(text);
   } catch (err) {
-    Max.post(`1.5 FAIL: ${err.message}. Is the engine running? Start it with engine/run.sh`, Max.POST_LEVELS.ERROR);
-    await Max.outlet("health", "fail", err.message);
+    const text = `1.5 FAIL: ${err.message}. Is the engine running? Start it with engine/run.sh`;
+    Max.post(text, Max.POST_LEVELS.ERROR);
+    await Max.outlet(text);
   }
 });
 
