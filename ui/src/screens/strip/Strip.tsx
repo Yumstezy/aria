@@ -1,107 +1,100 @@
-// The device strip on Main: 169 px tall (Live's device height), about 700 px wide.
-// Check mix and Ask on the left, what sticks out in the middle, Muse's advice on the right.
-import { Mic } from "lucide-react";
-import { LiquidGlass } from "@/components/ui/liquid-glass";
-import { Button, Cap, Mark } from "@/components/brand";
-import { addMarker, barsLabel, checkMix, describe, jumpTo, notice, openWindow, useAria } from "@/lib/aria";
+// The device strip on Main. Small and simple like Live's own devices (EQ Eight, Utility,
+// Limiter): Check and Ask on the left, a thumbnail of the result on the right. Everything
+// detailed lives in the window, one click away. 169 px tall (Live's device height).
+import { ArrowUpRight, Mic } from "lucide-react";
+import { GradientCard } from "@/components/ui/gradient-card";
+import { MiniWaves } from "@/components/mini-waves";
+import { CountUp } from "@/components/count-up";
+import { checkMix, notice, openWindow, useAria } from "@/lib/aria";
+import { problemsOf } from "@/lib/problems";
+import { cn } from "@/lib/utils";
+
+// Chip text: the shortest honest label for each problem
+function chip(name: string, value: string, unit: string) {
+  const word = name === "Vocal buried" ? "Vocal" : name === "Bass click" ? "Click" : name.split(" ")[0];
+  return unit.startsWith("%") ? word : `${word} ${unit === "dB under" ? "−" : ""}${parseFloat(value).toFixed(0)}`;
+}
 
 export function Strip() {
-  const { engine, progress, result, error, marker } = useAria();
-  const findings = result?.clarity.findings ?? [];
+  const { engine, progress, result, error } = useAria();
+  const list = result ? problemsOf(result) : [];
   const chain = result?.chain;
-  const chainWarning = chain && (!chain.on_main ? "Not on Main" : chain.after.length ? "Move Aria last" : null);
+  const engineDown = engine.state === "down" || engine.state === "error";
+  const warning = engineDown ? "Engine not running"
+    : chain && (!chain.on_main ? "Not on Main" : chain.after.length ? "Move Aria last" : null);
+  const busy = !!progress;
 
   return (
-    <div className="aria-lights h-[169px] overflow-hidden">
-      <div className="grid h-full grid-cols-[134px_minmax(0,1fr)_206px] gap-3 rounded-3xl p-3"
-           style={{ background: "color-mix(in srgb, var(--glass) 50%, transparent)" }}>
-
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2.5"><Mark /><b className="text-[13px] tracking-tight">Aria</b></div>
-          <Button variant="primary" className="w-full" disabled={!!progress} onClick={checkMix}>
-            {result ? "Check again" : "Check mix"}
-          </Button>
-          <Button variant="ghost" className="self-start bg-well" onClick={() => notice("Ask Muse is coming next.")}>
-            <Mic size={14} /> Ask
-          </Button>
-          {engine.state !== "up" && (
-            <span className={`mt-auto self-start whitespace-nowrap rounded-full bg-well px-2 py-0.5 text-[10.5px] font-semibold ${engine.state === "starting" ? "text-ink-muted" : "text-hot"}`}
-                  title={engine.text}>
-              {engine.state === "starting" ? "Starting Aria" : "Engine not running"}
-            </span>
-          )}
+    <div className="aria-lights flex h-[169px] gap-3 overflow-hidden p-3">
+      <div className="flex w-[84px] shrink-0 flex-col items-center gap-2">
+        <div className="flex items-center gap-1.5 self-start pl-1">
+          <svg viewBox="0 0 26 26" width={16} height={16} aria-hidden="true"><rect width="26" height="26" rx="8" fill="var(--action)" /><path d="M8 10v6M11.5 7v12M15 9v8M18.5 11v4" stroke="var(--on-action)" strokeWidth="2" strokeLinecap="round" /></svg>
+          <b className="text-xs tracking-tight">Aria</b>
         </div>
+        <button onClick={checkMix} disabled={busy} aria-label={result ? "Check again" : "Check mix"}
+                className={cn("grid size-[68px] place-items-center rounded-full bg-action text-on-action shadow-[0_10px_22px_-8px_var(--action-glow),inset_0_1px_0_rgba(255,255,255,0.35)]",
+                              "transition-transform duration-150 active:scale-95 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)]")}>
+          <span className="text-[13px] font-semibold leading-4">{busy ? "…" : result ? "Again" : "Check"}</span>
+        </button>
+        <button onClick={() => notice("Ask Muse is coming next.")} aria-label="Ask Muse"
+                className="flex h-7 items-center gap-1 rounded-full bg-white/8 px-2.5 text-[11.5px] font-semibold text-ink-muted ring-1 ring-white/10">
+          <Mic size={12} /> Ask
+        </button>
+      </div>
 
-        <LiquidGlass className="flex min-h-0 flex-col gap-1.5 px-3.5 py-3" radius="16px">
-          {error ? (
-            <div className="flex flex-1 flex-col justify-center gap-1 text-[13px]">
-              <b>Mix check stopped</b>
-              <span className="text-hot">{error}</span>
-            </div>
-          ) : progress ? (
-            <div className="flex flex-1 flex-col gap-1.5">
-              <Cap>Mix check</Cap>
-              <b className="text-sm font-semibold" role="status">{progress.text}</b>
-              <div className="h-1.5 overflow-hidden rounded-full bg-well">
-                <i className="block h-full rounded-full bg-action transition-[width] duration-200 ease-linear"
-                   style={{ width: progress.total ? `${Math.min(100, (100 * (progress.done ?? 0)) / progress.total)}%` : "100%" }} />
+      <GradientCard className="min-w-0 flex-1 px-3.5 py-2.5">
+        <div className="flex h-full flex-col">
+          {error || (!result && (engine.state === "down" || engine.state === "error")) ? (
+            <>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-faint">Mix check</span>
+              <p className="m-0 mt-1 line-clamp-4 text-xs leading-4 text-hot">{error ?? "The Aria engine isn't running."}</p>
+            </>
+          ) : busy ? (
+            <>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-faint">Mix check</span>
+              <span className="mt-auto text-sm font-semibold">{progress!.step === "record" ? "Listening" : progress!.step === "analyze" ? "Splitting and asking Muse" : "Getting ready"}</span>
+              <span className="font-mono text-[11px] text-ink-faint">{progress!.detail ?? ""}</span>
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/15">
+                <i className="block h-full rounded-full bg-white transition-[width] duration-200 ease-linear"
+                   style={{ width: progress!.total ? `${Math.min(100, (100 * (progress!.done ?? 0)) / progress!.total)}%` : "100%" }} />
               </div>
-              <span className="font-mono text-xs text-ink-faint">{progress.detail}</span>
-            </div>
+            </>
           ) : result ? (
             <>
-              <div className="flex items-center justify-between gap-2">
-                <Cap>What sticks out</Cap>
-                {chainWarning
-                  ? <span className="rounded-full bg-well px-2 text-[11px] font-semibold text-hot" title={chain!.after.length ? `Aria hears your mix before ${chain!.after.join(", ")}.` : `Aria is on "${chain!.track}".`}>{chainWarning}</span>
-                  : <span className="font-mono text-xs text-ink-faint">{barsLabel(result)}</span>}
+              <div className="flex items-start justify-between">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[30px] font-extralight leading-none tracking-[-0.04em]"><CountUp value={list.length} /></span>
+                  <span className="text-xs font-medium text-ink-muted">{list.length ? "to fix" : "Clear"}</span>
+                </div>
+                <button onClick={openWindow} aria-label="Open the Aria window" title="Open the Aria window"
+                        className="grid size-7 place-items-center rounded-full bg-white/15 text-white ring-1 ring-white/20 transition-colors hover:bg-white/25">
+                  <ArrowUpRight size={15} />
+                </button>
               </div>
-              {findings.length === 0 ? (
-                <p className="m-0 flex items-center gap-2 text-xs text-ink-muted">
-                  <span className="rounded-full bg-well px-2 font-semibold text-good">Clear</span> Nothing sticks out in these bars.
-                </p>
-              ) : (
-                <ol className="m-0 grid list-none gap-1 p-0">
-                  {findings.slice(0, 3).map((f, i) => {
-                    const d = describe(f);
-                    return (
-                      <li key={i}>
-                        <button onClick={() => jumpTo(f.bars[0])} title={`${d.about} Bars ${f.bars[0]} to ${f.bars[1]}. Click to jump there.`}
-                                className="grid w-full grid-cols-[82px_minmax(0,1fr)_54px] items-baseline gap-1 rounded-lg px-2 py-1 text-left transition-transform duration-150 hover:scale-[1.005]"
-                                style={{ background: "var(--glass-row)" }}>
-                          <span className="truncate text-[11.5px] font-semibold text-watch">{d.name}</span>
-                          <span className="truncate font-mono text-[11.5px]">{d.where}</span>
-                          <span className="text-right font-mono text-[11.5px] text-ink-muted">{d.size}</span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ol>
-              )}
+              {warning && <span className="mt-0.5 text-[11px] font-semibold text-hot" title={engineDown ? engine.text : chain!.after.length ? `Aria hears your mix before ${chain!.after.join(", ")}.` : `Aria is on "${chain!.track}".`}>{warning}</span>}
+              <div className="mt-auto">
+                {result.clarity.spectra && <MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode === "split"} />}
+                <div className="mt-1 flex gap-1 overflow-hidden">
+                  {list.slice(0, 3).map((p, i) => (
+                    <span key={i} className="whitespace-nowrap rounded-full bg-black/35 px-1.5 font-mono text-[10.5px] leading-[18px] text-white" title={p.short}>
+                      {chip(p.name, p.amount.value, p.amount.unit)}
+                    </span>
+                  ))}
+                  {list.length === 0 && <span className="text-[11px] text-ink-muted">Nothing sticks out here.</span>}
+                </div>
+              </div>
             </>
           ) : (
-            <div className="flex flex-1 flex-col justify-center gap-1 rounded-xl border-[1.5px] border-dashed border-hairline px-3 text-[13px] text-ink-muted">
-              <b className="font-semibold text-ink">Nothing measured yet.</b>
-              Press Check mix. Aria listens to 8 bars of your song.
-            </div>
+            <>
+              <div className="flex items-start justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-faint">Mix check</span>
+                <button onClick={openWindow} aria-label="Open the Aria window" className="grid size-7 place-items-center rounded-full bg-white/15 text-white ring-1 ring-white/20"><ArrowUpRight size={15} /></button>
+              </div>
+              <p className="m-0 mt-auto text-xs leading-4 text-ink-muted">{engine.state === "starting" ? "Starting Aria…" : "Play your song, then press Check."}</p>
+            </>
           )}
-        </LiquidGlass>
-
-        <LiquidGlass className="flex min-h-0 flex-col gap-1.5 px-3.5 py-3" radius="16px">
-          <Cap>{progress?.step === "analyze" ? "Muse Spark is writing" : result && !result.advice ? "No advice" : "Advice by Muse Spark"}</Cap>
-          <p className={`m-0 line-clamp-3 text-xs leading-4 ${result && !result.advice ? "text-ink-muted" : ""}`}>
-            {result ? (result.advice?.summary ?? result.advice_error ?? "Muse Spark did not answer.") : "Muse Spark explains what to fix after a Mix check."}
-          </p>
-          <div className="mt-auto flex gap-1.5">
-            <Button variant="light" small onClick={openWindow}>Open window</Button>
-            {result?.start_bar && (
-              <Button variant="ghost" small onClick={() => addMarker(result.start_bar!)}>
-                {marker ? `Marked bar ${marker.bar}` : `Mark bar ${result.start_bar}`}
-              </Button>
-            )}
-          </div>
-        </LiquidGlass>
-      </div>
+        </div>
+      </GradientCard>
     </div>
   );
 }

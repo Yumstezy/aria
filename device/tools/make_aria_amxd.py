@@ -18,7 +18,7 @@ from pathlib import Path
 from amxd import FONT, obj, template_patch, wire, write_amxd
 
 OUT = Path(__file__).resolve().parent.parent / "Aria.amxd"
-STRIP_W, STRIP_H = 700.0, 169.0
+STRIP_W, STRIP_H = 360.0, 169.0   # compact, like Live's own devices (Ian, Oct 27)
 WINDOW_W, WINDOW_H = 1200.0, 860.0
 
 

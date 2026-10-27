@@ -12,13 +12,16 @@ export function CountUp({ value, decimals = 0, duration = 900 }: { value: number
     const a = from.current, t0 = performance.now();
     let raf = 0;
     const f = (now: number) => {
-      const t = Math.min(1, (now - t0) / duration), v = a + (value - a) * (1 - (1 - t) ** 3);
+      const t = Math.max(0, Math.min(1, (now - t0) / duration)), v = a + (value - a) * (1 - (1 - t) ** 3);
       show(t < 1 ? v : value);
       from.current = v;
       if (t < 1) raf = requestAnimationFrame(f);
     };
     raf = requestAnimationFrame(f);
-    return () => cancelAnimationFrame(raf);
+    // Animation frames pause while the view is hidden (a collapsed device, a background
+    // window). The number must still land on the measured value.
+    const land = setTimeout(() => { cancelAnimationFrame(raf); show(value); from.current = value; }, duration + 150);
+    return () => { cancelAnimationFrame(raf); clearTimeout(land); };
   }, [value, decimals, duration]);
   return <span ref={ref}>{value.toFixed(decimals)}</span>;
 }
