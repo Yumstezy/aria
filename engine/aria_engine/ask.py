@@ -1,0 +1,191 @@
+"""Ask Muse: the producer types a request, Muse Spark picks tools from Aria's action menu.
+
+Muse never touches Live itself. This returns the tool calls, checked against the menu and
+its limits (docs/contracts.md), and the device applies them with Undo. Calls Muse makes
+on its own initiative come back as suggestions, which wait for the producer's yes.
+"""
+import json
+import os
+import re
+
+from openai import OpenAI, OpenAIError
+
+TIMEOUT_SEC = 20
+MAX_TOKENS = 1200
+MAX_NAME = 32
+MAX_WHY = 160
+DEFAULT_Q = 1.0   # a broad bell when the producer doesn't say how wide
+
+# The action menu Muse may use today, with the limits the device enforces too.
+TOOLS = [
+    {"type": "function", "function": {
+        "name": "jump_to", "description": "Move Live's playhead to the start of a bar.",
+        "parameters": {"type": "object", "properties": {"bar": {"type": "integer", "minimum": 1}}, "required": ["bar"]}}},
+    {"type": "function", "function": {
+        "name": "add_marker", "description": "Add a named marker (Live locator) at the start of a bar, or rename the one already there.",
+        "parameters": {"type": "object", "properties": {
+            "bar": {"type": "integer", "minimum": 1}, "name": {"type": "string", "maxLength": MAX_NAME}}, "required": ["bar", "name"]}}},
+    {"type": "function", "function": {
+        "name": "eq_band", "description": "Set one bell band on the EQ Eight at the end of the Main track (Aria adds one if needed). Negative gain cuts.",
+        "parameters": {"type": "object", "properties": {
+            "freq_hz": {"type": "number", "minimum": 20, "maximum": 20000},
+            "gain_db": {"type": "number", "minimum": -6, "maximum": 6},
+            "q": {"type": "number", "minimum": 0.3, "maximum": 12, "description": "Width. Leave out for a broad 1.0; use 4 to 8 for a narrow ringing note."}},
+            "required": ["freq_hz", "gain_db"]}}},
+    {"type": "function", "function": {
+        "name": "check_mix", "description": "Run a new Mix check: Aria records 16 bars of Main and analyzes them.",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "undo", "description": "Undo the last change Aria made in Live.",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "suggest", "description": "Offer a change the producer did NOT ask for. It is shown with Do it / Not now and only runs if they say yes.",
+        "parameters": {"type": "object", "properties": {
+            "action": {"type": "string", "enum": ["jump_to", "add_marker", "eq_band"]},
+            "args": {"type": "object"},
+            "why": {"type": "string", "maxLength": MAX_WHY}}, "required": ["action", "args", "why"]}}},
+]
+
+PROMPT = """You are Muse, the co-producer inside Aria, an Ableton Live device. The producer talks to you in plain words.
+Use the tools to do exactly what they ask, right away. Never do more than they asked: if you think something else
+would help, use "suggest" for it instead, and it waits for their yes.
+
+You get JSON context: the latest Mix check findings (what sticks out, where, by how much), the bars it covered,
+the playhead bar, the tempo, and the markers already in the producer's Live set (name and bar). When they name a
+part of the song, like "the drop", use a marker with that name; if there isn't one, say so. Use only numbers from the context or from the producer's words. Never invent a number.
+If they ask for a fix from the findings, use the finding's frequency. An EQ cut is a negative gain_db.
+If they don't say how wide, leave q out (a broad 1.0); a ringing note gets a narrow q of 4 to 8.
+
+The EQ sits on the Main track, so it changes every sound at once. Use it only for things that live in the
+whole mix: a ringing note, harsh hits, or a frequency the producer names. Never use it to fix a buried sound
+(like a buried vocal) or mud: cutting the whole mix there cuts the buried sound too and makes it worse.
+For those, don't call eq_band. Say plainly what to change on which track instead, for example turn the vocal
+up or dip the synths in that range, and that Aria can do it once Aria Ear is on those tracks.
+If you can't do what they ask with these tools, say so plainly and don't call a tool.
+
+Always also reply in one or two short sentences: what you did or why you couldn't. No emojis, no em dashes."""
+
+
+def _numbers(text):
+    return [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", text)]
+
+
+def _allowed(context, request, actions):
+    allowed = {0.0}
+
+    def add(v):
+        if isinstance(v, bool):
+            return
+        if isinstance(v, (int, float)):
+            for x in (v, abs(v)):
+                allowed.update({round(x, 2), round(x, 1), float(round(x)), round(x, -1)})
+                if x >= 1000:
+                    allowed.update({round(x / 1000, 1), round(x / 1000, 2)})
+        elif isinstance(v, (list, tuple)):
+            for x in v:
+                add(x)
+        elif isinstance(v, dict):
+            for x in v.values():
+                add(x)
+
+    add(context)
+    for n in _numbers(request):
+        add(n)
+    for a in actions:
+        add(a["args"])
+    return allowed
+
+
+def check_action(name, args):
+    """Return the cleaned args if this call is on the menu and in range, else None."""
+    if not isinstance(args, dict):
+        return None
+    try:
+        if name == "jump_to":
+            bar = int(args["bar"])
+            return {"bar": bar} if 1 <= bar <= 9999 else None
+        if name == "add_marker":
+            bar, label = int(args["bar"]), str(args["name"]).strip()
+            return {"bar": bar, "name": label} if 1 <= bar <= 9999 and 0 < len(label) <= MAX_NAME else None
+        if name == "eq_band":
+            f, g, q = float(args["freq_hz"]), float(args["gain_db"]), float(args.get("q", DEFAULT_Q))
+            ok = 20 <= f <= 20000 and -6 <= g <= 6 and 0.3 <= q <= 12 and g != 0
+            return {"freq_hz": round(f), "gain_db": round(g, 1), "q": round(q, 2)} if ok else None
+        if name in ("check_mix", "undo"):
+            return {}
+    except (KeyError, TypeError, ValueError):
+        return None
+    return None
+
+
+def interpret(message, context, request):
+    """Turn Muse's reply into {reply, actions, suggestions, dropped}. Exposed for tests."""
+    actions, suggestions, dropped = [], [], 0
+    for call in getattr(message, "tool_calls", None) or []:
+        name = call.function.name
+        try:
+            args = json.loads(call.function.arguments or "{}")
+        except json.JSONDecodeError:
+            dropped += 1
+            continue
+        if name == "suggest":
+            inner = check_action(args.get("action"), args.get("args"))
+            why = str(args.get("why", "")).strip()[:MAX_WHY]
+            if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band") and why:
+                suggestions.append({"type": args["action"], "args": inner, "why": why})
+            else:
+                dropped += 1
+            continue
+        cleaned = check_action(name, args)
+        if cleaned is None:
+            dropped += 1
+        else:
+            actions.append({"type": name, "args": cleaned})
+
+    reply = (message.content or "").strip() or None
+    if reply:
+        allowed = _allowed(context, request, actions + [{"args": s["args"]} for s in suggestions])
+        if any(round(n, 2) not in allowed for n in _numbers(reply)):
+            reply = None   # cited a number we don't have; the actions themselves still stand
+    return {"reply": reply, "actions": actions, "suggestions": suggestions, "dropped": dropped}
+
+
+# Everyday names for the split parts, so Muse never says "other"
+PART_NAMES = {"vocals": "vocal", "other": "synths and keys", "drums": "drums and loops", "bass": "bass", "the rest": "the rest of the mix"}
+
+
+def friendly(context):
+    """Context for Muse with everyday part names. Numbers are untouched."""
+    out = dict(context)
+    out["findings"] = [{k: PART_NAMES.get(v, v) if k in ("masked", "by") else v for k, v in f.items()}
+                       for f in context.get("findings") or []]
+    return out
+
+
+def ask(request, context, client=None):
+    """Returns {reply, actions, suggestions, dropped, error}."""
+    request = (request or "").strip()
+    context = friendly(context or {})
+    if not request:
+        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "error": "Say what you'd like Muse to do."}
+    key = os.environ.get("MODEL_API_KEY", "").strip()
+    if client is None and not key:
+        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0,
+                "error": "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."}
+    if client is None:
+        client = OpenAI(api_key=key, base_url=os.environ.get("MUSE_BASE_URL", "https://api.meta.ai/v1"),
+                        timeout=TIMEOUT_SEC, max_retries=1)
+    try:
+        res = client.chat.completions.create(
+            model=os.environ.get("MUSE_MODEL", "muse-spark-1.3"), max_tokens=MAX_TOKENS, reasoning_effort="minimal",
+            tools=TOOLS, tool_choice="auto",
+            messages=[{"role": "system", "content": PROMPT},
+                      {"role": "user", "content": json.dumps({"context": context, "request": request})}])
+    except OpenAIError as e:
+        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0,
+                "error": f"Muse Spark is unavailable right now ({type(e).__name__})."}
+    if not res.choices:
+        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "error": "Muse Spark returned an empty reply."}
+    out = interpret(res.choices[0].message, context, request)
+    out["error"] = None if (out["reply"] or out["actions"] or out["suggestions"]) else "Muse Spark didn't answer that one."
+    return out

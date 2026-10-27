@@ -11,7 +11,7 @@ import numpy as np
 from pydantic import BaseModel
 import soundfile as sf
 
-from aria_engine import __version__, analysis, clarity, muse, split, stems
+from aria_engine import __version__, analysis, ask, clarity, muse, split, stems
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 MAX_FILE_BYTES = 500 * 1024 * 1024
@@ -149,3 +149,14 @@ def mix_analyze(req: MixRequest):
         "advice_by": "Muse Spark" if advice else None,
         "advice_error": advice_error,
     }
+
+
+class AskRequest(BaseModel):
+    text: str
+    context: dict = {}
+
+
+@app.post("/muse/ask")
+def muse_ask(req: AskRequest):
+    """Ask Muse: returns checked tool calls for the device to apply, and suggestions."""
+    return ask.ask(req.text, req.context)
