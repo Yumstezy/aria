@@ -144,6 +144,7 @@ Max.addHandler("live_state", (s) => { const w = waiters.live_state; delete waite
 Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete waiters.marker_done; if (w) w(decode(s)); });
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
+Max.addHandler("volume_done", (s) => { const w = waiters.volume_done; delete waiters.volume_done; if (w) w(decode(s)); });
 Max.addHandler("live_error", (s) => toUI("error", decode(s)));
 Max.addHandler("live_playing", (on) => {
   if (waiters.live_playing) waiters.live_playing(on === 1);
@@ -239,9 +240,19 @@ Max.addHandler("add_marker", async (s) => {
 // ---------- Ask Muse ----------
 
 // One action from Muse's menu, applied in Live. Returns { ok, text } for the UI.
-async function apply(action) {
+// Track tools name a track; the engine already checked the name exists in the set.
+async function apply(action, tracks = []) {
   const a = action.args || {};
+  const trackIndex = (name) => {
+    const t = tracks.find((x) => x.name.toLowerCase() === String(name).toLowerCase());
+    if (!t) throw new UserError(`There's no track called "${name}" in this set.`);
+    return t.index;
+  };
   switch (action.type) {
+    case "track_volume":
+      return await askLive("volume", "volume_done", trackIndex(a.track), a.change_db);
+    case "track_eq":
+      return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track));
     case "jump_to":
       toLive("jump", a.bar);
       return { ok: true, text: `Moved the playhead to bar ${a.bar}.` };
@@ -271,6 +282,7 @@ async function askContext() {
     tempo: live ? live.tempo : null,
     playhead_bar: live ? Math.floor(live.song_beat / live.beats_per_bar) + 1 : null,
     markers: live ? live.markers : [],
+    tracks: live ? live.tracks : [],
   };
 }
 
@@ -282,11 +294,12 @@ Max.addHandler("ask", async (s) => {
   toUI("ask_pending", { request: text });
   try {
     await ensureEngine();
-    const res = await request("POST", "/muse/ask", { text, context: await askContext() }, ANALYZE_TIMEOUT_MS);
+    const context = await askContext();
+    const res = await request("POST", "/muse/ask", { text, context }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200 || !res.json) throw new UserError(`Muse couldn't answer (HTTP ${res.status}).`);
     const done = [];
     for (const action of res.json.actions) {
-      try { done.push({ ...action, ...(await apply(action)) }); }
+      try { done.push({ ...action, ...(await apply(action, context.tracks)) }); }
       catch (e) { done.push({ ...action, ok: false, text: e.message }); }
     }
     toUI("ask_reply", { request: text, reply: res.json.reply, done, suggestions: res.json.suggestions, error: res.json.error });
@@ -301,7 +314,7 @@ Max.addHandler("ask", async (s) => {
 Max.addHandler("do_action", async (s) => {
   const action = decode(s);
   let out;
-  try { out = await apply(action); } catch (e) { out = { ok: false, text: e.message }; }
+  try { out = await apply(action, (await askContext()).tracks); } catch (e) { out = { ok: false, text: e.message }; }
   toUI("action_done", { ...action, ...out });
 });
 

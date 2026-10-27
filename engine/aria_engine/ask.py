@@ -33,6 +33,17 @@ TOOLS = [
             "q": {"type": "number", "minimum": 0.3, "maximum": 12, "description": "Width. Leave out for a broad 1.0; use 4 to 8 for a narrow ringing note."}},
             "required": ["freq_hz", "gain_db"]}}},
     {"type": "function", "function": {
+        "name": "track_volume", "description": "Turn one of the producer's tracks up or down by a few dB. Use the exact track name from context.tracks.",
+        "parameters": {"type": "object", "properties": {
+            "track": {"type": "string"}, "change_db": {"type": "number", "minimum": -6, "maximum": 6}}, "required": ["track", "change_db"]}}},
+    {"type": "function", "function": {
+        "name": "track_eq", "description": "Set one bell band on an EQ Eight on one of the producer's tracks (Aria adds one if needed). Use the exact track name from context.tracks. Negative gain cuts.",
+        "parameters": {"type": "object", "properties": {
+            "track": {"type": "string"},
+            "freq_hz": {"type": "number", "minimum": 20, "maximum": 20000},
+            "gain_db": {"type": "number", "minimum": -6, "maximum": 6},
+            "q": {"type": "number", "minimum": 0.3, "maximum": 12}}, "required": ["track", "freq_hz", "gain_db"]}}},
+    {"type": "function", "function": {
         "name": "check_mix", "description": "Run a new Mix check: Aria records 16 bars of Main and analyzes them.",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
@@ -41,7 +52,7 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "suggest", "description": "Offer a change the producer did NOT ask for. It is shown with Do it / Not now and only runs if they say yes.",
         "parameters": {"type": "object", "properties": {
-            "action": {"type": "string", "enum": ["jump_to", "add_marker", "eq_band"]},
+            "action": {"type": "string", "enum": ["jump_to", "add_marker", "eq_band", "track_volume", "track_eq"]},
             "args": {"type": "object"},
             "why": {"type": "string", "maxLength": MAX_WHY}}, "required": ["action", "args", "why"]}}},
 ]
@@ -51,16 +62,23 @@ Use the tools to do exactly what they ask, right away. Never do more than they a
 would help, use "suggest" for it instead, and it waits for their yes.
 
 You get JSON context: the latest Mix check findings (what sticks out, where, by how much), the bars it covered,
-the playhead bar, the tempo, and the markers already in the producer's Live set (name and bar). When they name a
+the playhead bar, the tempo, the markers already in the producer's Live set (name and bar), and their tracks (name). When they name a
 part of the song, like "the drop", use a marker with that name; if there isn't one, say so. Use only numbers from the context or from the producer's words. Never invent a number.
 If they ask for a fix from the findings, use the finding's frequency. An EQ cut is a negative gain_db.
 If they don't say how wide, leave q out (a broad 1.0); a ringing note gets a narrow q of 4 to 8.
 
-The EQ sits on the Main track, so it changes every sound at once. Use it only for things that live in the
-whole mix: a ringing note, harsh hits, or a frequency the producer names. Never use it to fix a buried sound
+eq_band sits on the Main track, so it changes every sound at once. Use it only for things that live in the
+whole mix: a ringing note, harsh hits, or a frequency the producer names. Never use eq_band for a buried sound
 (like a buried vocal) or mud: cutting the whole mix there cuts the buried sound too and makes it worse.
-For those, don't call eq_band. Say plainly what to change on which track instead, for example turn the vocal
-up or dip the synths in that range, and that Aria can do it once Aria Ear is on those tracks.
+
+For a buried sound or mud, act on the producer's own tracks (context.tracks, by exact name):
+- a buried sound (like a buried vocal): raise its track by 1 to 3 dB with track_volume, and/or dip the track
+  covering it in that range with track_eq (a cut of 2 to 4 dB, broad q).
+- mud: there is already too much in that range, so never raise anything there. Cut the track that crowds it,
+  usually the bass or the biggest synth or pad, with track_eq in that range (2 to 4 dB, broad q).
+Match parts to tracks by name: a vocal is a track named like Vocal, Vox or Voice; synths and keys are tracks
+named like Synth, Keys, Pad, Lead or Chords; prefer a group track when there is one. If no track clearly
+matches, don't guess: name the tracks you see and ask which one.
 If you can't do what they ask with these tools, say so plainly and don't call a tool.
 
 Always also reply in one or two short sentences: what you did or why you couldn't. No emojis, no em dashes."""
@@ -96,11 +114,22 @@ def _allowed(context, request, actions):
     return allowed
 
 
-def check_action(name, args):
-    """Return the cleaned args if this call is on the menu and in range, else None."""
+def check_action(name, args, tracks=()):
+    """Return the cleaned args if this call is on the menu and in range, else None.
+    Track tools must name a track that exists in the set."""
     if not isinstance(args, dict):
         return None
     try:
+        if name in ("track_volume", "track_eq"):
+            names = {t.lower(): t for t in tracks}
+            track = names.get(str(args.get("track", "")).strip().lower())
+            if not track:
+                return None
+            if name == "track_volume":
+                change = float(args["change_db"])
+                return {"track": track, "change_db": round(change, 1)} if -6 <= change <= 6 and change != 0 else None
+            eq = check_action("eq_band", args)
+            return {"track": track, **eq} if eq else None
         if name == "jump_to":
             bar = int(args["bar"])
             return {"bar": bar} if 1 <= bar <= 9999 else None
@@ -121,6 +150,7 @@ def check_action(name, args):
 def interpret(message, context, request):
     """Turn Muse's reply into {reply, actions, suggestions, dropped}. Exposed for tests."""
     actions, suggestions, dropped = [], [], 0
+    tracks = [t["name"] if isinstance(t, dict) else str(t) for t in context.get("tracks") or []]
     for call in getattr(message, "tool_calls", None) or []:
         name = call.function.name
         try:
@@ -129,14 +159,14 @@ def interpret(message, context, request):
             dropped += 1
             continue
         if name == "suggest":
-            inner = check_action(args.get("action"), args.get("args"))
+            inner = check_action(args.get("action"), args.get("args"), tracks)
             why = str(args.get("why", "")).strip()[:MAX_WHY]
-            if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band") and why:
+            if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band", "track_volume", "track_eq") and why:
                 suggestions.append({"type": args["action"], "args": inner, "why": why})
             else:
                 dropped += 1
             continue
-        cleaned = check_action(name, args)
+        cleaned = check_action(name, args, tracks)
         if cleaned is None:
             dropped += 1
         else:
@@ -188,4 +218,7 @@ def ask(request, context, client=None):
         return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "error": "Muse Spark returned an empty reply."}
     out = interpret(res.choices[0].message, context, request)
     out["error"] = None if (out["reply"] or out["actions"] or out["suggestions"]) else "Muse Spark didn't answer that one."
+    # Local engine log only (~/Library/Logs/Aria/engine.log): what was asked and what Muse did
+    print(f"ask: {request!r} -> actions={out['actions']} suggestions={len(out['suggestions'])} "
+          f"dropped={out['dropped']} reply={out['reply']!r} error={out['error']!r}", flush=True)
     return out

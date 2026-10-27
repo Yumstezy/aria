@@ -74,8 +74,20 @@ function state() {
     playing: one(song, "is_playing") === 1,
     song_beat: one(song, "current_song_time"),
     chain: chain(),
-    markers: markerList()
+    markers: markerList(),
+    tracks: trackList()
   });
+}
+
+function trackList() {
+  return ids(song.get("tracks")).map(function (id, i) {
+    const t = new LiveAPI("id " + id);
+    return { name: String(one(t, "name")), index: i, group: one(t, "is_foldable") === 1 };
+  });
+}
+
+function trackAt(index) {
+  return index < 0 ? mainTrack() : new LiveAPI("live_set tracks " + index);
 }
 
 function markerList() {
@@ -211,31 +223,31 @@ function bandParams(eq) {
   return bands;
 }
 
-function eq(freq, gain, q) {
-  const track = mainTrack();
+function eq(freq, gain, q, trackIndex) {
+  const index = trackIndex === undefined ? -1 : trackIndex;
+  const track = trackAt(index);
   let device = findEq(track);
-  if (device) { applyEq(device, false, freq, gain, q); return; }
-  // Add one just before Aria, so Aria still hears the result
-  const me = new LiveAPI("this_device");
+  if (device) { applyEq(device, false, freq, gain, q, index); return; }
   const devs = ids(track.get("devices"));
-  const at = Math.max(0, devs.indexOf(Number(me.id)));
+  // On Main, add it just before Aria so Aria still hears the result; elsewhere at the end
+  const at = index < 0 ? Math.max(0, devs.indexOf(Number(new LiveAPI("this_device").id))) : devs.length;
   try { track.call("insert_device", "EQ Eight", at); } catch (e) { post("insert_device failed: " + e + "\n"); }
-  pendingEq = { freq: freq, gain: gain, q: q };
+  pendingEq = { freq: freq, gain: gain, q: q, index: index };
   outlet(0, "defer", "eq_continue");
 }
 
 function eq_continue() {
   const p = pendingEq;
   pendingEq = null;
-  const device = findEq(mainTrack());
+  const device = findEq(trackAt(p.index));
   if (!device) {
-    send("eq_done", { ok: false, text: "Aria couldn't add an EQ Eight. Put one on Main just before Aria, then ask again." });
+    send("eq_done", { ok: false, text: "Aria couldn't add an EQ Eight. Put one on that track, then ask again." });
     return;
   }
-  applyEq(device, true, p.freq, p.gain, p.q);
+  applyEq(device, true, p.freq, p.gain, p.q, p.index);
 }
 
-function applyEq(device, added, freq, gain, q) {
+function applyEq(device, added, freq, gain, q, index) {
   const bands = bandParams(device);
   // A band that's switched off, inner bands first; the outer ones are usually cuts
   const order = ["4", "5", "3", "6", "2", "7", "1", "8"];
@@ -249,7 +261,7 @@ function applyEq(device, added, freq, gain, q) {
   const keep = ["Filter On", "Filter Type", "Frequency", "Gain", "Resonance"].map(function (k) {
     return { id: Number(b[k].id), value: one(b[k], "value") };
   });
-  undoStack.push({ kind: "eq", params: keep, deviceId: added ? Number(device.id) : null, band: band });
+  undoStack.push({ kind: "eq", params: keep, deviceId: added ? Number(device.id) : null, band: band, track: index === undefined ? -1 : index });
 
   const types = b["Filter Type"].get("value_items");
   const bell = Array.isArray(types) ? types.indexOf("Bell") : -1;
@@ -260,8 +272,9 @@ function applyEq(device, added, freq, gain, q) {
     q: setByDisplay(b["Resonance"], q)
   };
   b["Filter On"].set("value", 1);
+  const where = index === undefined || index < 0 ? "Main" : "\"" + one(trackAt(index), "name") + "\"";
   send("eq_done", { ok: true, band: Number(band), added: added, shown: shown,
-                    text: (added ? "Added an EQ Eight on Main. " : "") + "Band " + band + ": " + shown.gain + " at " + shown.freq + ", Q " + shown.q + "." });
+                    text: (added ? "Added an EQ Eight on " + where + ". " : "On " + where + ": ") + "band " + band + " " + shown.gain + " at " + shown.freq + ", Q " + shown.q + "." });
 }
 
 // ---------- Undo: reverse the last change Aria made ----------
@@ -272,10 +285,13 @@ function undo() {
   if (u.kind === "eq") {
     u.params.forEach(function (p) { new LiveAPI("id " + p.id).set("value", p.value); });
     if (u.deviceId) {
-      const track = mainTrack(), at = ids(track.get("devices")).indexOf(u.deviceId);
+      const track = trackAt(u.track), at = ids(track.get("devices")).indexOf(u.deviceId);
       if (at >= 0) track.call("delete_device", at);
     }
     send("undo_done", { ok: true, text: u.deviceId ? "Removed the EQ Eight Aria added." : "Put EQ band " + u.band + " back how it was." });
+  } else if (u.kind === "params") {
+    u.params.forEach(function (p) { new LiveAPI("id " + p.id).set("value", p.value); });
+    send("undo_done", { ok: true, text: "Put \"" + one(trackAt(u.track), "name") + "\" volume back." });
   } else if (u.kind === "marker_rename") {
     new LiveAPI("id " + u.id).set("name", u.name);
     send("undo_done", { ok: true, text: "Renamed the marker at bar " + u.bar + " back to \"" + u.name + "\"." });
@@ -286,4 +302,18 @@ function undo() {
     timeObserver.property = "current_song_time";
     song.set("current_song_time", u.beats);
   }
+}
+
+// ---------- Track volume: nudge one track up or down, with Undo ----------
+
+function volume(trackIndex, changeDb) {
+  const track = trackAt(trackIndex);
+  const fader = new LiveAPI(track.unquotedpath + " mixer_device volume");
+  const before = one(fader, "value");
+  const now = displayed(fader, before);
+  if (now === null) { send("volume_done", { ok: false, text: "Aria couldn't read that track's volume." }); return; }
+  const target = Math.min(6, now + changeDb);
+  undoStack.push({ kind: "params", params: [{ id: Number(fader.id), value: before }], what: "volume", track: trackIndex });
+  const shown = setByDisplay(fader, target);
+  send("volume_done", { ok: true, text: "\"" + one(track, "name") + "\" " + (changeDb > 0 ? "up" : "down") + " " + Math.abs(changeDb) + " dB, now " + shown + "." });
 }

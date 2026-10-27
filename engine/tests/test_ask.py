@@ -76,3 +76,16 @@ def test_muse_sees_everyday_part_names():
     ask.ask("fix the mud", ctx, client=client)
     f = seen["payload"]["context"]["findings"][0]
     assert f["masked"] == "synths and keys" and f["by"] == "the rest of the mix" and f["gap_db"] == -6.2
+
+
+TRACKS = {**CONTEXT, "tracks": [{"name": "Vocal", "index": 9, "group": True}, {"name": "LEADS", "index": 12, "group": True}]}
+
+
+def test_track_tools_need_a_real_track_name():
+    out = ask.ask("make the vocal easier to hear", TRACKS, client=client_for(msg(
+        "Raised Vocal 2 dB and dipped LEADS at 2 kHz.",
+        call("track_volume", track="vocal", change_db=2), call("track_eq", track="LEADS", freq_hz=2000, gain_db=-3),
+        call("track_volume", track="Vox Male 7", change_db=2))))
+    assert out["actions"] == [{"type": "track_volume", "args": {"track": "Vocal", "change_db": 2.0}},
+                              {"type": "track_eq", "args": {"track": "LEADS", "freq_hz": 2000, "gain_db": -3.0, "q": 1.0}}]
+    assert out["dropped"] == 1
