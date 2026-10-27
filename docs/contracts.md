@@ -255,7 +255,9 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
   - `clear_history`
   - `open_ask`: open the window with the Ask pop-up open.
   - `window_mode {mode: "full" | "left" | "right", screen: {x, y, w, h}}`: size and place the window. Left and right dock to that screen edge and float over Live. Saved in `~/Library/Application Support/Aria/window.json`.
-  - `open_chat {screen}`: pop Ask Muse out into its own small floating window.
+  - `open_chat {screen}`: pop Ask Muse out. The main window shrinks to what to fix, with the chat stacked under it on the docked edge.
+  - `close_chat`: close the chat; the main window takes its full docked height again.
+  - `close_window`: close the window (and the chat).
 - Device to UI:
   - `ask_pending {request | null}`
   - `ask_log [exchange]`: the whole history, sent on `ready` and on every change. The bridge owns it and saves it in `~/Library/Application Support/Aria/ask-history.json` (last 100).

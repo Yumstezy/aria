@@ -2,7 +2,7 @@
 // Picture first, a short line second, numbers and long text only when asked for (DESIGN.md).
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeftRight, AudioWaveform, ChartNoAxesColumn, Columns2, Grip, House, Maximize2, MessageSquare, Mic, PanelLeft, PanelRight } from "lucide-react";
+import { ArrowLeftRight, AudioWaveform, ChartNoAxesColumn, ChevronsDown, Columns2, Grip, House, Maximize2, MessageSquare, Mic, PanelLeft, PanelRight, Play, X } from "lucide-react";
 import { LiquidGlass } from "@/components/ui/liquid-glass";
 import { Button, Cap, Mark } from "@/components/brand";
 import { Waves } from "@/components/waves";
@@ -12,22 +12,15 @@ import { CountUp } from "@/components/count-up";
 import { Segmented } from "@/components/ui/segmented";
 import { AskMuse, InlineAsk } from "@/components/ask-muse";
 import { problemsOf, type Problem } from "@/lib/problems";
-import { barsLabel, checkMix, describe, jumpTo, lastDock, notice, openChat, setAskOpen, setWindowMode, soundName, useAria, useAriaSnapshot, type Result } from "@/lib/aria";
+import { MiniWaves } from "@/components/mini-waves";
+import { barsLabel, checkMix, closeChat, closeWindow, describe, jumpTo, lastDock, notice, openChat, setAskOpen, setWindowMode, soundName, useAria, useAriaSnapshot, useViewport, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
 type View = "home" | "mixcheck";
 
-// Side mode (a narrow panel beside Live) stacks everything in one column.
-const NARROW_PX = 760;
-function useNarrow() {
-  const [narrow, setNarrow] = useState(() => window.innerWidth < NARROW_PX);
-  useEffect(() => {
-    const on = () => setNarrow(window.innerWidth < NARROW_PX);
-    window.addEventListener("resize", on);
-    return () => window.removeEventListener("resize", on);
-  }, []);
-  return narrow;
-}
+// Docked (a narrow panel beside Live) stacks everything in one column, on see-through glass.
+// Short as well as narrow means Ask Muse is popped out under it: show only what to fix.
+const NARROW_PX = 760, COMPACT_PX = 480;
 const wide = (narrow: boolean, cls: string) => (narrow ? "col-span-12" : cls);
 
 export function AriaWindow() {
@@ -35,18 +28,22 @@ export function AriaWindow() {
   const [view, setView] = useState<View>("home");
   const [detailed, setDetailed] = useState(false);
   const [open, setOpen] = useState(0);
-  const narrow = useNarrow();
+  const [width, height] = useViewport();
+  const narrow = width < NARROW_PX, compact = narrow && height < COMPACT_PX;
+  useEffect(() => { document.documentElement.classList.toggle("see-through", narrow); }, [narrow]);
 
   // A new result opens Mix check with the first problem ("fix first") open.
   useEffect(() => { if (result) { setView("mixcheck"); setOpen(0); } }, [result]);
 
   const status = progress ? `${progress.text}${progress.detail ? ` · ${progress.detail}` : ""}` : error ?? note;
 
+  if (compact) return <Compact />;
+
   return (
-    <div className={cn("aria-lights min-h-full", narrow ? "p-0" : "p-8")}>
-      <div className={cn("grid overflow-hidden", narrow ? "h-screen grid-cols-1"
+    <div className={cn("min-h-full", narrow ? "p-0" : "aria-lights p-8")}>
+      <div className={cn("grid overflow-hidden", narrow ? "glass-panel h-screen grid-cols-1"
                          : "h-[calc(100vh-64px)] min-h-[700px] grid-cols-[184px_minmax(0,1fr)] rounded-[28px] shadow-[var(--shadow-tile),var(--shadow-rim)]")}
-           style={{ background: "color-mix(in srgb, var(--glass) 55%, transparent)", backdropFilter: "blur(24px) saturate(140%)" }}>
+           style={narrow ? undefined : { background: "color-mix(in srgb, var(--glass) 55%, transparent)", backdropFilter: "blur(24px) saturate(140%)" }}>
         {!narrow && <Rail view={view} setView={setView} />}
 
         <main className={cn("flex min-w-0 flex-col gap-4 overflow-y-auto", narrow ? "p-3.5" : "p-[22px] pl-5")}>
@@ -59,6 +56,7 @@ export function AriaWindow() {
                 <IconButton label="Move to the other side" onClick={() => setWindowMode(lastDock() === "left" ? "right" : "left")}><ArrowLeftRight size={15} /></IconButton>
                 <IconButton label="Pop out Ask Muse" onClick={openChat}><MessageSquare size={15} /></IconButton>
                 <IconButton label="Full window" onClick={() => setWindowMode("full")}><Maximize2 size={15} /></IconButton>
+                <IconButton label="Close" onClick={closeWindow}><X size={15} /></IconButton>
               </div>
             </div>
           )}
@@ -97,6 +95,50 @@ export function AriaWindow() {
         </main>
       </div>
       <AskMuse narrow={narrow} />
+    </div>
+  );
+}
+
+/** While Ask Muse is popped out: the main window shrinks to what needs fixing. Tap a row to hear it. */
+function Compact() {
+  const { result, progress, error } = useAria();
+  const list = result ? problemsOf(result) : [];
+  return (
+    <div className="glass-panel flex h-screen flex-col gap-2.5 overflow-hidden p-3.5">
+      <div className="flex items-center gap-2">
+        <Mark size={22} />
+        <b className="text-sm">Mix check</b>
+        <span className="truncate text-xs text-ink-faint">{progress ? progress.text : result ? barsLabel(result) : ""}</span>
+        <div className="ml-auto flex items-center">
+          <IconButton label={result ? "Check again" : "Check mix"} onClick={checkMix}><Play size={14} fill="currentColor" /></IconButton>
+          <IconButton label="Show everything" onClick={closeChat}><ChevronsDown size={16} /></IconButton>
+          <IconButton label="Close" onClick={closeWindow}><X size={15} /></IconButton>
+        </div>
+      </div>
+      {error && <p className="m-0 line-clamp-2 text-xs text-hot">{error}</p>}
+      {!result ? (
+        <p className="m-0 text-[13px] text-ink-muted">No Mix check yet. Play the busiest part of your song and press play above.</p>
+      ) : (
+        <>
+          <div className="flex items-end gap-2">
+            <span className="text-[44px] font-extralight leading-none tracking-[-0.04em] tabular-nums"><CountUp value={list.length} /></span>
+            <span className="pb-1 text-sm font-medium text-ink-muted">{list.length === 0 ? "things stick out" : list.length === 1 ? "thing to fix" : "things to fix"}</span>
+            {result.clarity.spectra && <div className="mb-1 ml-auto h-10 w-[150px]"><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode === "split"} /></div>}
+          </div>
+          <div className="flex min-h-0 flex-col overflow-y-auto">
+            {list.map((p, i) => (
+              <button key={i} onClick={() => jumpTo(p.bar)} title={`${p.short}. Tap to hear it in Live.`}
+                      className={cn("flex h-[38px] shrink-0 items-center gap-2.5 text-left", i > 0 && "border-t border-hairline")}>
+                <i className="size-2 shrink-0 rounded-full bg-watch" />
+                <span className="flex-1 truncate text-[13px] font-semibold">{p.name}</span>
+                <span className="whitespace-nowrap rounded-full bg-black/35 px-2 font-mono text-[11px] leading-5 text-white/85">{p.where}</span>
+                <span className="w-[64px] text-right font-mono text-[13px] text-ink-muted">{p.amount.unit.startsWith("%") ? `${p.amount.value}%` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`}</span>
+              </button>
+            ))}
+            {list.length === 0 && <p className="m-0 text-[13px] text-good">Clear in these bars.</p>}
+          </div>
+        </>
+      )}
     </div>
   );
 }

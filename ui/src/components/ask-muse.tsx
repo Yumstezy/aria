@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUp, Check, Mic, SquareArrowOutUpRight, Undo2, X } from "lucide-react";
-import { answerSuggestion, askMuse, clearHistory, hz, openChat, setAskOpen, undoLast, useAria, type Finding, type Suggestion } from "@/lib/aria";
+import { answerSuggestion, askMuse, clearHistory, closeChat, hz, openChat, setAskOpen, undoLast, useAria, type Finding, type Suggestion } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
 // Starting points built from what Aria found, so the first ask is one tap
@@ -169,13 +169,17 @@ function ClearButton({ className }: { className?: string }) {
 /** Ask Muse popped out into its own small window that floats over Live. */
 export function ChatWindow() {
   const { ask, result } = useAria();
+  useEffect(() => { document.documentElement.classList.add("see-through"); }, []);
   return (
-    <div className="aria-lights flex h-screen flex-col text-white">
-      <div className="flex h-full flex-col" style={{ background: "rgba(16, 22, 38, 0.55)" }}>
+    <div className="glass-panel flex h-screen flex-col overflow-hidden text-white">
+      <div className="flex h-full flex-col">
         <div className="flex items-center gap-2 px-4 pb-2 pt-3.5">
           <b className="text-sm">Ask Muse</b>
           <span className="text-xs text-white/50">{result ? "about Mix check" : "about your set"}</span>
-          {ask.log.length > 0 && <ClearButton className="ml-auto" />}
+          <div className="ml-auto flex items-center gap-1">
+            {ask.log.length > 0 && <ClearButton />}
+            <button onClick={closeChat} title="Close" aria-label="Close Ask Muse" className="grid size-7 place-items-center rounded-full text-white/60 hover:bg-white/10"><X size={15} /></button>
+          </div>
         </div>
         <AskThread className="flex-1 px-4 pb-2" />
         <AskInput autoFocus className="border-t border-white/10 px-3 py-2.5" />

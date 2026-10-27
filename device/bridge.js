@@ -33,7 +33,7 @@ const HISTORY_MAX = 100;
 const WINDOW_FILE = path.join(os.homedir(), "Library", "Application Support", "Aria", "window.json");
 const FULL = { w: 1200, h: 860 };
 const SIDE_W = 460;
-const CHAT = { w: 400, h: 620 };
+const COMPACT_H = 280;   // the main window while Ask Muse is popped out: just what to fix
 const REC_DIR = path.join(os.tmpdir(), "aria");
 const BARS = 16;   // 16 bars, so a check covers a whole phrase (Ian, Oct 27)
 const START_TIMEOUT_MS = 20000;
@@ -46,6 +46,7 @@ let engineState = { state: "starting", text: "Starting Aria" };
 let busy = false;
 let windowLoaded = false;
 let chatLoaded = false;
+let chatOpen = false;
 let lastResult = null;    // so a window opened later shows the latest Check mix
 const waiters = {};       // live.js reply name -> resolve function
 let askLog = loadHistory();   // every Ask Muse exchange; the strip and window both show it
@@ -290,30 +291,41 @@ function loadWindowPrefs() {
   try { return JSON.parse(fs.readFileSync(WINDOW_FILE, "utf8")); } catch (e) { return { mode: "full", screen: null }; }
 }
 
-function sizeWindow(target, ui, { x, y, w, h }, float) {
+// Docked windows float over Live with no title bar, so their glass can show Live through it.
+function sizeWindow(target, ui, { x, y, w, h }, docked) {
   Max.outlet(target, "window", "size", Math.round(x), Math.round(y), Math.round(x + w), Math.round(y + h));
-  Max.outlet(target, "window", "flags", float ? "float" : "nofloat");
+  Max.outlet(target, "window", "flags", docked ? "float" : "nofloat");
+  Max.outlet(target, "window", "flags", docked ? "notitle" : "title");
   Max.outlet(target, "window", "exec");
   Max.outlet(target, "script", "sendbox", ui, "presentation_rect", 0, 0, Math.round(w), Math.round(h));
 }
+
+const FALLBACK_SCREEN = { x: 0, y: 25, w: 1440, h: 875 };
+const dockX = (side, sc) => (side === "left" ? sc.x + 8 : sc.x + sc.w - SIDE_W - 8);
 
 // Size and place the window for a mode. Docking needs the screen size, which only the page knows.
 function placeWindow({ mode, screen }) {
   if (mode === "side") mode = "right";   // the first version had one side
   const docked = (mode === "left" || mode === "right") && screen;
   if (!docked) { sizeWindow("window", "aria-window-ui", { x: 120, y: 90, ...FULL }, false); return; }
-  const h = Math.max(600, screen.h - 40);
-  const x = mode === "left" ? screen.x + 8 : screen.x + screen.w - SIDE_W - 8;
-  sizeWindow("window", "aria-window-ui", { x, y: screen.y + 32, w: SIDE_W, h }, true);
+  sizeWindow("window", "aria-window-ui", { x: dockX(mode, screen), y: screen.y + 8, w: SIDE_W, h: screen.h - 16 }, true);
 }
 
-// Ask Muse in its own window, bottom corner, on the side away from a docked window. Always on top.
-function placeChat(screen) {
-  const prefs = loadWindowPrefs();
-  const sc = screen || prefs.screen || { x: 0, y: 25, w: 1440, h: 875 };
-  const left = prefs.mode === "right" || prefs.mode === "side";
-  const x = left ? sc.x + sc.w - SIDE_W - CHAT.w - 24 : sc.x + sc.w - CHAT.w - 16;
-  sizeWindow("chat", "aria-chat-ui", { x, y: sc.y + sc.h - CHAT.h - 16, ...CHAT }, true);
+// Ask Muse popped out: the main window shrinks to just what to fix, and the chat stacks under it,
+// both docked on the same edge, so nothing sits in the middle of Live.
+function placeStack(side, sc) {
+  const top = { x: dockX(side, sc), y: sc.y + 8, w: SIDE_W, h: COMPACT_H };
+  sizeWindow("window", "aria-window-ui", top, true);
+  sizeWindow("chat", "aria-chat-ui", { x: top.x, y: top.y + COMPACT_H + 8, w: SIDE_W, h: sc.h - COMPACT_H - 24 }, true);
+}
+
+function savePrefs(prefs) {
+  try {
+    fs.mkdirSync(path.dirname(WINDOW_FILE), { recursive: true });
+    fs.writeFileSync(WINDOW_FILE, JSON.stringify(prefs));
+  } catch (e) {
+    Max.post(`Couldn't save the window size: ${e.message}`);
+  }
 }
 
 function showWindow(url) {
@@ -327,19 +339,38 @@ function showWindow(url) {
 
 Max.addHandler("open_window", () => showWindow(WINDOW_URL));
 Max.addHandler("open_chat", (s) => {
-  chatLoaded = true;
-  Max.outlet("chat", "url", WINDOW_URL + "&view=chat");
-  placeChat(s ? decode(s).screen : null);
+  const prefs = loadWindowPrefs();
+  const screen = (s && decode(s).screen) || prefs.screen || FALLBACK_SCREEN;
+  // The side it's docked on, or the side it was last docked on
+  const side = prefs.mode === "left" || prefs.mode === "right" ? prefs.mode : prefs.side === "left" ? "left" : "right";
+  savePrefs({ ...prefs, mode: side, side, screen });
+  if (!windowLoaded) { windowLoaded = true; Max.outlet("window", "url", WINDOW_URL); }
+  if (!chatLoaded) { chatLoaded = true; Max.outlet("chat", "url", WINDOW_URL + "&view=chat"); }
+  chatOpen = true;
+  placeStack(side, screen);
+  Max.outlet("window", "front");
   Max.outlet("chat", "front");
 });
+
+// Back from the stack: close the chat, the main window takes its full docked height again.
+Max.addHandler("close_chat", () => {
+  chatOpen = false;
+  Max.outlet("chat", "wclose");
+  placeWindow(loadWindowPrefs());
+});
+
+Max.addHandler("close_window", () => {
+  if (chatOpen) { chatOpen = false; Max.outlet("chat", "wclose"); }
+  Max.outlet("window", "wclose");
+});
+
 Max.addHandler("window_mode", (s) => {
   const prefs = decode(s);
-  try {
-    fs.mkdirSync(path.dirname(WINDOW_FILE), { recursive: true });
-    fs.writeFileSync(WINDOW_FILE, JSON.stringify(prefs));
-  } catch (e) {
-    Max.post(`Couldn't save the window size: ${e.message}`);
-  }
+  if (prefs.mode === "left" || prefs.mode === "right") prefs.side = prefs.mode;
+  else prefs.side = loadWindowPrefs().side;
+  savePrefs(prefs);
+  if (chatOpen && prefs.mode !== "full") { placeStack(prefs.mode, prefs.screen || FALLBACK_SCREEN); return; }
+  if (chatOpen) { chatOpen = false; Max.outlet("chat", "wclose"); }
   placeWindow(prefs);
 });
 Max.addHandler("jump_to", (s) => toLive("jump", decode(s).bar));

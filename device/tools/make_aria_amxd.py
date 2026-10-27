@@ -9,7 +9,9 @@
     v8 live.js ──► route defer ──┤ (everything else)
                        └──► deferlow ──► v8 live.js   (Live API changes from notifications)
     live.thisdevice ──► v8 live.js                    (Live API ready)
-    p window: routepass front window script ──► thispatcher (open, size, float), else ──► jweb ──► out to the bridge
+    p window: routepass front window script wclose ──► thispatcher (open, size, float, close), else ──► jweb ──► out
+              The window can be see-through: transparent patcher background, no title bar when docked
+              (set by the bridge), and jweb rendering with a transparent background
     p chat:   the same, for Ask Muse popped out into its own small window
 
 Run:  python3.11 device/tools/make_aria_amxd.py
@@ -32,19 +34,21 @@ def window_patcher(template, ui_name="aria-window-ui", w=WINDOW_W, h=WINDOW_H):
     inner.update({
         "rect": [120.0, 90.0, 120.0 + w, 90.0 + h],
         "openinpresentation": 1, "toolbarvisible": 0, "statusbarvisible": 0, "devicewidth": 0.0,
+        "bgcolor": [0.0, 0.0, 0.0, 0.0], "editing_bgcolor": [0.0, 0.0, 0.0, 0.0],
         "boxes": [
             {"box": {"id": "w-in", "maxclass": "inlet", "numinlets": 0, "numoutlets": 1, "outlettype": [""],
                      "patching_rect": [8.0, 8.0, 30.0, 30.0]}},
-            obj("w-route", "routepass front window script", [8.0, 50.0, 180.0, 22.0], 1, 4),   # routepass keeps the first word for thispatcher
+            obj("w-route", "routepass front window script wclose", [8.0, 50.0, 220.0, 22.0], 1, 5),   # routepass keeps the first word for thispatcher
             obj("w-this", "thispatcher", [8.0, 90.0, 70.0, 22.0], 1, 2),
             {"box": {**FONT, "id": "w-ui", "varname": ui_name, "maxclass": "jweb", "numinlets": 1, "numoutlets": 1, "outlettype": [""],
                      "patching_rect": [100.0, 90.0, 400.0, 280.0],
-                     "presentation": 1, "presentation_rect": [0.0, 0.0, w, h], "rendermode": 0, "url": ""}},
+                     "presentation": 1, "presentation_rect": [0.0, 0.0, w, h], "rendermode": 2, "url": ""}},   # 2: transparent background
             {"box": {"id": "w-out", "maxclass": "outlet", "numinlets": 1, "numoutlets": 0,
                      "patching_rect": [100.0, 400.0, 30.0, 30.0]}},
         ],
         "lines": [wire("w-in", "w-route"), wire("w-route", "w-this", 0, 0), wire("w-route", "w-this", 1, 0),
-                  wire("w-route", "w-this", 2, 0), wire("w-route", "w-ui", 3, 0), wire("w-ui", "w-out")],
+                  wire("w-route", "w-this", 2, 0), wire("w-route", "w-this", 3, 0), wire("w-route", "w-ui", 4, 0),
+                  wire("w-ui", "w-out")],
     })
     return inner
 

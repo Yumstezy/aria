@@ -211,8 +211,19 @@ export function lastDock(): "left" | "right" {
   try { return localStorage.getItem("aria.dock") === "left" ? "left" : "right"; } catch { return "right"; }
 }
 
-/** Ask Muse in its own small window that stays on top. */
-export const openChat = () => { if (!send("open_chat", { screen: screenRect() })) window.open("?view=chat", "aria-chat", "width=400,height=620"); };
+/** Ask Muse in its own window, stacked under a shrunk main window on the docked edge. */
+export const openChat = () => { if (!send("open_chat", { screen: screenRect() })) window.open("?view=chat", "aria-chat", "width=460,height=620"); };
+/** Close the popped-out chat; the main window takes its full docked height again. */
+export const closeChat = () => { if (!send("close_chat")) window.close(); };
+export const closeWindow = () => { if (!send("close_window")) window.close(); };
+
+/** The window's size, kept up to date (docked, stacked and full layouts depend on it). */
+export function useViewport() {
+  return useSyncExternalStore(
+    (l) => { window.addEventListener("resize", l); return () => window.removeEventListener("resize", l); },
+    () => `${window.innerWidth}x${window.innerHeight}`,
+  ).split("x").map(Number) as [number, number];
+}
 export const openWindow = () => { if (!send("open_window")) window.open("../window/index.html", "aria-window"); };
 export const addMarker = (bar: number) => send("add_marker", { bar, name: "Aria check" });
 

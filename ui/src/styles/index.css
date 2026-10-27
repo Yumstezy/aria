@@ -40,6 +40,14 @@
 
 html, body, #root { height: 100%; margin: 0; }
 body { font-family: var(--font-sans); color: var(--ink); background: var(--ground); -webkit-font-smoothing: antialiased; }
+/* Docked and popped-out windows are see-through: Max draws no background behind them, so Live shows
+   through the tint. The page can't blur what's behind its window, so it's tinted glass, not frosted. */
+html.see-through, html.see-through body { background: transparent; }
+.glass-panel {
+  background: color-mix(in srgb, var(--ground) 68%, transparent);
+  border-radius: 22px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12), 0 18px 50px -20px rgb(0 0 0 / 0.6);
+}
 
 /* The light behind the glass: soft coloured blobs for it to bend */
 .aria-lights {
