@@ -141,11 +141,11 @@ export function useVoice(placeholder: string, soonText = VOICE_SOON) {
 }
 
 export function AskInput({ autoFocus }: { autoFocus?: boolean }) {
-  const { ask } = useAria();
+  const { ask, askFocus } = useAria();
   const [text, setText] = useState("");
   const voice = useVoice("Ask, or tell Muse what to change");
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (autoFocus) input.current?.focus(); }, [autoFocus]);
+  useEffect(() => { if (autoFocus) input.current?.focus(); }, [autoFocus, askFocus]);
   return (
     <form className="cp-composer" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { askMuse(text); setText(""); } }}>
       <button type="button" className="cp-icon-btn" aria-label="Ask by voice" onClick={voice.press}><MicIcon /></button>

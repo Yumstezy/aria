@@ -3,6 +3,7 @@
     plugin~ ──────────────► plugout~        audio passes through untouched
        └──► sfrecord~ 2                      records Main while Check mix runs
     jweb (strip UI) ──► node.script bridge.js ──► route jweb window live rec
+    live.text "Ask key" ──► prepend ask_key ──┘   (map a key to it in Live: it opens Ask Muse)
                                  ▲                 │      │     └──► sfrecord~
                                  │                 │      └──► v8 live.js
                                  │                 └──► jweb
@@ -61,6 +62,17 @@ def build():
                     "presentation": 1, "presentation_rect": [0.0, 0.0, STRIP_W, STRIP_H],
                     "rendermode": 0, "url": ""}}
 
+    # The mapped key: Live maps keys and MIDI only to its own controls, so the strip has one small
+    # live.text under the page's left column. Key Map (Cmd+K), click it, press a key: that key opens Ask Muse.
+    ask_key = {"box": {"id": "askkey", "maxclass": "live.text", "varname": "Ask Muse", "numinlets": 1, "numoutlets": 2, "outlettype": ["", ""],
+                       "patching_rect": [400.0, 300.0, 60.0, 20.0], "presentation": 1, "presentation_rect": [10.0, 147.0, 98.0, 14.0],
+                       "mode": 0, "text": "Ask key", "texton": "Ask key", "fontname": "Arial", "fontsize": 9.0,
+                       "bgcolor": [0.0, 0.0, 0.0, 0.0], "bgoncolor": [0.122, 0.373, 0.816, 1.0], "bordercolor": [0.0, 0.0, 0.0, 0.0],
+                       "focusbordercolor": [0.122, 0.373, 0.816, 1.0], "textcolor": [0.275, 0.333, 0.439, 1.0], "textoncolor": [1.0, 1.0, 1.0, 1.0],
+                       "parameter_enable": 1,
+                       "saved_attribute_attributes": {"valueof": {"parameter_longname": "Ask Muse", "parameter_shortname": "Ask",
+                                                                  "parameter_type": 2, "parameter_mmax": 1, "parameter_enum": ["off", "on"]}}}}
+
     window = obj("window", "p window", [8.0, 500.0, 70.0, 22.0], 1, 1)
     window["box"]["patcher"] = window_patcher(patch["patcher"])
     chat = obj("chat", "p chat", [90.0, 500.0, 60.0, 22.0], 1, 1)
@@ -68,6 +80,8 @@ def build():
 
     boxes = [
         jweb,
+        ask_key,   # after the page, so it draws on top of it
+        obj("ask-prepend", "prepend ask_key", [400.0, 330.0, 95.0, 22.0], 1, 1),
         window,
         chat,
         obj("bridge", "node.script bridge.js @autostart 1 @watch 1", [8.0, 300.0, 230.0, 22.0], 1, 2),
@@ -85,6 +99,8 @@ def build():
     lines = [
         # UI and Live API messages into the bridge
         wire("ui", "bridge"),
+        wire("askkey", "ask-prepend"),
+        wire("ask-prepend", "bridge"),
         wire("route-defer", "bridge", 1, 0),
         # bridge out to the UI, the Live API and the recorder
         wire("bridge", "route-out"),

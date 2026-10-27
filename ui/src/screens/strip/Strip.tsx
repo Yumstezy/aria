@@ -108,7 +108,8 @@ export function Strip() {
             <span className="cp-voice-icon"><MicIcon /></span>
             <span style={{ fontSize: 12, fontWeight: 600, marginLeft: 2 }}>{ask.pending ? "Asking" : "Ask"}</span>
           </button>
-          <button className="cp-meta cp-push text-left hover:underline" style={{ fontSize: 11, background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={openWindow}>Open window</button>
+          <button className="cp-meta text-left hover:underline" style={{ fontSize: 11, background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={openWindow}>Open window</button>
+          {/* The bottom 16px belong to Live's own "Ask key" control (device/tools/make_aria_amxd.py), which a key can be mapped to */}
         </div>
         <Card />
       </div>

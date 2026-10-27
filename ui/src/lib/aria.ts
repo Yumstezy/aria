@@ -76,6 +76,8 @@ interface State {
   notice: string | null;
   theme: Theme;
   session: Session | null;
+  /** Goes up each time the mapped key opens Ask Muse, so its input takes focus */
+  askFocus: number;
 }
 
 export type Theme = "sky" | "night";
@@ -93,7 +95,7 @@ export const inMax = typeof window !== "undefined" && !!window.max?.outlet;
 let state: State = {
   ask: { open: typeof location !== "undefined" && new URLSearchParams(location.search).get("ask") === "1", pending: null, log: [] },
   engine: { state: "starting", text: "Starting Aria" },
-  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null,
+  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0,
 };
 
 // Light (Sky) unless the producer picked Dark. Inside Live the bridge saves the choice and puts it in
@@ -162,6 +164,7 @@ export function connect() {
     on<Exchange[]>("ask_log", (log) => set({ ask: { ...state.ask, log } }));
     on<{ theme: Theme }>("theme", (t) => { applyTheme(t.theme); set({ theme: t.theme }); });
     on<Session>("session", (x) => set({ session: x }));
+    on("focus_ask", () => set({ askFocus: state.askFocus + 1 }));
     send("ready");   // bridge.js replies with the engine state and the latest result
   } else {
     checkEngine();

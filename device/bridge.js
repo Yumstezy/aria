@@ -52,6 +52,7 @@ let chatOpen = false;
 let mainOpen = false;
 let lastResult = null;    // so a window opened later shows the latest Check mix
 const waiters = {};       // live.js reply name -> resolve function
+const stateWaiters = [];  // everyone waiting for the next live_state
 let askLog = loadHistory();   // every Ask Muse exchange; the strip and window both show it
 
 const encode = (obj) => encodeURIComponent(JSON.stringify(obj));
@@ -229,8 +230,16 @@ async function pluginNames() {
 
 function askLive(command, reply, ...args) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { delete waiters[reply]; reject(new UserError("Live didn't answer. Try removing and adding Aria again.")); }, LIVE_TIMEOUT_MS);
-    waiters[reply] = (payload) => { clearTimeout(timer); resolve(payload); };
+    const timer = setTimeout(() => {
+      if (reply === "live_state") stateWaiters.splice(stateWaiters.indexOf(done) >>> 0, 1);
+      else delete waiters[reply];
+      reject(new UserError("Live didn't answer. Try removing and adding Aria again."));
+    }, LIVE_TIMEOUT_MS);
+    const done = (payload) => { clearTimeout(timer); resolve(payload); };
+    // Several parts of the bridge ask for the state at once (the window's session line, Ask Muse's
+    // context): one reply answers them all. Other replies have one asker at a time.
+    if (reply === "live_state") { stateWaiters.push(done); if (stateWaiters.length > 1) return; }
+    else waiters[reply] = done;
     toLive(command, ...args);
   });
 }
@@ -242,7 +251,7 @@ function waitForPlaying(timeoutMs) {
   });
 }
 
-Max.addHandler("live_state", (s) => { const w = waiters.live_state; delete waiters.live_state; if (w) w(decode(s)); });
+Max.addHandler("live_state", (s) => { const all = stateWaiters.splice(0); all.forEach((w) => w(decode(s))); });
 Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete waiters.marker_done; if (w) w(decode(s)); });
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
@@ -410,9 +419,15 @@ function showWindow(url) {
 }
 
 Max.addHandler("open_window", () => showWindow(pageUrl("window")));
-Max.addHandler("open_chat", (s) => {
+Max.addHandler("open_chat", (s) => openChatWindow(s && decode(s).screen));
+
+// The mapped key (the strip's "Ask key" in Live's Key Map): pressing it opens Ask Muse, ready to type.
+// Voice will use the hold; for now the release does nothing.
+Max.addHandler("ask_key", (v) => { if (v === undefined || v === "bang" || Number(v) !== 0) openChatWindow(null); });
+
+function openChatWindow(fromPage) {
   const prefs = loadWindowPrefs();
-  const screen = (s && decode(s).screen) || prefs.screen || FALLBACK_SCREEN;
+  const screen = fromPage || prefs.screen || FALLBACK_SCREEN;
   // The side it's docked on, or the side it was last docked on
   const side = prefs.mode === "left" || prefs.mode === "right" ? prefs.mode : prefs.side === "left" ? "left" : "right";
   savePrefs({ ...prefs, mode: side, side, screen });
@@ -423,7 +438,8 @@ Max.addHandler("open_chat", (s) => {
   placeStack(side, screen);
   Max.outlet("window", "front");
   Max.outlet("chat", "front");
-});
+  toUI("focus_ask", {});
+}
 
 // Back from the stack: close the chat, the main window takes its full docked height again.
 Max.addHandler("close_chat", () => {

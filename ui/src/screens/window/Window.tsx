@@ -9,7 +9,7 @@ import { TickGauge } from "@/components/tick-gauge";
 import { CountUp } from "@/components/count-up";
 import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
-import { AnalyzerIcon, BuriedIcon, ChatIcon, ClickIcon, CloseIcon, ExpandIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
+import { AnalyzerIcon, BuriedIcon, ChatIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
 import { barGroups, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, jumpTo, lastDock, notice, openChat, setAskOpen, setTheme, setWindowMode,
@@ -59,6 +59,14 @@ export function AriaWindow() {
                 </div>
               )}
               <button className="cp-btn cp-btn-primary" disabled={!!progress} onClick={checkMix}>{progress ? "Checking" : result ? "Check again" : "Check mix"}</button>
+              {!narrow && (
+                <div className="cp-row" style={{ gap: 0 }}>
+                  <button className="cp-icon-btn" style={{ width: 32, height: 32, borderRadius: 10, background: "transparent" }} title="Dock on the left of the screen"
+                          aria-label="Dock on the left of the screen" onClick={() => setWindowMode("left")}><DockLeftIcon /></button>
+                  <button className="cp-icon-btn" style={{ width: 32, height: 32, borderRadius: 10, background: "transparent" }} title="Dock on the right of the screen"
+                          aria-label="Dock on the right of the screen" onClick={() => setWindowMode("right")}><DockRightIcon /></button>
+                </div>
+              )}
             </div>
           </header>
           {(status || engine.state !== "up") && (
@@ -126,6 +134,7 @@ function Rail({ view, setView, narrow }: { view: View; setView: (v: View) => voi
       <div className="cp-ask-dock">
         <button className="cp-ask-btn" aria-expanded={ask.open} aria-label="Ask Muse" style={narrow ? { justifyContent: "center", padding: 0 } : undefined}
                 onClick={() => setAskOpen(!ask.open)}><MicIcon />{!narrow && "Ask Muse"}</button>
+        {!narrow && <span className="cp-meta" title="In Live, press Cmd+K, click Ask key on the Aria strip, then press a key.">or press your mapped key</span>}
       </div>
     </aside>
   );
