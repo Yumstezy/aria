@@ -302,21 +302,26 @@ function sizeWindow(target, ui, { x, y, w, h }, docked) {
 
 const FALLBACK_SCREEN = { x: 0, y: 25, w: 1440, h: 875 };
 const dockX = (side, sc) => (side === "left" ? sc.x + 8 : sc.x + sc.w - SIDE_W - 8);
+// Live's web view may report the screen without the menu bar taken off (top 0). Keep clear of it,
+// with room for the taller menu bar on MacBooks with a notch.
+const MENU_BAR = 40;
+const dockTop = (sc) => (sc.y > 0 ? sc.y + 8 : MENU_BAR);
+const dockHeight = (sc) => sc.h - (dockTop(sc) - sc.y) - 8;
 
 // Size and place the window for a mode. Docking needs the screen size, which only the page knows.
 function placeWindow({ mode, screen }) {
   if (mode === "side") mode = "right";   // the first version had one side
   const docked = (mode === "left" || mode === "right") && screen;
   if (!docked) { sizeWindow("window", "aria-window-ui", { x: 120, y: 90, ...FULL }, false); return; }
-  sizeWindow("window", "aria-window-ui", { x: dockX(mode, screen), y: screen.y + 8, w: SIDE_W, h: screen.h - 16 }, true);
+  sizeWindow("window", "aria-window-ui", { x: dockX(mode, screen), y: dockTop(screen), w: SIDE_W, h: dockHeight(screen) }, true);
 }
 
 // Ask Muse popped out: the main window shrinks to just what to fix, and the chat stacks under it,
 // both docked on the same edge, so nothing sits in the middle of Live.
 function placeStack(side, sc) {
-  const top = { x: dockX(side, sc), y: sc.y + 8, w: SIDE_W, h: COMPACT_H };
+  const top = { x: dockX(side, sc), y: dockTop(sc), w: SIDE_W, h: COMPACT_H };
   sizeWindow("window", "aria-window-ui", top, true);
-  sizeWindow("chat", "aria-chat-ui", { x: top.x, y: top.y + COMPACT_H + 8, w: SIDE_W, h: sc.h - COMPACT_H - 24 }, true);
+  sizeWindow("chat", "aria-chat-ui", { x: top.x, y: top.y + COMPACT_H + 8, w: SIDE_W, h: dockHeight(sc) - COMPACT_H - 8 }, true);
 }
 
 function savePrefs(prefs) {

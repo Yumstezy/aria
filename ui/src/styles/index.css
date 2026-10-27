@@ -44,7 +44,8 @@ body { font-family: var(--font-sans); color: var(--ink); background: var(--groun
    through the tint. The page can't blur what's behind its window, so it's tinted glass, not frosted. */
 html.see-through, html.see-through body { background: transparent; }
 .glass-panel {
-  background: color-mix(in srgb, var(--ground) 68%, transparent);
+  /* 88%: Live is still there behind it, but faint enough that text on top stays easy to read */
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
   border-radius: 22px;
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12), 0 18px 50px -20px rgb(0 0 0 / 0.6);
 }
