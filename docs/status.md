@@ -29,7 +29,36 @@ Run with `engine/spikes/muse_spike.py`. The measurements in it are a test fixtur
 **1.3 Tool calling. Yes, on both models.**
 - "Make bars 1 to 16 the intro" became `set_section({"start_bar":1,"bars":16,"name":"Intro"})` in 0.8 s (1.1) and 1.2 s (1.3).
 
-**Still to do:** 1.4 Voice Transcribe endpoint, and 1.5 to 1.8 inside Live and Max (transport, markers, clip paths, groove output).
+### Plan for the rest of Step 1
+
+Pass condition: all eight questions have a written yes or no and a chosen path.
+
+**1.4 Muse Voice Transcribe (Claude, no Max needed)**
+- Find the endpoint in Meta's docs.
+- Make a test recording with the Mac's built-in `say` command ("make bars one to sixteen the intro"), send it, and check the transcript.
+- If there's no usable endpoint, voice stays stretch and Ask Muse is typed only.
+
+**1.5 to 1.8 inside Live (Claude writes the code and a guide, Ian builds the test device)**
+
+Claude writes these files in `device/spike/`:
+- `bridge_spike.js`, for `node.script`: calls the engine's `/health` and prints the reply in the Max window. This answers 1.5.
+- `live_spike.js`, for Max's `v8` object, which has the Live API built in. It answers the other three:
+  - **1.6 Markers:** add a cue point at a given bar and name it. It checks for an existing marker first, because `set_or_delete_cue` deletes one that's already there.
+  - **1.7 Clip file paths:** read `file_path` from the selected audio clip.
+  - **1.8 Groove output:** try to create a new audio clip from a wav file on a track (`create_audio_clip`, which needs a recent Live 12).
+- `docs/max-guide-step1.md`: a click-by-click guide for Ian:
+  - create a Max Audio Effect on the master track
+  - place about 6 objects
+  - add one button per test
+  - save the device as `device/spike/Aria Spike.amxd`
+  - for each test: what to click, and what you should see in the Max window if it worked
+
+Ian runs the tests in Live 12.4 (Max 9.1.4) and reports what the Max window says. Claude writes the answers here.
+
+**What happens with the answers**
+- If 1.5 fails, the device and engine talk through a JSON file the device checks instead of HTTP.
+- If 1.8 fails, Groove match writes the fixed loop to `test-pack/out/` for you to drag in.
+- Everything that passes becomes the base of the real `Aria.amxd` in Step 2.
 
 ## Done: Step 0, repo and tooling (Oct 26)
 
