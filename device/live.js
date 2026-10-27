@@ -535,7 +535,7 @@ function applyDevice(dev, added, index, name, settings) {
   }
   undoStack.push({ kind: "device", params: keep, deviceId: added ? Number(dev.id) : null, name: name, track: index });
   const where = index < 0 ? "Main" : "\"" + one(trackAt(index), "name") + "\"";
-  let text = (added ? "Added a " + name + " on " + where : "On the " + name + " on " + where) + (done.length ? ": " + done.join(", ") + "." : ".");
+  let text = (added ? "Added " + (/^[AEIO]/i.test(name) ? "an " : "a ") + name + " on " + where : "On the " + name + " on " + where) + (done.length ? ": " + done.join(", ") + "." : ".");
   if (missed.length) text += " Couldn't set " + missed.join(", ") + ".";
   send("device_done", { ok: true, added: added, text: text });
 }
