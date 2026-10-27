@@ -33,7 +33,11 @@ def measure(path):
         audio, rate = sf.read(path, always_2d=True, dtype="float64")
     except (RuntimeError, sf.LibsndfileError) as e:
         raise AnalysisError(f"Can't read {path} as audio: {e}") from e
+    return measure_array(audio, rate)
 
+
+def measure_array(audio, rate):
+    """Measure audio already in memory: shape (samples, channels), floats, full scale 1.0."""
     channels = audio.shape[1]
     duration = audio.shape[0] / rate
     out = {
