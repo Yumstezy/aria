@@ -53,3 +53,10 @@ body { font-family: var(--font-sans); color: var(--ink); background: var(--groun
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* On the gradient hero card: white text, part colours bright enough to read on blue */
+.on-hero {
+  --ink: #ffffff; --ink-muted: rgba(255, 255, 255, 0.78); --ink-faint: rgba(255, 255, 255, 0.55);
+  --hairline: rgba(255, 255, 255, 0.14); --hot: #ffb07a;
+  --part-vocals: #ffffff; --part-other: #d4c4ff; --part-bass: #7ff0e0; --part-drums: rgba(255, 255, 255, 0.45); --part-mix: #ffffff;
+}

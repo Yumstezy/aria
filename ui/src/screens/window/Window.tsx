@@ -1,12 +1,15 @@
 // The Aria window, a floating window inside Live: Home and Mix check (Simple and Detailed).
 // Picture first, a short line second, numbers and long text only when asked for (DESIGN.md).
 import { useEffect, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { AudioWaveform, ChartNoAxesColumn, Columns2, Grip, House, Mic } from "lucide-react";
 import { LiquidGlass } from "@/components/ui/liquid-glass";
 import { Button, Cap, Mark } from "@/components/brand";
 import { Waves } from "@/components/waves";
-import { Problems, problemsOf } from "@/components/problems";
-import { barsLabel, checkMix, notice, soundName, useAria, type Result } from "@/lib/aria";
+import { GradientCard } from "@/components/ui/gradient-card";
+import { TickGauge } from "@/components/tick-gauge";
+import { problemsOf, type Problem } from "@/lib/problems";
+import { barsLabel, checkMix, describe, jumpTo, notice, soundName, useAria, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
 type View = "home" | "mixcheck";
@@ -31,8 +34,10 @@ export function AriaWindow() {
         <main className="flex min-w-0 flex-col gap-4 overflow-y-auto p-[22px] pl-5">
           <header className="flex items-center justify-between gap-3">
             <div>
-              <Cap>{result ? `${barsLabel(result)} · ${result.clarity.mode === "split" ? "split into parts" : "full mix only"}` : "This session"}</Cap>
-              <h1 className="m-0 mt-1 text-[22px] font-bold leading-[26px] tracking-[-0.03em]">{view === "mixcheck" ? "Mix check" : "Home"}</h1>
+              <h1 className="m-0 text-[28px] font-bold leading-8 tracking-[-0.03em]">{view === "mixcheck" ? "Mix check" : "Home"}</h1>
+              <span className="mt-0.5 block text-[15px] font-medium tracking-[-0.01em] text-ink-faint">
+                {view === "mixcheck" && result ? barsLabel(result) : "This session"}
+              </span>
             </div>
             <div className="flex items-center gap-2.5">
               {status && <span className={cn("max-w-[360px] truncate text-xs", error ? "text-hot" : "text-ink-muted")} role="status">{status}</span>}
@@ -42,11 +47,12 @@ export function AriaWindow() {
                 </span>
               )}
               {view === "mixcheck" && result && (
-                <div className="inline-flex gap-0.5 rounded-full bg-well p-[3px]" role="group" aria-label="View">
+                <div className="flex gap-0.5 rounded-[14px] border border-white/12 bg-white/8 p-[3px]" role="group" aria-label="View">
                   {(["Simple", "Detailed"] as const).map((label) => {
                     const on = (label === "Detailed") === detailed;
                     return <button key={label} aria-pressed={on} onClick={() => setDetailed(label === "Detailed")}
-                                   className={cn("h-[26px] rounded-full px-3 text-xs font-semibold", on ? "bg-[var(--card)] text-ink shadow" : "text-ink-muted")}>{label}</button>;
+                                   className={cn("h-7 min-w-11 rounded-[11px] px-3 text-[12.5px] font-semibold transition-colors duration-200",
+                                                 on ? "bg-white text-[#0b0b0c]" : "text-ink-muted")}>{label}</button>;
                   })}
                 </div>
               )}
@@ -136,27 +142,117 @@ const verdict = (r: Result) => {
   return n === 0 ? "Nothing sticks out" : n === 1 ? "1 thing to fix" : `${n} things to fix`;
 };
 
+const EASE = [0.32, 0.72, 0, 1] as const;
+
+/** Cards rise in one after another when a result arrives. */
+function Rise({ i, className, children }: { i: number; className?: string; children: ReactNode }) {
+  return (
+    <motion.div className={className} initial={{ opacity: 0, y: 14, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ opacity: { duration: 0.7, delay: i * 0.06 }, default: { duration: 0.9, ease: EASE, delay: i * 0.06 } }}>
+      {children}
+    </motion.div>
+  );
+}
+
 function Simple({ r, open, setOpen }: { r: Result; open: number; setOpen: (i: number) => void }) {
   const list = problemsOf(r);
+  const selected = list[open];
+  const span = list.length >= 4 ? "col-span-3" : list.length === 3 ? "col-span-4" : list.length === 2 ? "col-span-6" : "col-span-12";
+
   return (
-    <div className="grid grid-cols-12 gap-3">
-      <LiquidGlass as="section" className="col-span-12 flex items-baseline gap-4 px-5 py-4">
-        <span className="whitespace-nowrap text-2xl font-bold tracking-[-0.02em]">{verdict(r)}</span>
-        <span className="text-sm text-ink-muted">{r.advice?.summary ?? r.advice_error}</span>
-      </LiquidGlass>
-      <LiquidGlass as="section" className="col-span-7 flex flex-col gap-2.5 p-5">
-        <div className="flex items-center justify-between"><Cap>Where each part sits</Cap>
-          <span className="text-xs text-ink-faint">{r.clarity.mode === "split" ? "Each part, split from your mix" : "Your whole mix"}</span></div>
-        {r.clarity.spectra
-          ? <Waves spectra={r.clarity.spectra} findings={r.clarity.findings} split={r.clarity.mode === "split"}
-                   onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
-          : <p className="text-xs text-ink-muted">The picture appears after the next Check mix.</p>}
-      </LiquidGlass>
-      <LiquidGlass as="section" className="col-span-5 flex flex-col gap-2 p-5">
-        <Cap>What to fix</Cap>
-        <Problems list={list} open={open} setOpen={setOpen} />
-      </LiquidGlass>
+    <div className="grid grid-cols-12 gap-3.5">
+      <Rise i={0} className="col-span-8">
+        <GradientCard className="flex h-full min-h-[376px] flex-col gap-2 px-6 py-5">
+          <div className="flex items-baseline justify-between">
+            <span className="text-lg font-semibold tracking-[-0.02em]">Where each part sits</span>
+            <span className="text-xs text-ink-faint">{r.clarity.mode === "split" ? "Hover to see each part's level" : "Your whole mix"}</span>
+          </div>
+          {r.clarity.spectra
+            ? <Waves spectra={r.clarity.spectra} findings={r.clarity.findings} split={r.clarity.mode === "split"}
+                     onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
+            : <p className="text-xs text-ink-muted">The picture appears after the next Check mix.</p>}
+        </GradientCard>
+      </Rise>
+
+      <Rise i={1} className="col-span-4">
+        <LiquidGlass as="section" radius="28px" className="flex h-full min-h-[376px] flex-col px-6 py-5">
+          <Cap>This check</Cap>
+          <div className="mt-4 flex items-end gap-3">
+            <span className="text-[64px] font-extralight leading-none tracking-[-0.04em] tabular-nums">{list.length}</span>
+            <span className="pb-2 text-base font-medium text-ink-muted">{list.length === 0 ? "things stick out" : list.length === 1 ? "thing to fix" : "things to fix"}</span>
+          </div>
+          <p className="m-0 mt-3 line-clamp-3 text-[13px] leading-[18px] text-ink-muted">{r.advice?.summary ?? r.advice_error}</p>
+          <div className="mt-auto">
+            {list.map((p, i) => (
+              <button key={i} onClick={() => setOpen(i)}
+                      className={cn("flex h-[34px] w-full items-center gap-3 text-left", i > 0 && "border-t border-hairline")}>
+                <i className="size-2 rounded-full bg-watch" />
+                <span className="flex-1 text-[13px] font-semibold">{p.name}</span>
+                <span className="font-mono text-[13px] text-ink-muted">{p.amount.unit.startsWith("%") ? `${p.amount.value}%` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`}</span>
+              </button>
+            ))}
+            {list.length === 0 && <p className="m-0 text-[13px] text-good">Clear in these bars.</p>}
+          </div>
+        </LiquidGlass>
+      </Rise>
+
+      {list.map((p, i) => (
+        <Rise key={p.name + i} i={2 + i} className={span}>
+          <ProblemTile p={p} selected={open === i} onSelect={() => setOpen(open === i ? -1 : i)} />
+        </Rise>
+      ))}
+
+      <AnimatePresence mode="wait">
+        {selected && (
+          <motion.div key={open} className="col-span-12" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.25, ease: EASE }}>
+            <ProblemDetail p={selected} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function ProblemTile({ p, selected, onSelect }: { p: Problem; selected: boolean; onSelect: () => void }) {
+  return (
+    <LiquidGlass as="section" radius="28px" interactive onClick={onSelect}
+                 className={cn("flex h-[184px] flex-col px-5 py-4 transition-shadow", selected && "ring-2 ring-[var(--watch)]")}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11.5px] font-semibold uppercase tracking-[0.06em] text-ink-muted">{p.name}</span>
+        <span className="whitespace-nowrap rounded-full bg-black/40 px-2 font-mono text-[11px] leading-[22px] text-white">{p.where}</span>
+      </div>
+      <div className="mt-3 flex items-baseline gap-1.5">
+        <span className="text-[40px] font-extralight leading-none tracking-[-0.04em] tabular-nums">{p.amount.value}</span>
+        <span className="text-xs font-medium text-ink-faint">{p.amount.unit}</span>
+      </div>
+      <p className="m-0 mt-2 line-clamp-1 text-[12.5px] text-ink-muted">{p.short}</p>
+      <div className="mt-auto"><TickGauge share={p.share} label={p.shareLabel} /></div>
+    </LiquidGlass>
+  );
+}
+
+function ProblemDetail({ p }: { p: Problem }) {
+  return (
+    <LiquidGlass as="section" radius="28px" className="flex flex-col gap-3 px-6 py-5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-lg font-semibold tracking-[-0.02em]">{p.name}</span>
+        <div className="flex gap-2">
+          <Button small className="bg-well text-ink" onClick={() => jumpTo(p.bar)}>Hear it in Live</Button>
+          {p.fix && <Button small variant="primary" onClick={() => notice("Fix it for me is coming next.")}>Fix it for me</Button>}
+        </div>
+      </div>
+      {p.notes.length
+        ? p.notes.map((n, k) => <p key={k} className="m-0 max-w-[760px] text-[13.5px] leading-5">{n.text}</p>)
+        : <p className="m-0 text-[13px] text-ink-muted">{describe(p.findings[0]).about}</p>}
+      <div className="flex flex-wrap gap-1.5">
+        {p.findings.map((f, k) => {
+          const d = describe(f);
+          return <span key={k} className="whitespace-nowrap rounded-full bg-well px-2 font-mono text-[11px] leading-5 text-ink-muted">
+            {d.where} · {d.size} · bars {f.bars[0]}{f.bars[1] !== f.bars[0] ? `–${f.bars[1]}` : ""}</span>;
+        })}
+      </div>
+    </LiquidGlass>
   );
 }
 

@@ -1,10 +1,11 @@
 // Where each part sits: every part's measured spectrum as a smooth filled wave on a frequency
 // axis, with problem zones shaded and labelled. Parts a problem is about stand out; the rest
 // step back. Curves are smoothed for display only; the engine's numbers stay as measured.
+import { useRef, useState, type PointerEvent } from "react";
 import { motion } from "motion/react";
 import { describe, soundName, type Finding, type Spectra } from "@/lib/aria";
 
-const W = 640, H = 300, PAD_B = 24, PAD_T = 26, LO = 30, HI = 16000, FLOOR_DB = -60;
+const W = 640, H = 270, PAD_B = 24, PAD_T = 26, LO = 30, HI = 16000, FLOOR_DB = -60;
 const ORDER = ["drums", "bass", "other", "vocals"];   // drawn back to front
 const TICKS = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
 
@@ -32,6 +33,18 @@ export function Waves({ spectra, findings, split, onZone }: {
   const involved = new Set<string>();
   findings.forEach((f) => { if (f.kind === "masking") involved.add(f.masked!); if (f.kind === "bass_click") involved.add("bass"); });
   const names = split ? ORDER.filter((n) => spectra.parts[n]) : ["mix"];
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [hover, setHover] = useState<{ i: number; left: number; top: number } | null>(null);
+
+  // Hover: the nearest measured point under the pointer, with each part's real level there.
+  const onMove = (e: PointerEvent<SVGSVGElement>) => {
+    const r = svgRef.current!.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * W;
+    const hzAt = 10 ** (Math.log10(LO) + (x / W) * (Math.log10(HI) - Math.log10(LO)));
+    let i = 0;
+    spectra.hz.forEach((h, k) => { if (Math.abs(Math.log(h / hzAt)) < Math.abs(Math.log(spectra.hz[i] / hzAt))) i = k; });
+    setHover({ i, left: e.clientX, top: e.clientY });
+  };
 
   // Waves with their label positions, labels nudged so none overlap
   const waves = names.map((n) => {
@@ -52,7 +65,8 @@ export function Waves({ spectra, findings, split, onZone }: {
 
   return (
     <div className="flex flex-col gap-2.5">
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="Each part's frequency curve">
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="Each part's frequency curve"
+           onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
         {TICKS.map((t) => (
           <g key={t}>
             <line x1={X(t)} x2={X(t)} y1={PAD_T - 6} y2={H - PAD_B} stroke="var(--hairline)" />
@@ -79,7 +93,24 @@ export function Waves({ spectra, findings, split, onZone }: {
             <text x={wv.label.x} y={wv.label.y} textAnchor="middle" fill={`var(--part-${wv.n})`} opacity={wv.quiet ? 0.5 : 1} className="text-[11.5px] font-semibold">{soundName(wv.n)}</text>
           </motion.g>
         ))}
+        {hover && <line x1={X(spectra.hz[hover.i])} x2={X(spectra.hz[hover.i])} y1={PAD_T - 6} y2={H - PAD_B} stroke="currentColor" strokeOpacity={0.6} strokeWidth={1.5} />}
       </svg>
+
+      {hover && (
+        <div className="pointer-events-none fixed z-50 min-w-[150px] rounded-[14px] border border-white/12 bg-[rgba(14,14,16,0.92)] px-3 py-2 text-xs text-white shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] backdrop-blur-xl"
+             style={{ left: hover.left + 16, top: hover.top - 16, transform: "translateY(-100%)" }}>
+          <div className="mb-1 font-medium text-white/60">{spectra.hz[hover.i] >= 1000 ? `${(spectra.hz[hover.i] / 1000).toFixed(1)} kHz` : `${spectra.hz[hover.i]} Hz`}</div>
+          {names.slice().reverse().map((n) => {
+            const v = (split ? spectra.parts[n]! : spectra.mix)[hover.i];
+            return (
+              <div key={n} className="flex items-center justify-between gap-3.5 leading-[19px]">
+                <span className="inline-flex items-center gap-1.5 text-white/60"><i className="size-[7px] rounded-full" style={{ background: `var(--part-${n})` }} />{soundName(n)}</span>
+                <b className="font-mono font-medium">{v <= FLOOR_DB ? "silent" : `${v.toFixed(0)} dB`}</b>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3.5 text-xs text-ink-muted">
         {names.map((n) => (
