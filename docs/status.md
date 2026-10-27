@@ -136,7 +136,8 @@ Pass condition (from `docs/build-steps.md`): `uvicorn` serves `/health`, `pytest
 5. Stop the engine and reload the page. It should say the engine isn't running.
 
 ## Next
-- Step 1: the Day 1 tests. To start them, Ian needs to say how the `.amxd` gets built (Ian wires it in Max from a guide, or Claude generates it) and which Max version is installed.
+- Ian builds the test device from `docs/max-guide-step1.md` and sends the Max Console lines for 1.5 to 1.8.
+- Then Step 2, the bare bones round trip. It now includes **engine auto-start**: Aria starts the engine when it loads and stops it when Live quits, so no terminal is needed (see `docs/build-steps.md`).
 
 ## Decisions so far
 - The build started Oct 26.

@@ -32,6 +32,12 @@ Pass: all eight have a written yes or no and a chosen path.
 
 This is the "First milestone" in CLAUDE.md: install, run inside Ableton, call the Live API and the Muse API, and show real results.
 
+- **The engine starts by itself.** When Aria loads, `bridge.js` (in `node.script`) checks `/health`.
+  - If nothing answers, it starts `engine/run.sh` as a child process and waits for `/health`. The strip shows "Starting Aria" until then.
+  - If an engine is already running (for example one started by hand while developing), it uses that one and starts nothing.
+  - The engine's output goes to `~/Library/Logs/Aria/engine.log`.
+  - When the device is removed or Live quits, `bridge.js` stops the engine it started, and only that one.
+  - If the engine can't start (not installed, port taken), the strip says why in plain words and how to fix it.
 - The device sits on the master and shows the strip UI in `jweb` with a Check mix button.
 - Pressing it records 8 bars of the master with `sfrecord~` to a temp wav and stores the start song time.
 - `bridge.js` POSTs `/mix/analyze` with the path. The engine measures it for real: integrated LUFS, true peak, Bass, Mids and Treble levels, and width. No stub numbers.
@@ -39,7 +45,7 @@ This is the "First milestone" in CLAUDE.md: install, run inside Ableton, call th
 - The engine sends the measurements to Muse Spark and returns its advice. If there's no key or the call fails, it says so and shows the measurements only.
 - The strip shows the measurements and Muse's advice.
 
-Pass: on Ian's machine, Check mix leads to real measurements and real Muse Spark advice in the strip, three times in a row. From the end of the recording to the result on screen takes under 15 seconds. The 8 bar recording itself runs in real time (about 15.5 s at 124 BPM).
+Pass: on Ian's machine, with no terminal open, dragging Aria onto the master starts the engine. Check mix then leads to real measurements and real Muse Spark advice in the strip, three times in a row. From the end of the recording to the result on screen takes under 15 seconds. The 8 bar recording itself runs in real time (about 15.5 s at 124 BPM).
 
 ## Parallel track: the good mix vs bad mix model (from Oct 26)
 
