@@ -12,7 +12,14 @@
 <script src="window.js"></script>
 </head>
 <body>
-<div class="cp-stage" data-theme="sky">
+<!-- Liquid glass: warps the blurred backdrop of .aria-liquid panels (see aria.css) -->
+<svg width="0" height="0" style="position: absolute;" aria-hidden="true">
+  <filter id="aria-liquid" x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox">
+    <feTurbulence type="fractalNoise" baseFrequency="0.003 0.007" numOctaves="1" result="turbulence"/>
+    <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="200" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+<div class="cp-stage aria-lights" data-theme="sky">
 <div class="cp-glass cp-window aria-window">
 
 <aside class="cp-rail">
@@ -81,35 +88,35 @@
 
     <div data-mix-body hidden>
       <div class="cp-bento" data-simple>
-        <section class="cp-tile cp-card span-12 aria-verdict-tile">
+        <section class="cp-tile aria-liquid span-12 aria-verdict-tile">
           <span class="aria-verdict" data-verdict></span>
           <span class="aria-verdict-line" data-verdict-line></span>
         </section>
 
-        <section class="cp-tile cp-card span-7" style="gap: 10px;">
+        <section class="cp-tile aria-liquid span-7" style="gap: 10px;">
           <div class="cp-spread"><span class="cp-cap">Where each part sits</span><span class="cp-meta" data-waves-note></span></div>
           <svg class="aria-waves" data-waves viewBox="0 0 640 300" role="img" aria-label="Each part's frequency curve"></svg>
           <div class="aria-wave-key" data-wave-key></div>
         </section>
 
-        <section class="cp-tile cp-card span-5" style="gap: 8px;">
+        <section class="cp-tile aria-liquid span-5" style="gap: 8px;">
           <span class="cp-cap">What to fix</span>
           <ol class="aria-problems" data-problems></ol>
         </section>
       </div>
 
       <div class="cp-bento" data-detailed hidden>
-        <section class="cp-tile cp-card span-7" style="gap: 12px;">
+        <section class="cp-tile aria-liquid span-7" style="gap: 12px;">
           <span class="cp-cap">The numbers</span>
           <div class="aria-numbers" data-numbers></div>
           <p class="cp-meta">Loudness and peak are here for reference. Aria's advice is about clarity.</p>
         </section>
-        <section class="cp-tile cp-card span-5" style="gap: 12px;" data-parts-tile>
+        <section class="cp-tile aria-liquid span-5" style="gap: 12px;" data-parts-tile>
           <span class="cp-cap">Each part against the mix</span>
           <div class="aria-numbers" data-parts></div>
           <p class="cp-meta" data-split-by></p>
         </section>
-        <section class="cp-tile cp-card span-12" style="gap: 8px;">
+        <section class="cp-tile aria-liquid span-12" style="gap: 8px;">
           <span class="cp-cap">Everything Muse Spark said</span>
           <ul class="aria-notes" data-notes></ul>
         </section>

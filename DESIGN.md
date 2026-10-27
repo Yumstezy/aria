@@ -64,6 +64,13 @@ Two themes: **Sky** (default) and **Night** (for dark Live themes). Set `data-th
   - 28: window frame
   - pill: chips, tags and toggles
 - Glass: `backdrop-filter: blur(24px) saturate(140%)`, a 1px light edge and a bright top rim.
+- **Liquid glass** (Oct 27, Ian): the Apple-style look, in `ui/aria.css` as `.aria-liquid`. Use it for every panel in the window and the strip.
+  - **The light:** `.aria-lights` puts soft colored blobs behind the glass. Glass needs something to bend.
+  - **The bend:** the blurred backdrop is warped by the `#aria-liquid` SVG turbulence filter.
+  - **The face:** a faint translucent fill and a soft glow.
+  - **The edge:** thin inner highlights.
+  - Plain CSS, no React or build step.
+- Type in the UI is Geist (bundled), with Helvetica Neue by name as the fallback.
 - Shadow: `0 10px 30px -12px` in blue-gray (Sky) or black (Night).
 - Motion: 160 to 200ms ease-out. Charts may grow in over about 1s. Respect `prefers-reduced-motion`.
 

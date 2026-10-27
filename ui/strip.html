@@ -11,7 +11,14 @@
 <script src="app.js"></script>
 </head>
 <body>
-<div class="cp-stage aria-strip-stage" data-theme="sky">
+<!-- Liquid glass: warps the blurred backdrop of .aria-liquid panels (see aria.css) -->
+<svg width="0" height="0" style="position: absolute;" aria-hidden="true">
+  <filter id="aria-liquid" x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox">
+    <feTurbulence type="fractalNoise" baseFrequency="0.003 0.007" numOctaves="1" result="turbulence"/>
+    <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="200" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
+<div class="cp-stage aria-strip-stage aria-lights" data-theme="sky">
 <div class="cp-glass cp-strip aria-strip">
 
   <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -24,7 +31,7 @@
     <span class="cp-tag cp-push" data-engine style="align-self: flex-start;">Starting Aria</span>
   </div>
 
-  <section class="cp-tile cp-card" style="gap: 6px;">
+  <section class="cp-tile aria-liquid" style="gap: 6px;">
     <div data-state="idle" class="aria-empty" style="min-height: 0; flex: 1; padding: 10px 12px;">
       <b>Nothing measured yet.</b>
       <span data-notice role="status">Press Check mix. Aria listens to 8 bars of your song.</span>
@@ -49,7 +56,7 @@
     </div>
   </section>
 
-  <section class="cp-tile cp-card aria-advice-tile" style="gap: 6px;">
+  <section class="cp-tile aria-liquid aria-advice-tile" style="gap: 6px;">
     <span class="cp-cap" data-advice-title>Advice by Muse Spark</span>
     <p class="cp-body aria-advice" data-advice>Muse Spark explains your numbers after a Mix check.</p>
     <div class="cp-row cp-push aria-advice-actions">
