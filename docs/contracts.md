@@ -254,7 +254,8 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
   - `undo`: undo the last change Aria made.
   - `clear_history`
   - `open_ask`: open the window with the Ask pop-up open.
-  - `window_mode {mode: "full" | "side", screen: {x, y, w, h}}`: size and place the window. Side floats over Live. Saved in `~/Library/Application Support/Aria/window.json`.
+  - `window_mode {mode: "full" | "left" | "right", screen: {x, y, w, h}}`: size and place the window. Left and right dock to that screen edge and float over Live. Saved in `~/Library/Application Support/Aria/window.json`.
+  - `open_chat {screen}`: pop Ask Muse out into its own small floating window.
 - Device to UI:
   - `ask_pending {request | null}`
   - `ask_log [exchange]`: the whole history, sent on `ready` and on every change. The bridge owns it and saves it in `~/Library/Application Support/Aria/ask-history.json` (last 100).

@@ -2,7 +2,7 @@
 // Picture first, a short line second, numbers and long text only when asked for (DESIGN.md).
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { AudioWaveform, ChartNoAxesColumn, Columns2, Grip, House, Maximize2, Mic, PanelRight } from "lucide-react";
+import { ArrowLeftRight, AudioWaveform, ChartNoAxesColumn, Columns2, Grip, House, Maximize2, MessageSquare, Mic, PanelLeft, PanelRight } from "lucide-react";
 import { LiquidGlass } from "@/components/ui/liquid-glass";
 import { Button, Cap, Mark } from "@/components/brand";
 import { Waves } from "@/components/waves";
@@ -12,7 +12,7 @@ import { CountUp } from "@/components/count-up";
 import { Segmented } from "@/components/ui/segmented";
 import { AskMuse, InlineAsk } from "@/components/ask-muse";
 import { problemsOf, type Problem } from "@/lib/problems";
-import { barsLabel, checkMix, describe, jumpTo, notice, setAskOpen, setWindowMode, soundName, useAria, useAriaSnapshot, type Result } from "@/lib/aria";
+import { barsLabel, checkMix, describe, jumpTo, lastDock, notice, openChat, setAskOpen, setWindowMode, soundName, useAria, useAriaSnapshot, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
 type View = "home" | "mixcheck";
@@ -55,8 +55,11 @@ export function AriaWindow() {
               <Mark size={22} />
               <Segmented label="Screen" items={["Home", "Mix check"] as const} value={view === "home" ? "Home" : "Mix check"}
                          onChange={(v) => setView(v === "Home" ? "home" : "mixcheck")} />
-              <button onClick={() => setWindowMode("full")} title="Full window" aria-label="Full window"
-                      className="ml-auto grid size-8 place-items-center rounded-full text-ink-muted hover:bg-well"><Maximize2 size={15} /></button>
+              <div className="ml-auto flex items-center">
+                <IconButton label="Move to the other side" onClick={() => setWindowMode(lastDock() === "left" ? "right" : "left")}><ArrowLeftRight size={15} /></IconButton>
+                <IconButton label="Pop out Ask Muse" onClick={openChat}><MessageSquare size={15} /></IconButton>
+                <IconButton label="Full window" onClick={() => setWindowMode("full")}><Maximize2 size={15} /></IconButton>
+              </div>
             </div>
           )}
           <header className={cn("flex justify-between gap-3", narrow ? "flex-col items-stretch" : "items-center")}>
@@ -78,8 +81,10 @@ export function AriaWindow() {
               )}
               <Button variant="primary" disabled={!!progress} onClick={checkMix}>{result ? "Check again" : "Check mix"}</Button>
               {!narrow && (
-                <button onClick={() => setWindowMode("side")} title="Dock beside Live" aria-label="Dock beside Live"
-                        className="grid size-9 place-items-center rounded-full text-ink-muted hover:bg-well"><PanelRight size={17} /></button>
+                <div className="flex items-center">
+                  <IconButton label="Dock on the left of the screen" onClick={() => setWindowMode("left")}><PanelLeft size={17} /></IconButton>
+                  <IconButton label="Dock on the right of the screen" onClick={() => setWindowMode("right")}><PanelRight size={17} /></IconButton>
+                </div>
               )}
             </div>
           </header>
@@ -94,6 +99,10 @@ export function AriaWindow() {
       <AskMuse narrow={narrow} />
     </div>
   );
+}
+
+function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  return <button onClick={onClick} title={label} aria-label={label} className="grid size-8 place-items-center rounded-full text-ink-muted hover:bg-well hover:text-ink">{children}</button>;
 }
 
 function Rail({ view, setView }: { view: View; setView: (v: View) => void }) {

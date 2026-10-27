@@ -327,6 +327,8 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
   - `/health` now reports the engine's pid and when its code was loaded. The bridge restarts the engine when the code on disk is newer.
   - A cut reuses the cut already on the track instead of stacking a second one.
   - A band that's on but flat (a fresh EQ Eight has bands 1 to 4 on at 0 dB) counts as free.
+- **Window, fourth pass (Oct 27).** The window docks **Left** or **Right** (floats over Live) or goes **Full**. In docked mode, buttons at the top switch sides, pop out Ask Muse, and go back to Full. **Ask Muse pops out** into its own small window (`p chat` in the device, `?view=chat`) that floats over Live; it shows the same saved history. A see-through window isn't possible as far as we know: Max windows are opaque, so the page can only look like glass.
+- **Everyday asks:** "add clarity", "less muddy", "some air" and the like now use standard starting points (for example clarity is +2 dB at 3 kHz) instead of asking for numbers. A Mix check finding's frequency wins when there is one.
 - **Voice** isn't in yet. Muse Voice Transcribe works (step 1.4). The open question is the microphone: whether `jweb` can record it, or whether it goes through Live's input.
 
 ### The big change: device control
@@ -335,7 +337,7 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
 
 ## Next
 - **Ian:**
-  - Re-add `device/Aria.amxd` (the window can now be sized and float).
+  - Re-add `device/Aria.amxd` (it now has the pop-out chat window).
   - Try: "jump to bar 17" while stopped, then press Play; "cut the mud on <synth track>"; the Side button.
   - Send a few `.adv` presets with words for their sound, and your most-used plugins (see `docs/device-control.md`, "From Ian").
   - Re-add `device/Aria.amxd`: the device file changed, because it now has the window.

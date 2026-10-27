@@ -3,8 +3,8 @@
 // (design screen 08). Both show the same history, which the bridge saves on this Mac.
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUp, Check, Mic, Undo2, X } from "lucide-react";
-import { answerSuggestion, askMuse, clearHistory, hz, setAskOpen, undoLast, useAria, type Finding, type Suggestion } from "@/lib/aria";
+import { ArrowUp, Check, Mic, SquareArrowOutUpRight, Undo2, X } from "lucide-react";
+import { answerSuggestion, askMuse, clearHistory, hz, openChat, setAskOpen, undoLast, useAria, type Finding, type Suggestion } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
 // Starting points built from what Aria found, so the first ask is one tap
@@ -142,7 +142,11 @@ export function InlineAsk() {
       <div className="flex items-center gap-2">
         <b className="text-sm">Ask Muse</b>
         <span className="text-xs text-white/50">about this check</span>
-        {ask.log.length > 0 && <button onClick={() => setAskOpen(true)} className="ml-auto text-xs text-white/55 hover:text-white">History</button>}
+        <div className="ml-auto flex items-center gap-1">
+          {ask.log.length > 0 && <button onClick={() => setAskOpen(true)} className="rounded-full px-2 py-0.5 text-xs text-white/55 hover:bg-white/10 hover:text-white">History</button>}
+          <button onClick={openChat} title="Pop out into its own window" aria-label="Pop out Ask Muse"
+                  className="grid size-7 place-items-center rounded-full text-white/60 hover:bg-white/10 hover:text-white"><SquareArrowOutUpRight size={14} /></button>
+        </div>
       </div>
       <AskThread last={2} className="max-h-[320px]" />
       <AskInput className="border-t border-white/10 pt-2" />
@@ -150,11 +154,39 @@ export function InlineAsk() {
   );
 }
 
+/** Clear, asking once more before it deletes the history. */
+function ClearButton({ className }: { className?: string }) {
+  const [sure, setSure] = useState(false);
+  useEffect(() => { if (sure) { const t = setTimeout(() => setSure(false), 3000); return () => clearTimeout(t); } }, [sure]);
+  return (
+    <button onClick={() => { if (sure) { clearHistory(); setSure(false); } else setSure(true); }}
+            className={cn("rounded-full px-2 py-0.5 text-xs hover:bg-white/10", sure ? "text-[#ffb07a]" : "text-white/50 hover:text-white", className)}>
+      {sure ? "Clear all?" : "Clear"}
+    </button>
+  );
+}
+
+/** Ask Muse popped out into its own small window that floats over Live. */
+export function ChatWindow() {
+  const { ask, result } = useAria();
+  return (
+    <div className="aria-lights flex h-screen flex-col text-white">
+      <div className="flex h-full flex-col" style={{ background: "rgba(16, 22, 38, 0.55)" }}>
+        <div className="flex items-center gap-2 px-4 pb-2 pt-3.5">
+          <b className="text-sm">Ask Muse</b>
+          <span className="text-xs text-white/50">{result ? "about Mix check" : "about your set"}</span>
+          {ask.log.length > 0 && <ClearButton className="ml-auto" />}
+        </div>
+        <AskThread className="flex-1 px-4 pb-2" />
+        <AskInput autoFocus className="border-t border-white/10 px-3 py-2.5" />
+      </div>
+    </div>
+  );
+}
+
 /** The pop-up: the whole history. */
 export function AskMuse({ narrow }: { narrow?: boolean }) {
   const { ask, result } = useAria();
-  const [sure, setSure] = useState(false);   // Clear asks once more before it deletes the history
-  useEffect(() => { if (sure) { const t = setTimeout(() => setSure(false), 3000); return () => clearTimeout(t); } }, [sure]);
   return (
     <AnimatePresence>
       {ask.open && (
@@ -168,10 +200,7 @@ export function AskMuse({ narrow }: { narrow?: boolean }) {
           <div className="flex items-center gap-2 px-4 pb-2 pt-3.5">
             <b className="text-sm">Ask Muse</b>
             <span className="text-xs text-white/50">{result ? "about Mix check" : "about your set"}</span>
-            {ask.log.length > 0 && <button onClick={() => { if (sure) { clearHistory(); setSure(false); } else setSure(true); }}
-                      className={cn("ml-auto rounded-full px-2 py-0.5 text-xs hover:bg-white/10", sure ? "text-[#ffb07a]" : "text-white/50 hover:text-white")}>
-                {sure ? "Clear all?" : "Clear"}
-              </button>}
+            {ask.log.length > 0 && <ClearButton className="ml-auto" />}
             <button onClick={() => setAskOpen(false)} aria-label="Close" className={cn("grid size-7 place-items-center rounded-full text-white/60 hover:bg-white/10", !ask.log.length && "ml-auto")}><X size={15} /></button>
           </div>
           <AskThread className="flex-1 px-4 pb-2" />

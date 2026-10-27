@@ -27,11 +27,13 @@ const LOG_DIR = path.join(os.homedir(), "Library", "Logs", "Aria");
 // Ask Muse history, kept across Live sessions. Local to this Mac, never sent anywhere.
 const HISTORY_FILE = path.join(os.homedir(), "Library", "Application Support", "Aria", "ask-history.json");
 const HISTORY_MAX = 100;
-// The window's size and place: "full" (a big window) or "side" (a tall panel docked right,
-// floating over Live so both stay in view). Remembered between sessions.
+// The window's size and place: "full" (a big window), or "left" / "right" (a tall panel docked to
+// that edge, floating over Live so both stay in view). Remembered between sessions.
+// Ask Muse can also pop out into its own small floating window ("chat").
 const WINDOW_FILE = path.join(os.homedir(), "Library", "Application Support", "Aria", "window.json");
 const FULL = { w: 1200, h: 860 };
 const SIDE_W = 460;
+const CHAT = { w: 400, h: 620 };
 const REC_DIR = path.join(os.tmpdir(), "aria");
 const BARS = 16;   // 16 bars, so a check covers a whole phrase (Ian, Oct 27)
 const START_TIMEOUT_MS = 20000;
@@ -43,6 +45,7 @@ let engineChild = null;   // only an engine this device started, never one start
 let engineState = { state: "starting", text: "Starting Aria" };
 let busy = false;
 let windowLoaded = false;
+let chatLoaded = false;
 let lastResult = null;    // so a window opened later shows the latest Check mix
 const waiters = {};       // live.js reply name -> resolve function
 let askLog = loadHistory();   // every Ask Muse exchange; the strip and window both show it
@@ -54,6 +57,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const toUI = (name, payload) => {
   Max.outlet("jweb", name, encode(payload));
   if (windowLoaded) Max.outlet("window", name, encode(payload));
+  if (chatLoaded) Max.outlet("chat", name, encode(payload));
 };
 const toLive = (...args) => Max.outlet("live", ...args);
 const toRec = (...args) => Max.outlet("rec", ...args);
@@ -286,22 +290,30 @@ function loadWindowPrefs() {
   try { return JSON.parse(fs.readFileSync(WINDOW_FILE, "utf8")); } catch (e) { return { mode: "full", screen: null }; }
 }
 
-// Size and place the window for a mode. Side needs the screen size, which only the page knows.
+function sizeWindow(target, ui, { x, y, w, h }, float) {
+  Max.outlet(target, "window", "size", Math.round(x), Math.round(y), Math.round(x + w), Math.round(y + h));
+  Max.outlet(target, "window", "flags", float ? "float" : "nofloat");
+  Max.outlet(target, "window", "exec");
+  Max.outlet(target, "script", "sendbox", ui, "presentation_rect", 0, 0, Math.round(w), Math.round(h));
+}
+
+// Size and place the window for a mode. Docking needs the screen size, which only the page knows.
 function placeWindow({ mode, screen }) {
-  let x, y, w, h;
-  if (mode === "side" && screen) {
-    w = SIDE_W;
-    h = Math.max(600, screen.h - 40);
-    x = screen.x + screen.w - w - 8;
-    y = screen.y + 32;
-  } else {
-    ({ w, h } = FULL);
-    x = 120; y = 90;
-  }
-  Max.outlet("window", "window", "size", x, y, x + w, y + h);
-  Max.outlet("window", "window", "flags", mode === "side" ? "float" : "nofloat");
-  Max.outlet("window", "window", "exec");
-  Max.outlet("window", "script", "sendbox", "aria-window-ui", "presentation_rect", 0, 0, w, h);
+  if (mode === "side") mode = "right";   // the first version had one side
+  const docked = (mode === "left" || mode === "right") && screen;
+  if (!docked) { sizeWindow("window", "aria-window-ui", { x: 120, y: 90, ...FULL }, false); return; }
+  const h = Math.max(600, screen.h - 40);
+  const x = mode === "left" ? screen.x + 8 : screen.x + screen.w - SIDE_W - 8;
+  sizeWindow("window", "aria-window-ui", { x, y: screen.y + 32, w: SIDE_W, h }, true);
+}
+
+// Ask Muse in its own window, bottom corner, on the side away from a docked window. Always on top.
+function placeChat(screen) {
+  const prefs = loadWindowPrefs();
+  const sc = screen || prefs.screen || { x: 0, y: 25, w: 1440, h: 875 };
+  const left = prefs.mode === "right" || prefs.mode === "side";
+  const x = left ? sc.x + sc.w - SIDE_W - CHAT.w - 24 : sc.x + sc.w - CHAT.w - 16;
+  sizeWindow("chat", "aria-chat-ui", { x, y: sc.y + sc.h - CHAT.h - 16, ...CHAT }, true);
 }
 
 function showWindow(url) {
@@ -314,6 +326,12 @@ function showWindow(url) {
 }
 
 Max.addHandler("open_window", () => showWindow(WINDOW_URL));
+Max.addHandler("open_chat", (s) => {
+  chatLoaded = true;
+  Max.outlet("chat", "url", WINDOW_URL + "&view=chat");
+  placeChat(s ? decode(s).screen : null);
+  Max.outlet("chat", "front");
+});
 Max.addHandler("window_mode", (s) => {
   const prefs = decode(s);
   try {

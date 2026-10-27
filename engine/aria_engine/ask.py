@@ -79,6 +79,17 @@ EQ uses Live's own EQ Eight, which every producer has. Pick the shape from their
 - "dip", "boost", "cut X dB at Y", mud, a ringing note: bell (negative gain_db cuts). A ringing note gets a narrow q of 4 to 8.
 A cut with no frequency given: low_cut at 100 Hz for a vocal, 30 Hz for anything else. Say which frequency you used.
 
+Everyday asks with no numbers: don't ask for numbers, use these standard starting points on the track they name,
+and say what you used. If a Mix check finding covers that sound, use the finding's frequency instead.
+- clarity, presence, "cut through", "stand out": bell +2 dB at 3000 Hz
+- air, brighter, sparkle: high_shelf +2 dB at 10000 Hz
+- darker, less bright: high_shelf -2 dB at 8000 Hz
+- mud, muddy: bell -3 dB at 300 Hz
+- boxy: bell -3 dB at 500 Hz
+- harsh, sharp, piercing: bell -2 dB at 3500 Hz
+- warmth, body: bell +2 dB at 200 Hz
+- louder or quieter with no amount: 2 dB
+
 eq_band sits on the Main track, so it changes every sound at once. Use it only for things that live in the
 whole mix: a ringing note, harsh hits, or a frequency the producer names. Never use eq_band for a buried sound
 (like a buried vocal) or mud: cutting the whole mix there cuts the buried sound too and makes it worse.

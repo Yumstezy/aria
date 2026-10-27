@@ -196,11 +196,23 @@ export const openAsk = () => { if (!send("open_ask")) window.open("../window/ind
 
 export const jumpTo = (bar: number) => send("jump_to", { bar });
 
-/** Side: a tall panel docked right that floats over Live. Full: the big window. */
-export function setWindowMode(mode: "side" | "full") {
+function screenRect() {
   const sc = window.screen as Screen & { availLeft?: number; availTop?: number };
-  send("window_mode", { mode, screen: { x: sc.availLeft ?? 0, y: sc.availTop ?? 0, w: sc.availWidth, h: sc.availHeight } });
+  return { x: sc.availLeft ?? 0, y: sc.availTop ?? 0, w: sc.availWidth, h: sc.availHeight };
 }
+
+export type WindowMode = "left" | "right" | "full";
+/** Left or right: a tall panel docked to that edge, floating over Live. Full: the big window. */
+export function setWindowMode(mode: WindowMode) {
+  try { localStorage.setItem("aria.dock", mode); } catch { /* storage may be off; the bridge remembers too */ }
+  send("window_mode", { mode, screen: screenRect() });
+}
+export function lastDock(): "left" | "right" {
+  try { return localStorage.getItem("aria.dock") === "left" ? "left" : "right"; } catch { return "right"; }
+}
+
+/** Ask Muse in its own small window that stays on top. */
+export const openChat = () => { if (!send("open_chat", { screen: screenRect() })) window.open("?view=chat", "aria-chat", "width=400,height=620"); };
 export const openWindow = () => { if (!send("open_window")) window.open("../window/index.html", "aria-window"); };
 export const addMarker = (bar: number) => send("add_marker", { bar, name: "Aria check" });
 
