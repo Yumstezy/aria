@@ -105,7 +105,7 @@
       adv.title = r.advice ? r.advice.notes.map(function (n) { return n.text; }).join('\n') : '';
     }
     var mark = show('[data-action="mark"]', !!r.start_bar && inMax);
-    if (mark) { mark.setAttribute('data-bar', r.start_bar); mark.disabled = false; mark.textContent = 'Mark bar ' + r.start_bar + ' in Live'; }
+    if (mark) { mark.setAttribute('data-bar', r.start_bar); mark.disabled = false; mark.textContent = 'Mark bar ' + r.start_bar; }
     var btn = $('[data-action="check-mix"]');
     if (btn) { btn.disabled = false; btn.textContent = 'Check again'; }
   }
@@ -146,8 +146,7 @@
       btn.className = 'aria-finding';
       var d = describe(f);
       btn.title = (d[3] ? d[3] + ' ' : '') + 'Bars ' + f.bars[0] + (f.bars[1] !== f.bars[0] ? ' to ' + f.bars[1] : '') + '. Click to jump there.';
-      [['aria-finding-kind', d[0]], ['aria-finding-hz', d[1]], ['aria-finding-size', d[2]],
-       ['aria-finding-bars', 'bar ' + f.bars[0]]].forEach(function (p) {
+      [['aria-finding-kind', d[0]], ['aria-finding-hz', d[1]], ['aria-finding-size', d[2]]].forEach(function (p) {
         var span = document.createElement('span');
         span.className = p[0];
         span.textContent = p[1];
