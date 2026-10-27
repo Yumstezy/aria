@@ -90,7 +90,12 @@ docs/          build steps, contracts, screens
 
 ## UI rules
 
-- The UI is plain HTML, CSS and JS inside Max's `jweb` (embedded Chromium). No framework and no build step unless one is clearly needed.
+- The UI is React + TypeScript + Tailwind, built with Vite (decided Oct 27 with Ian, so we can use components like 21st.dev and shadcn, and `motion`, and keep the interactive screens tidy).
+  - Code lives in `ui/src/`, and components go in `ui/src/components/ui/` (shadcn layout).
+  - `npm run build` in `ui/` turns each screen into one self-contained HTML file in `ui/dist/` (`strip.html`, `index.html`), with code, styles and fonts inside.
+  - Max's `jweb` loads those files from disk, because module scripts won't load over `file://`.
+  - `ui/dist/` is committed, so running Aria never needs Node. Only changing the UI does.
+  - It all runs inside Live's built-in web view, not a browser app.
 - Use `design/ds/tokens.css` and `design/ds/components/bundle.css` as they are. Class names start with `cp-`, an internal code name. Keep it.
 - Charts come from `window.CoProducer` in `design/ds/components/bundle.js` (spectrum, sectionMap, energy, stereo, timing, arrangement, analyzer). Feed them the engine's JSON.
 - Talk to Max with `window.max.outlet(...)` and `window.max.bindInlet(...)`. Guard for `window.max` being missing. In a normal browser, the UI calls the engine directly with a real wav path, so we develop fast without Live and still see only real results.

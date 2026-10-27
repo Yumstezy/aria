@@ -268,6 +268,17 @@ Build order, each a demo beat:
 - **Muse may only attach an EQ fix** to ringing notes, harsh hits and build-ups. It had offered an EQ cut for a buried vocal, which would cut the vocal too.
 - **Checked:** rendered with a real result from Ian's muddy mix, and the bridge's window routing was tested with a stand-in for Max. **Not yet checked inside Live.**
 
+## Now: moving the UI to React (Oct 27)
+
+Ian's call: use React for the front end so it can look better, using component libraries (21st.dev, shadcn) and `motion`. It still runs entirely inside Ableton, in Live's built-in web view.
+
+1. **Scaffold `ui/`:** Vite, React, TypeScript, Tailwind v4, `motion`, the shadcn layout (`src/components/ui`, `src/lib/utils.ts`), and `vite-plugin-singlefile` so each screen builds to one HTML file.
+2. **Port the strip first** and check it inside Live. That doubles as the test that React works in `jweb`.
+3. **Port the window:** Home, and Mix check Simple and Detailed with the waves, using the liquid glass card (the component Ian sent, adapted to our tokens).
+4. **The bridge** points `jweb` at `ui/dist/strip.html` and `ui/dist/index.html`.
+5. **The old plain files** (`ui/app.js`, `window.js`, `aria.css`) are removed once the React versions pass in Live.
+6. **Then** Fix it for me and Ask Muse are built in React.
+
 ## Next
 - **Ian:**
   - Re-add `device/Aria.amxd`: the device file changed, because it now has the window.
