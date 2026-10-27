@@ -1,100 +1,437 @@
-// The Aria window, a floating window inside Live: Home and Mix check (Simple and Detailed).
-// Picture first, a short line second, numbers and long text only when asked for (DESIGN.md).
-import { useEffect, useState, type ReactNode } from "react";
+// The Aria window: the side rail and the bento (design/screens/11 and 12), Home and Mix check
+// (Simple and Detailed). Picture first, a short line second, numbers when asked for (DESIGN.md).
+// Before the first check every card shows its layout greyed out and says what comes next.
+import { useEffect, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeftRight, AudioWaveform, ChartNoAxesColumn, ChevronsDown, Columns2, Grip, House, Maximize2, MessageSquare, Mic, PanelLeft, PanelRight, Play, X } from "lucide-react";
-import { LiquidGlass } from "@/components/ui/liquid-glass";
-import { Button, Cap, Mark } from "@/components/brand";
+import { Mark } from "@/components/brand";
 import { Waves } from "@/components/waves";
-import { GradientCard } from "@/components/ui/gradient-card";
 import { TickGauge } from "@/components/tick-gauge";
 import { CountUp } from "@/components/count-up";
-import { Segmented } from "@/components/ui/segmented";
-import { AskMuse, InlineAsk } from "@/components/ask-muse";
-import { problemsOf, type Problem } from "@/lib/problems";
+import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
-import { barsLabel, checkMix, closeChat, closeWindow, describe, jumpTo, lastDock, notice, openChat, setAskOpen, setWindowMode, soundName, useAria, useAriaSnapshot, useViewport, type Result } from "@/lib/aria";
+import { AnalyzerIcon, BuriedIcon, ChatIcon, ClickIcon, CloseIcon, ExpandIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
+         ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
+import { barGroups, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
+import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, jumpTo, lastDock, notice, openChat, setAskOpen, setTheme, setWindowMode,
+         soundName, useAria, useViewport, type Kind, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
 type View = "home" | "mixcheck";
 
-// Docked (a narrow panel beside Live) stacks everything in one column, on see-through glass.
+// Docked (a narrow panel beside Live) keeps the rail as icons and stacks the bento in one column.
 // Short as well as narrow means Ask Muse is popped out under it: show only what to fix.
 const NARROW_PX = 760, COMPACT_PX = 480;
-const wide = (narrow: boolean, cls: string) => (narrow ? "col-span-12" : cls);
+const span = (narrow: boolean, n: number) => (narrow ? "span-12" : `span-${n}`);
+const n = (v: number) => ({ "--n": v }) as CSSProperties;
 
 export function AriaWindow() {
-  const { engine, progress, result, error, notice: note } = useAria();
+  const { engine, progress, result, error, notice: note, session } = useAria();
   const [view, setView] = useState<View>("home");
   const [detailed, setDetailed] = useState(false);
   const [open, setOpen] = useState(0);
   const [width, height] = useViewport();
   const narrow = width < NARROW_PX, compact = narrow && height < COMPACT_PX;
-  useEffect(() => { document.documentElement.classList.toggle("see-through", narrow); }, [narrow]);
 
   // A new result opens Mix check with the first problem ("fix first") open.
   useEffect(() => { if (result) { setView("mixcheck"); setOpen(0); } }, [result]);
 
-  const status = progress ? `${progress.text}${progress.detail ? ` · ${progress.detail}` : ""}` : error ?? note;
-
   if (compact) return <Compact />;
 
-  return (
-    <div className={cn("min-h-full", narrow ? "p-0" : "aria-lights p-8")}>
-      <div className={cn("grid overflow-hidden", narrow ? "glass-panel h-screen grid-cols-1"
-                         : "h-[calc(100vh-64px)] min-h-[700px] grid-cols-[184px_minmax(0,1fr)] rounded-[28px] shadow-[var(--shadow-tile),var(--shadow-rim)]")}
-           style={narrow ? undefined : { background: "color-mix(in srgb, var(--glass) 55%, transparent)", backdropFilter: "blur(24px) saturate(140%)" }}>
-        {!narrow && <Rail view={view} setView={setView} />}
+  const status = progress ? `${progress.text}${progress.detail ? ` · ${progress.detail}` : ""}` : error ?? note;
+  const sessionLine = session ? `This session · ${Math.round(session.tempo)} BPM · ${session.signature[0]}/${session.signature[1]}` : "This session";
 
-        <main className={cn("flex min-w-0 flex-col gap-4 overflow-y-auto", narrow ? "p-3.5" : "p-[22px] pl-5")}>
-          {narrow && (
-            <div className="flex items-center gap-2">
-              <Mark size={22} />
-              <Segmented label="Screen" items={["Home", "Mix check"] as const} value={view === "home" ? "Home" : "Mix check"}
-                         onChange={(v) => setView(v === "Home" ? "home" : "mixcheck")} />
-              <div className="ml-auto flex items-center">
-                <IconButton label="Move to the other side" onClick={() => setWindowMode(lastDock() === "left" ? "right" : "left")}><ArrowLeftRight size={15} /></IconButton>
-                <IconButton label="Pop out Ask Muse" onClick={openChat}><MessageSquare size={15} /></IconButton>
-                <IconButton label="Full window" onClick={() => setWindowMode("full")}><Maximize2 size={15} /></IconButton>
-                <IconButton label="Close" onClick={closeWindow}><X size={15} /></IconButton>
-              </div>
-            </div>
-          )}
-          <header className={cn("flex justify-between gap-3", narrow ? "flex-col items-stretch" : "items-center")}>
+  return (
+    <div className={cn("cp-stage", narrow && "is-flush")} style={narrow ? undefined : { height: "100vh", minHeight: 0 }}>
+      <div className="cp-glass cp-window" style={{ height: narrow ? "100vh" : "100%", borderRadius: narrow ? 0 : undefined, gridTemplateColumns: narrow ? "60px minmax(0, 1fr)" : undefined }}>
+        <Rail view={view} setView={setView} narrow={narrow} />
+        <main className="cp-main overflow-y-auto" style={narrow ? { padding: 14 } : undefined}>
+          <header className={cn("cp-spread", narrow && "flex-wrap")}>
             <div>
-              <h1 className={cn("m-0 font-bold tracking-[-0.03em]", narrow ? "text-[22px] leading-7" : "text-[28px] leading-8")}>{view === "mixcheck" ? "Mix check" : "Home"}</h1>
-              <span className="mt-0.5 block text-[15px] font-medium tracking-[-0.01em] text-ink-faint">
-                {view === "mixcheck" && result ? barsLabel(result) : "This session"}
-              </span>
+              <span className="cp-cap">{view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : sessionLine}</span>
+              <h1 className="cp-title" style={{ marginTop: 4 }}>{view === "mixcheck" ? "Mix check" : "Home"}</h1>
             </div>
-            <div className={cn("flex items-center gap-2.5", narrow && "flex-wrap")}>
-              {status && <span className={cn("max-w-[360px] truncate text-xs", error ? "text-hot" : "text-ink-muted", narrow && "basis-full")} role="status">{status}</span>}
-              {engine.state !== "up" && (
-                <span className={cn("whitespace-nowrap rounded-full bg-well px-2.5 py-0.5 text-[11px] font-semibold", engine.state === "starting" ? "text-ink-muted" : "text-hot")}>
-                  {engine.state === "starting" ? "Starting Aria" : "Engine not running"}
-                </span>
-              )}
+            <div className="cp-row flex-wrap justify-end">
+              {narrow && <WindowControls />}
               {view === "mixcheck" && result && (
-                <Segmented label="View" items={["Simple", "Detailed"] as const} value={detailed ? "Detailed" : "Simple"} onChange={(v) => setDetailed(v === "Detailed")} />
-              )}
-              <Button variant="primary" disabled={!!progress} onClick={checkMix}>{result ? "Check again" : "Check mix"}</Button>
-              {!narrow && (
-                <div className="flex items-center">
-                  <IconButton label="Dock on the left of the screen" onClick={() => setWindowMode("left")}><PanelLeft size={17} /></IconButton>
-                  <IconButton label="Dock on the right of the screen" onClick={() => setWindowMode("right")}><PanelRight size={17} /></IconButton>
+                <div className="cp-seg" role="group" aria-label="View">
+                  <button aria-pressed={!detailed} onClick={() => setDetailed(false)}>Simple</button>
+                  <button aria-pressed={detailed} onClick={() => setDetailed(true)}>Detailed</button>
                 </div>
               )}
+              <button className="cp-btn cp-btn-primary" disabled={!!progress} onClick={checkMix}>{progress ? "Checking" : result ? "Check again" : "Check mix"}</button>
             </div>
           </header>
+          {(status || engine.state !== "up") && (
+            <div className="cp-row flex-wrap" role="status">
+              {engine.state !== "up" && <span className={cn("cp-tag", engine.state === "starting" ? "cp-tag-idle" : "cp-tag-hot")}>{engine.state === "starting" ? "Starting Aria" : "Engine not running"}</span>}
+              {status && <span className="cp-meta" style={error ? { color: "var(--hot)" } : undefined}>{status}</span>}
+            </div>
+          )}
 
-          {view === "home" ? <Home result={result} engineUp={engine.state === "up"} onOpen={() => setView("mixcheck")} narrow={narrow} />
-            : !result ? <Empty />
+          {view === "home" ? <Home narrow={narrow} onOpen={() => setView("mixcheck")} />
+            : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />
             : <Simple r={result} open={open} setOpen={setOpen} narrow={narrow} />}
-          {view === "mixcheck" && <InlineAsk />}
         </main>
+        <AskMuse narrow={narrow} />
       </div>
-      <AskMuse narrow={narrow} />
+    </div>
+  );
+}
+
+// Docked windows have no title bar: close, full size, other side and pop out Ask Muse live here.
+function WindowControls() {
+  const icon = (label: string, onClick: () => void, child: ReactNode) => (
+    <button className="cp-icon-btn" style={{ width: 30, height: 30, borderRadius: 10, background: "transparent" }} title={label} aria-label={label} onClick={onClick}>{child}</button>
+  );
+  return (
+    <div className="cp-row" style={{ gap: 0 }}>
+      {icon("Move to the other side", () => setWindowMode(lastDock() === "left" ? "right" : "left"), <SwapIcon style={{ width: 15, height: 15 }} />)}
+      {icon("Pop out Ask Muse", openChat, <ChatIcon style={{ width: 15, height: 15 }} />)}
+      {icon("Full window", () => setWindowMode("full"), <ExpandIcon style={{ width: 15, height: 15 }} />)}
+      {icon("Close", closeWindow, <CloseIcon style={{ width: 15, height: 15 }} />)}
+    </div>
+  );
+}
+
+function Rail({ view, setView, narrow }: { view: View; setView: (v: View) => void; narrow: boolean }) {
+  const { theme, ask } = useAria();
+  const item = (id: View | null, label: string, icon: ReactNode) => (
+    <a key={label} href="#" title={label} aria-current={id === view ? "page" : undefined} style={narrow ? { justifyContent: "center", padding: 0 } : undefined}
+       onClick={(e: MouseEvent) => { e.preventDefault(); if (id) setView(id); else notice(`${label} is coming soon.`); }}>
+      {icon}{!narrow && label}
+    </a>
+  );
+  return (
+    <aside className="cp-rail" style={narrow ? { padding: "16px 8px", alignItems: "stretch" } : undefined}>
+      <div className="cp-mark" style={narrow ? { justifyContent: "center" } : undefined}><Mark size={26} />{!narrow && <b>Aria</b>}</div>
+      <nav className="cp-nav" aria-label="Tools">
+        {item("home", "Home", <HomeIcon />)}
+        {item("mixcheck", "Mix check", <MixIcon />)}
+        {item(null, "Live analyzer", <AnalyzerIcon />)}
+        {item(null, "Groove match", <GrooveIcon />)}
+        {item(null, "Reference", <ReferenceIcon />)}
+      </nav>
+      {narrow ? (
+        <button className="cp-icon-btn" style={{ marginTop: "auto", alignSelf: "center" }} title={theme === "sky" ? "Switch to dark" : "Switch to light"}
+                aria-label={theme === "sky" ? "Switch to dark" : "Switch to light"} onClick={() => setTheme(theme === "sky" ? "night" : "sky")}>
+          {theme === "sky" ? <MoonIcon /> : <SunIcon />}
+        </button>
+      ) : (
+        <div className="cp-seg" role="group" aria-label="Appearance" style={{ alignSelf: "flex-start", marginTop: "auto", marginBottom: 14 }}>
+          <button aria-pressed={theme === "sky"} onClick={() => setTheme("sky")}>Light</button>
+          <button aria-pressed={theme === "night"} onClick={() => setTheme("night")}>Dark</button>
+        </div>
+      )}
+      <div className="cp-ask-dock">
+        <button className="cp-ask-btn" aria-expanded={ask.open} aria-label="Ask Muse" style={narrow ? { justifyContent: "center", padding: 0 } : undefined}
+                onClick={() => setAskOpen(!ask.open)}><MicIcon />{!narrow && "Ask Muse"}</button>
+      </div>
+    </aside>
+  );
+}
+
+// ---------- Home ----------
+
+function Home({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
+  const { engine, result, session, ask } = useAria();
+  const list = result ? problemsOf(result) : [];
+  const steps: [string, boolean][] = [
+    ["Aria engine is running", engine.state === "up"],
+    ["Aria is last on your Main track", !!session && session.chain.on_main && !session.chain.after.length],
+    ["Play the busiest part, press Check mix", !!result],
+    ["Ask Muse to fix what it finds", ask.log.length > 0],
+  ];
+  const next = steps.findIndex(([, done]) => !done);
+  const tool = (label: string, icon: ReactNode, tag: ReactNode, onClick: () => void) => (
+    <a className={cn("cp-tile cp-card", span(narrow, 3))} href="#" style={{ minHeight: 118, gap: 8 }} onClick={(e) => { e.preventDefault(); onClick(); }}>
+      <span className="grid place-items-center" style={{ width: 34, height: 34, borderRadius: 12, background: "var(--well)", color: "var(--action)" }}>{icon}</span>
+      <span className="cp-tile-title">{label}</span>
+      <span className="cp-push">{tag}</span>
+    </a>
+  );
+  const soon = (label: string) => () => notice(`${label} is coming soon.`);
+
+  return (
+    <div className="cp-bento">
+      <section className={cn("cp-tile cp-hero", span(narrow, 7))} style={{ minHeight: narrow ? 0 : 286, gap: 10 }}>
+        <span className="cp-cap">Your song</span>
+        {result ? (
+          <>
+            <span style={{ fontSize: 28, lineHeight: "32px", fontWeight: 600, letterSpacing: "-.02em" }}>
+              {list.length === 0 ? "Nothing sticks out" : `${list.length} ${list.length === 1 ? "thing" : "things"} to fix`}
+            </span>
+            <span style={{ fontSize: 14, lineHeight: "20px", color: "var(--on-tile-muted)" }}>{barsLabel(result)}. {list.slice(0, 3).map((p) => p.name).join(", ")}{list.length > 3 ? " and more" : ""}</span>
+            {result.clarity.spectra && <div className="cp-push" style={{ height: 64 }}><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode === "split"} /></div>}
+            <div className={result.clarity.spectra ? "" : "cp-push"}><button className="cp-btn cp-btn-light" onClick={onOpen}>See what to fix</button></div>
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: 28, lineHeight: "32px", fontWeight: 600, letterSpacing: "-.02em" }}>Not checked yet</span>
+            <span style={{ fontSize: 14, lineHeight: "20px", color: "var(--on-tile-muted)", maxWidth: 460 }}>
+              Aria listens to 16 bars of your song and finds sounds that clash or stick out. Muse Spark says how to fix each one, and fixes it when you say yes.
+            </span>
+            <div className="cp-empty cp-push" style={{ flexDirection: "row", alignItems: "center", gap: 14, color: "var(--on-tile)" }}>
+              <MixIcon style={{ width: 22, height: 22, flex: "none" }} />
+              <div style={{ display: "grid", gap: 2 }}>
+                <b style={{ fontSize: 14 }}>Play the busiest part, then press Check mix</b>
+                <span style={{ fontSize: 12, color: "var(--on-tile-muted)" }}>Buried vocals, mud, harsh hits, ringing notes and bass clicks</span>
+              </div>
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className={cn("cp-tile cp-card", span(narrow, 5))} style={{ minHeight: narrow ? 0 : 286, gap: 16 }}>
+        <span className="cp-cap">Get started</span>
+        <ul className="cp-check">
+          {steps.map(([label, done], i) => <li key={label} className={done ? "is-done" : i === next ? "is-next" : ""}><i />{label}</li>)}
+        </ul>
+        <span className="cp-meta cp-push">Nothing in your set changes until you ask Muse or say yes.</span>
+      </section>
+
+      {tool("Mix check", <MixIcon style={{ width: 20, height: 20 }} />,
+            !result ? <span className="cp-tag cp-tag-idle">Not run yet</span>
+              : list.length ? <span className="cp-tag cp-tag-hot">{list.length} to fix</span> : <span className="cp-tag cp-tag-good">Clear</span>, onOpen)}
+      {tool("Live analyzer", <AnalyzerIcon style={{ width: 20, height: 20 }} />, <span className="cp-tag cp-tag-idle">Coming soon</span>, soon("Live analyzer"))}
+      {tool("Groove match", <GrooveIcon style={{ width: 20, height: 20 }} />, <span className="cp-tag cp-tag-idle">Coming soon</span>, soon("Groove match"))}
+      {tool("Reference", <ReferenceIcon style={{ width: 20, height: 20 }} />, <span className="cp-tag cp-tag-idle">Coming soon</span>, soon("Reference"))}
+
+      <WhereItHappens r={result} narrow={narrow} />
+    </div>
+  );
+}
+
+/** The checked bars, the ones with a problem marked. Before a check: what will appear, greyed out. */
+function WhereItHappens({ r, narrow }: { r: Result | null; narrow: boolean }) {
+  const { session } = useAria();
+  const list = r ? problemsOf(r) : [];
+  if (!r) {
+    const marks = session?.markers ?? [];
+    return (
+      <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 12 }}>
+        <div className="cp-spread"><span className="cp-cap">Where it happens</span><span className="cp-tag cp-tag-idle">No check yet</span></div>
+        {marks.length > 1 && (
+          <div className="cp-where is-empty">
+            {marks.slice(0, 8).map((m, i, all) => (
+              <button key={i} style={n(all[i + 1] ? all[i + 1].bar - m.bar : 8)} onClick={() => jumpTo(m.bar)} title={`Jump to ${m.name}`}>
+                {m.name}<small>bar {m.bar}</small>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="cp-empty" style={{ flexDirection: narrow ? "column" : "row", alignItems: narrow ? "flex-start" : "center", justifyContent: "space-between", padding: "18px 20px", gap: 12 }}>
+          <div style={{ display: "grid", gap: 4 }}>
+            <b style={{ fontSize: 15 }}>Your first Mix check fills this in</b>
+            <span className="cp-meta">Each problem on the bars where it happens{marks.length > 1 ? ", next to your markers" : ""}. Tap one to hear it in Live.</span>
+          </div>
+          <button className="cp-btn" onClick={checkMix}>Check mix</button>
+        </div>
+      </section>
+    );
+  }
+  const groups = barGroups(r, undefined, 4).map((g) => ({ ...g, found: list.filter((p) => p.findings.some((f) => f.bars[0] <= g.to && f.bars[1] >= g.from)) }));
+  return (
+    <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 12 }}>
+      <div className="cp-spread"><span className="cp-cap">Where it happens</span><span className="cp-meta">Tap to hear it in Live</span></div>
+      <div className="cp-where">
+        {groups.map((g) => (
+          <button key={g.from} className={g.found.length ? "is-hot" : ""} style={n(g.to - g.from + 1)} onClick={() => jumpTo(g.from)} title={g.found.map((p) => p.name).join(", ") || "Clear"}>
+            Bars {g.from} to {g.to}<small>{g.found.length ? g.found.map((p) => statusWord(p)).join(", ") : "Clear"}</small>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------- Mix check ----------
+
+const KINDS: { kind: Kind; name: string; line: string; icon: ReactNode }[] = [
+  { kind: "masking", name: "Buried sounds", line: "A sound hidden under another one.", icon: <BuriedIcon /> },
+  { kind: "buildup", name: "Mud and build-up", line: "Too much piled up in one range.", icon: <MudIcon /> },
+  { kind: "harsh", name: "Harsh hits", line: "Sharp peaks that sting the ear.", icon: <HarshIcon /> },
+  { kind: "resonance", name: "Ringing notes", line: "One note that rings on too loud.", icon: <RingIcon /> },
+  { kind: "bass_click", name: "Bass clicks", line: "Clicks where bass notes start.", icon: <ClickIcon /> },
+];
+// Mud is measured as synths buried in the low mids, so it gets the mud icon, not the buried one
+const iconFor = (p: Problem) => KINDS.find((x) => x.kind === (p.name === "Mud" ? "buildup" : p.findings[0].kind))!.icon;
+
+/** Before the first check: the Simple view's layout greyed out, saying what will appear and how to start. */
+function EmptyCheck({ narrow }: { narrow: boolean }) {
+  return (
+    <div className="cp-bento">
+      <section className={cn("cp-tile cp-hero", span(narrow, 7))} style={{ minHeight: narrow ? 0 : 228, gap: 10 }}>
+        <span className="cp-cap">Where each part sits</span>
+        <span style={{ fontSize: 34, lineHeight: "38px", fontWeight: 700, letterSpacing: "-.03em" }}>Not checked yet</span>
+        <span style={{ fontSize: 14, color: "var(--on-tile-muted)" }}>Play the busiest part of your song and press Check mix. Aria listens to 16 bars.</span>
+        <div className="cp-score cp-push">{["Vocal", "Synths", "Bass", "Drums"].map((p) => <span key={p}><i />{p}</span>)}</div>
+      </section>
+      <section className={cn("cp-tile cp-solid", span(narrow, 5))} style={{ minHeight: narrow ? 0 : 228, gap: 8 }}>
+        <span className="cp-cap">Fix first</span>
+        <h2 className="cp-tile-title" style={{ fontSize: 20, lineHeight: "25px" }}>Nothing yet</h2>
+        <p className="cp-body is-quiet" style={{ margin: 0 }}>After a check, the one thing to fix first shows here, with a button that has Muse fix it for you.</p>
+      </section>
+      {KINDS.map((k, i) => (
+        <section key={k.kind} className={cn("cp-tile cp-card cp-stat", span(narrow, i < 3 ? 4 : 6))}>
+          <div className="cp-stat-head"><span className="cp-stat-icon">{k.icon}</span><span className="cp-stat-name">{k.name}</span><span className="cp-tag cp-tag-idle cp-stat-word">Not checked</span></div>
+          <p className="cp-stat-line">{k.line}</p>
+          <TickGauge share={0} />
+        </section>
+      ))}
+      <WhereItHappens r={null} narrow={narrow} />
+    </div>
+  );
+}
+
+const EASE = [0.32, 0.72, 0, 1] as const;
+
+/** Cards rise in one after another when a result arrives. */
+function Rise({ i, className, children }: { i: number; className?: string; children: ReactNode }) {
+  return (
+    <motion.div className={cn(className, "grid")} initial={{ opacity: 0, y: 14, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ opacity: { duration: 0.7, delay: i * 0.06 }, default: { duration: 0.9, ease: EASE, delay: i * 0.06 } }}>
+      {children}
+    </motion.div>
+  );
+}
+
+const amountText = (p: Problem) => (p.amount.unit.startsWith("%") ? `${p.amount.value}% of notes` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`);
+const fixWithMuse = (p: Problem) => { fixIt(p); setAskOpen(true); };
+
+function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen: (i: number) => void; narrow: boolean }) {
+  const list = problemsOf(r);
+  const first = list[0], selected = list[open];
+  const tileSpan = list.length >= 3 ? 4 : list.length === 2 ? 6 : 12;
+  return (
+    <div className="cp-bento">
+      <Rise i={0} className={span(narrow, 7)}>
+        <section className="cp-tile cp-hero" style={{ gap: 6, minHeight: narrow ? 0 : 320 }}>
+          <div className="cp-spread"><span className="cp-cap">Where each part sits</span>
+            <span className="cp-meta" style={{ color: "var(--on-tile-muted)" }}>{r.clarity.mode === "split" ? "Hover to see each part's level" : "Your whole mix"}</span></div>
+          {r.clarity.spectra
+            ? <Waves spectra={r.clarity.spectra} findings={r.clarity.findings} split={r.clarity.mode === "split"}
+                     onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
+            : <p className="cp-meta" style={{ color: "var(--on-tile-muted)" }}>The picture appears after the next Check mix.</p>}
+        </section>
+      </Rise>
+
+      <Rise i={1} className={span(narrow, 5)}>
+        <section className="cp-tile cp-solid" style={{ gap: 8, minHeight: narrow ? 0 : 320 }}>
+          {first ? (
+            <>
+              <div className="cp-spread"><span className="cp-cap">Fix first</span><span className="cp-tag cp-tag-hot">{statusWord(first)}</span></div>
+              <h2 className="cp-tile-title" style={{ fontSize: 20, lineHeight: "25px" }}>{first.name}</h2>
+              <span className="cp-meta">{barsOf(first)} · {first.where}</span>
+              <p className="cp-body is-quiet line-clamp-4" style={{ margin: 0 }}>{first.short}</p>
+              <div className="cp-row cp-push">
+                <button className="cp-btn cp-btn-light" onClick={() => fixWithMuse(first)}>Fix it</button>
+                <button className="cp-btn cp-btn-ghost" onClick={() => jumpTo(first.bar)}>Hear it in Live</button>
+              </div>
+              {list.length > 1 && <span className="cp-meta">{list.length - 1} more below</span>}
+            </>
+          ) : (
+            <>
+              <div className="cp-spread"><span className="cp-cap">This check</span><span className="cp-tag cp-tag-good">Clear</span></div>
+              <h2 className="cp-tile-title" style={{ fontSize: 20, lineHeight: "25px" }}>Nothing sticks out</h2>
+              <p className="cp-body is-quiet" style={{ margin: 0 }}>{r.advice?.summary ?? "Check another part of the song next."}</p>
+            </>
+          )}
+        </section>
+      </Rise>
+
+      {list.map((p, i) => (
+        <Rise key={p.name + i} i={2 + i} className={span(narrow, tileSpan)}>
+          <section className={cn("cp-tile cp-card cp-stat cursor-pointer", open === i && "ring-2 ring-[var(--action)]")} onClick={() => setOpen(open === i ? -1 : i)}>
+            <div className="cp-stat-head">
+              <span className="cp-stat-icon">{iconFor(p)}</span>
+              <span className="cp-stat-name">{p.name}</span>
+              <span className="cp-tag cp-tag-hot cp-stat-word">{amountText(p)}</span>
+            </div>
+            <p className="cp-stat-line line-clamp-2">{p.short}</p>
+            <TickGauge share={p.share} label={`${p.shareLabel} · ${barsOf(p)}`} />
+          </section>
+        </Rise>
+      ))}
+
+      <AnimatePresence mode="wait">
+        {selected && (
+          <motion.div key={open} className="span-12 grid" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
+                      transition={{ duration: 0.25, ease: EASE }}>
+            <ProblemDetail p={selected} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <WhereItHappens r={r} narrow={narrow} />
+    </div>
+  );
+}
+
+function ProblemDetail({ p }: { p: Problem }) {
+  return (
+    <section className="cp-tile cp-card" style={{ gap: 12 }}>
+      <div className="cp-spread flex-wrap">
+        <span className="cp-tile-title">{p.name}</span>
+        <div className="cp-row">
+          <button className="cp-btn" onClick={() => jumpTo(p.bar)}>Hear it in Live</button>
+          <button className="cp-btn cp-btn-primary" onClick={() => fixWithMuse(p)}>Fix it</button>
+        </div>
+      </div>
+      {p.notes.length
+        ? p.notes.map((note, k) => <p key={k} className="cp-body" style={{ maxWidth: 760 }}>{note.text}</p>)
+        : <p className="cp-body" style={{ color: "var(--ink-muted)" }}>{describe(p.findings[0]).about}</p>}
+      <div className="cp-row flex-wrap" style={{ gap: 6 }}>
+        {p.findings.map((f, k) => {
+          const d = describe(f);
+          return <span key={k} className="cp-tag" style={{ fontFamily: "var(--font-mono)" }}>{d.where} · {d.size} · bars {f.bars[0]}{f.bars[1] !== f.bars[0] ? `–${f.bars[1]}` : ""}</span>;
+        })}
+      </div>
+    </section>
+  );
+}
+
+function Stat({ label, value, unit, why }: { label: string; value: number | null | undefined; unit: string; why?: string }) {
+  const missing = value === null || value === undefined;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="cp-cap">{label}</span>
+      {missing ? <span className="cp-meta" style={{ lineHeight: "28px" }} title={why}>Not measured</span>
+        : <span className="cp-figure-sm">{value}<small>{unit}</small></span>}
+    </div>
+  );
+}
+
+function Detailed({ r, narrow }: { r: Result; narrow: boolean }) {
+  const m = r.measured, why = m.unmeasured;
+  const f1 = (x: number | null | undefined) => (x === null || x === undefined ? null : Number(x.toFixed(1)));
+  return (
+    <div className="cp-bento">
+      <section className={cn("cp-tile cp-card", span(narrow, 7))} style={{ gap: 12 }}>
+        <span className="cp-cap">The numbers</span>
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-x-4 gap-y-3">
+          <Stat label="Loudness" value={f1(m.integrated_lufs)} unit="LUFS" why={why.integrated_lufs || why.all} />
+          <Stat label="True peak" value={f1(m.true_peak_dbtp)} unit="dBTP" why={why.all} />
+          {["bass", "mids", "treble"].map((b) => <Stat key={b} label={b} value={f1(m.bands_db[b])} unit="dB" why={why[`bands_db.${b}`] || why.all} />)}
+          {["bass", "mids", "treble"].map((b) => <Stat key={"w" + b} label={`Width ${b}`} value={m.width[b] === null || m.width[b] === undefined ? null : Math.round(m.width[b]! * 100)} unit="%" why={why[`width.${b}`] || why.all} />)}
+        </div>
+        <p className="cp-meta">Loudness and peak are here for reference. Aria's advice is about clarity.</p>
+      </section>
+      {r.clarity.stems && (
+        <section className={cn("cp-tile cp-card", span(narrow, 5))} style={{ gap: 12 }}>
+          <span className="cp-cap">Each part against the mix</span>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            {Object.entries(r.clarity.stems).map(([k, v]) => <Stat key={k} label={soundName(k)} value={f1(v)} unit="dB vs mix" />)}
+          </div>
+          <p className="cp-meta">Split by {r.clarity.split_by ?? "Demucs"}. A sound more than 20 dB under the mix counts as not playing.</p>
+        </section>
+      )}
+      <section className="cp-tile cp-card span-12" style={{ gap: 8 }}>
+        <span className="cp-cap">Everything Muse Spark said</span>
+        <ul className="cp-body m-0 grid gap-1.5 pl-[18px]">
+          {r.advice ? r.advice.notes.map((note, i) => <li key={i}>{note.text}</li>) : <li style={{ color: "var(--ink-muted)" }}>{r.advice_error ?? "No advice."}</li>}
+        </ul>
+      </section>
     </div>
   );
 }
@@ -104,280 +441,36 @@ function Compact() {
   const { result, progress, error } = useAria();
   const list = result ? problemsOf(result) : [];
   return (
-    <div className="glass-panel flex h-screen flex-col gap-2.5 overflow-hidden p-3.5">
-      <div className="flex items-center gap-2">
-        <Mark size={22} />
-        <b className="text-sm">Mix check</b>
-        <span className="truncate text-xs text-ink-faint">{progress ? progress.text : result ? barsLabel(result) : ""}</span>
-        <div className="ml-auto flex items-center">
-          <IconButton label={result ? "Check again" : "Check mix"} onClick={checkMix}><Play size={14} fill="currentColor" /></IconButton>
-          <IconButton label="Show everything" onClick={closeChat}><ChevronsDown size={16} /></IconButton>
-          <IconButton label="Close" onClick={closeWindow}><X size={15} /></IconButton>
+    <div className="cp-stage is-tight" style={{ height: "100vh", minHeight: 0 }}>
+      <section className="cp-tile cp-card h-full" style={{ gap: 10 }}>
+        <div className="cp-spread">
+          <div className="cp-mark"><Mark size={22} /><b>Mix check</b></div>
+          <div className="cp-row" style={{ gap: 2 }}>
+            <button className="cp-btn cp-btn-primary cp-btn-sm" disabled={!!progress} onClick={checkMix}>{progress ? "Checking" : result ? "Check again" : "Check mix"}</button>
+            <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={closeChat}>Show all</button>
+            <button className="cp-icon-btn" style={{ width: 28, height: 28, borderRadius: 10 }} aria-label="Close" onClick={closeWindow}><CloseIcon style={{ width: 14, height: 14 }} /></button>
+          </div>
         </div>
-      </div>
-      {error && <p className="m-0 line-clamp-2 text-xs text-hot">{error}</p>}
-      {!result ? (
-        <p className="m-0 text-[13px] text-ink-muted">No Mix check yet. Play the busiest part of your song and press play above.</p>
-      ) : (
-        <>
-          <div className="flex items-end gap-2">
-            <span className="text-[44px] font-extralight leading-none tracking-[-0.04em] tabular-nums"><CountUp value={list.length} /></span>
-            <span className="pb-1 text-sm font-medium text-ink-muted">{list.length === 0 ? "things stick out" : list.length === 1 ? "thing to fix" : "things to fix"}</span>
-            {result.clarity.spectra && <div className="mb-1 ml-auto h-10 w-[150px]"><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode === "split"} /></div>}
-          </div>
-          <div className="flex min-h-0 flex-col overflow-y-auto">
-            {list.map((p, i) => (
-              <button key={i} onClick={() => jumpTo(p.bar)} title={`${p.short}. Tap to hear it in Live.`}
-                      className={cn("flex h-[38px] shrink-0 items-center gap-2.5 text-left", i > 0 && "border-t border-hairline")}>
-                <i className="size-2 shrink-0 rounded-full bg-watch" />
-                <span className="flex-1 truncate text-[13px] font-semibold">{p.name}</span>
-                <span className="whitespace-nowrap rounded-full bg-black/35 px-2 font-mono text-[11px] leading-5 text-white/85">{p.where}</span>
-                <span className="w-[64px] text-right font-mono text-[13px] text-ink-muted">{p.amount.unit.startsWith("%") ? `${p.amount.value}%` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`}</span>
-              </button>
-            ))}
-            {list.length === 0 && <p className="m-0 text-[13px] text-good">Clear in these bars.</p>}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
-  return <button onClick={onClick} title={label} aria-label={label} className="grid size-8 place-items-center rounded-full text-ink-muted hover:bg-well hover:text-ink">{children}</button>;
-}
-
-function Rail({ view, setView }: { view: View; setView: (v: View) => void }) {
-  const item = (id: View | null, label: string, icon: ReactNode) => (
-    <button key={label} onClick={() => (id ? setView(id) : notice(`${label} is not ready yet.`))} aria-current={id === view ? "page" : undefined}
-            className={cn("flex h-9 items-center gap-2.5 rounded-xl px-2.5 text-[13px] font-semibold text-ink-muted",
-                          id === view && "bg-[var(--card)] text-ink shadow")}>
-      {icon}{label}
-    </button>
-  );
-  return (
-    <aside className="flex flex-col gap-5 border-r border-hairline px-4 py-[22px]">
-      <div className="flex items-center gap-2.5"><Mark size={26} /><b className="text-sm tracking-tight">Aria</b></div>
-      <nav className="grid gap-1" aria-label="Tools">
-        {item("home", "Home", <House size={18} />)}
-        {item("mixcheck", "Mix check", <AudioWaveform size={18} />)}
-        {item(null, "Live analyzer", <ChartNoAxesColumn size={18} />)}
-        {item(null, "Groove match", <Grip size={18} />)}
-        {item(null, "Reference", <Columns2 size={18} />)}
-      </nav>
-      <div className="mt-auto grid gap-1.5">
-        <Button variant="primary" className="h-11 w-full text-sm" onClick={() => setAskOpen(!useAriaSnapshot().ask.open)}><Mic size={16} /> Ask Muse</Button>
-        <span className="text-xs text-ink-faint">or hold your mapped key</span>
-      </div>
-    </aside>
-  );
-}
-
-function Home({ result, engineUp, onOpen, narrow }: { result: Result | null; engineUp: boolean; onOpen: () => void; narrow: boolean }) {
-  const steps = ["Start the Aria engine", "Put Aria last on your Main track", "Play the busiest part of your song", "Press Check mix"];
-  const done = [engineUp, false, false, !!result];
-  return (
-    <div className="grid grid-cols-12 gap-3">
-      <LiquidGlass as="section" className={cn(wide(narrow, "col-span-7"), "flex min-h-[340px] flex-col gap-3 p-5")}>
-        <Cap>Get started</Cap>
-        <h2 className="m-0 max-w-[440px] text-[28px] font-semibold leading-8 tracking-[-0.02em]">Make every sound in your mix easy to hear</h2>
-        <p className="m-0 text-[13px] leading-[18px] text-ink-muted">Aria listens to your song, finds what's buried, muddy or clicking, and Muse Spark tells you how to fix it.</p>
-        <ol className="m-0 mt-auto grid list-none gap-3 p-0">
-          {steps.map((s, i) => (
-            <li key={s} className={cn("flex items-center gap-2.5 text-sm", done[i] ? "text-ink" : "text-ink-muted")}>
-              <i className={cn("grid size-[18px] place-items-center rounded-full border-2", done[i] ? "border-transparent bg-good" : "border-hairline")}>
-                {done[i] && <svg viewBox="0 0 10 8" width="9" height="7"><path d="M1 4l2.5 2.5L9 1" stroke="var(--ground)" strokeWidth="2" fill="none" /></svg>}
-              </i>{s}
-            </li>
-          ))}
-        </ol>
-      </LiquidGlass>
-      <LiquidGlass as="section" className={cn(wide(narrow, "col-span-5"), "flex flex-col gap-2.5 p-5", !narrow && "min-h-[340px]")}>
-        <Cap>Latest Mix check</Cap>
-        {result ? (
+        {error && <p className="cp-meta line-clamp-2" style={{ color: "var(--hot)" }}>{error}</p>}
+        {!result ? <p className="cp-meta">{progress ? progress.text : "No Mix check yet. Play the busiest part of your song and press Check mix."}</p> : (
           <>
-            <h2 className="m-0 text-xl font-semibold leading-[25px]">{verdict(result)}</h2>
-            <p className="m-0 text-[13px] leading-[18px] text-ink-muted">{result.advice?.summary ?? result.advice_error}</p>
-            <Button variant="primary" className="mt-auto self-start" onClick={onOpen}>Open results</Button>
+            <div className="cp-row" style={{ alignItems: "flex-end" }}>
+              <span className="cp-figure"><CountUp value={list.length} /><small>{list.length === 1 ? "thing to fix" : list.length ? "things to fix" : "Nothing sticks out"}</small></span>
+              {result.clarity.spectra && <div className="ml-auto h-10 w-[150px]"><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode === "split"} /></div>}
+            </div>
+            <div className="flex min-h-0 flex-col overflow-y-auto">
+              {list.map((p, i) => (
+                <button key={i} onClick={() => jumpTo(p.bar)} title={`${p.short} Tap to hear it in Live.`}
+                        className={cn("flex h-[38px] shrink-0 items-center gap-2.5 text-left text-ink", i > 0 && "border-t border-hairline")}>
+                  <span className="flex-1 truncate text-[13px] font-semibold">{p.name}</span>
+                  <span className="cp-tag cp-tag-hot">{statusWord(p)}</span>
+                  <span className="cp-meta w-[86px] text-right" style={{ fontFamily: "var(--font-mono)" }}>{barsOf(p)}</span>
+                </button>
+              ))}
+            </div>
           </>
-        ) : <p className="m-0 text-[13px] text-ink-muted">Nothing yet. Your latest result shows up here after you press Check mix.</p>}
-      </LiquidGlass>
-    </div>
-  );
-}
-
-function Empty() {
-  return (
-    <div className="rounded-2xl border-[1.5px] border-dashed border-hairline bg-well p-4 text-[13px] text-ink-muted">
-      <b className="text-ink">No Mix check yet.</b> Play the busiest part of your song and press Check mix. Aria listens to 16 bars.
-    </div>
-  );
-}
-
-const verdict = (r: Result) => {
-  const n = problemsOf(r).length;
-  return n === 0 ? "Nothing sticks out" : n === 1 ? "1 thing to fix" : `${n} things to fix`;
-};
-
-const EASE = [0.32, 0.72, 0, 1] as const;
-
-/** Cards rise in one after another when a result arrives. */
-function Rise({ i, className, children }: { i: number; className?: string; children: ReactNode }) {
-  return (
-    <motion.div className={className} initial={{ opacity: 0, y: 14, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ opacity: { duration: 0.7, delay: i * 0.06 }, default: { duration: 0.9, ease: EASE, delay: i * 0.06 } }}>
-      {children}
-    </motion.div>
-  );
-}
-
-function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen: (i: number) => void; narrow: boolean }) {
-  const list = problemsOf(r);
-  const selected = list[open];
-  const span = narrow ? (list.length > 1 ? "col-span-6" : "col-span-12")
-    : list.length >= 4 ? "col-span-3" : list.length === 3 ? "col-span-4" : list.length === 2 ? "col-span-6" : "col-span-12";
-
-  return (
-    <div className="grid grid-cols-12 gap-3.5">
-      <Rise i={0} className={wide(narrow, "col-span-8")}>
-        <GradientCard className={cn("flex h-full flex-col gap-2", narrow ? "px-4 py-4" : "min-h-[376px] px-6 py-5")}>
-          <div className="flex items-baseline justify-between">
-            <span className="text-lg font-semibold tracking-[-0.02em]">Where each part sits</span>
-            <span className="text-xs text-ink-faint">{r.clarity.mode === "split" ? "Hover to see each part's level" : "Your whole mix"}</span>
-          </div>
-          {r.clarity.spectra
-            ? <Waves spectra={r.clarity.spectra} findings={r.clarity.findings} split={r.clarity.mode === "split"}
-                     onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
-            : <p className="text-xs text-ink-muted">The picture appears after the next Check mix.</p>}
-        </GradientCard>
-      </Rise>
-
-      <Rise i={1} className={wide(narrow, "col-span-4")}>
-        <LiquidGlass as="section" radius="28px" className={cn("flex h-full flex-col", narrow ? "px-4 py-4" : "min-h-[376px] px-6 py-5")}>
-          <Cap>This check</Cap>
-          <div className="mt-4 flex items-end gap-3">
-            <span className="text-[64px] font-extralight leading-none tracking-[-0.04em] tabular-nums"><CountUp value={list.length} /></span>
-            <span className="pb-2 text-base font-medium text-ink-muted">{list.length === 0 ? "things stick out" : list.length === 1 ? "thing to fix" : "things to fix"}</span>
-          </div>
-          <p className="m-0 mt-3 line-clamp-3 text-[13px] leading-[18px] text-ink-muted">{r.advice?.summary ?? r.advice_error}</p>
-          <div className={narrow ? "mt-3" : "mt-auto"}>
-            {list.map((p, i) => (
-              <button key={i} onClick={() => setOpen(i)}
-                      className={cn("flex h-[34px] w-full items-center gap-3 text-left", i > 0 && "border-t border-hairline")}>
-                <i className="size-2 rounded-full bg-watch" />
-                <span className="flex-1 text-[13px] font-semibold">{p.name}</span>
-                <span className="font-mono text-[13px] text-ink-muted">{p.amount.unit.startsWith("%") ? `${p.amount.value}%` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`}</span>
-              </button>
-            ))}
-            {list.length === 0 && <p className="m-0 text-[13px] text-good">Clear in these bars.</p>}
-          </div>
-        </LiquidGlass>
-      </Rise>
-
-      {list.map((p, i) => (
-        <Rise key={p.name + i} i={2 + i} className={span}>
-          <ProblemTile p={p} selected={open === i} onSelect={() => setOpen(open === i ? -1 : i)} />
-        </Rise>
-      ))}
-
-      <AnimatePresence mode="wait">
-        {selected && (
-          <motion.div key={open} className="col-span-12" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
-                      transition={{ duration: 0.25, ease: EASE }}>
-            <ProblemDetail p={selected} />
-          </motion.div>
         )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function ProblemTile({ p, selected, onSelect }: { p: Problem; selected: boolean; onSelect: () => void }) {
-  return (
-    <LiquidGlass as="section" radius="28px" interactive onClick={onSelect}
-                 className={cn("flex h-[184px] flex-col px-5 py-4 transition-shadow", selected && "ring-2 ring-[var(--watch)]")}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11.5px] font-semibold uppercase tracking-[0.06em] text-ink-muted">{p.name}</span>
-        <span className="whitespace-nowrap rounded-full bg-black/40 px-2 font-mono text-[11px] leading-[22px] text-white">{p.where}</span>
-      </div>
-      <div className="mt-3 flex items-baseline gap-1.5">
-        <span className="text-[40px] font-extralight leading-none tracking-[-0.04em] tabular-nums">
-          {p.amount.value.startsWith("+") && "+"}<CountUp value={Math.abs(parseFloat(p.amount.value))} decimals={p.amount.value.includes(".") ? 1 : 0} />
-        </span>
-        <span className="text-xs font-medium text-ink-faint">{p.amount.unit}</span>
-      </div>
-      <p className="m-0 mt-2 line-clamp-1 text-[12.5px] text-ink-muted">{p.short}</p>
-      <div className="mt-auto"><TickGauge share={p.share} label={p.shareLabel} /></div>
-    </LiquidGlass>
-  );
-}
-
-function ProblemDetail({ p }: { p: Problem }) {
-  return (
-    <LiquidGlass as="section" radius="28px" className="flex flex-col gap-3 px-6 py-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-lg font-semibold tracking-[-0.02em]">{p.name}</span>
-        <div className="flex gap-2">
-          <Button small className="bg-well text-ink" onClick={() => jumpTo(p.bar)}>Hear it in Live</Button>
-          {p.fix && <Button small variant="primary" onClick={() => notice("Fix it for me is coming next.")}>Fix it for me</Button>}
-        </div>
-      </div>
-      {p.notes.length
-        ? p.notes.map((n, k) => <p key={k} className="m-0 max-w-[760px] text-[13.5px] leading-5">{n.text}</p>)
-        : <p className="m-0 text-[13px] text-ink-muted">{describe(p.findings[0]).about}</p>}
-      <div className="flex flex-wrap gap-1.5">
-        {p.findings.map((f, k) => {
-          const d = describe(f);
-          return <span key={k} className="whitespace-nowrap rounded-full bg-well px-2 font-mono text-[11px] leading-5 text-ink-muted">
-            {d.where} · {d.size} · bars {f.bars[0]}{f.bars[1] !== f.bars[0] ? `–${f.bars[1]}` : ""}</span>;
-        })}
-      </div>
-    </LiquidGlass>
-  );
-}
-
-function Stat({ label, value, unit, why }: { label: string; value: number | null | undefined; unit: string; why?: string }) {
-  const missing = value === null || value === undefined;
-  return (
-    <div className="flex flex-col gap-0.5">
-      <Cap>{label}</Cap>
-      <span className={missing ? "text-[13px] leading-7 text-ink-faint" : "font-mono text-[22px] leading-7"} title={missing ? why : undefined}>
-        {missing ? "Not measured" : <>{value}<small className="text-xs text-ink-muted"> {unit}</small></>}
-      </span>
-    </div>
-  );
-}
-
-function Detailed({ r, narrow }: { r: Result; narrow: boolean }) {
-  const m = r.measured, why = m.unmeasured;
-  const f1 = (x: number | null | undefined) => (x === null || x === undefined ? null : Number(x.toFixed(1)));
-  return (
-    <div className="grid grid-cols-12 gap-3">
-      <LiquidGlass as="section" className={cn(wide(narrow, "col-span-7"), "flex flex-col gap-3 p-5")}>
-        <Cap>The numbers</Cap>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-x-4 gap-y-3">
-          <Stat label="Loudness" value={f1(m.integrated_lufs)} unit="LUFS" why={why.integrated_lufs || why.all} />
-          <Stat label="True peak" value={f1(m.true_peak_dbtp)} unit="dBTP" why={why.all} />
-          {["bass", "mids", "treble"].map((b) => <Stat key={b} label={b} value={f1(m.bands_db[b])} unit="dB" why={why[`bands_db.${b}`] || why.all} />)}
-          {["bass", "mids", "treble"].map((b) => <Stat key={"w" + b} label={`Width ${b}`} value={m.width[b] === null || m.width[b] === undefined ? null : Math.round(m.width[b]! * 100)} unit="%" why={why[`width.${b}`] || why.all} />)}
-        </div>
-        <p className="m-0 text-xs text-ink-faint">Loudness and peak are here for reference. Aria's advice is about clarity.</p>
-      </LiquidGlass>
-      {r.clarity.stems && (
-        <LiquidGlass as="section" className={cn(wide(narrow, "col-span-5"), "flex flex-col gap-3 p-5")}>
-          <Cap>Each part against the mix</Cap>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            {Object.entries(r.clarity.stems).map(([k, v]) => <Stat key={k} label={soundName(k)} value={f1(v)} unit="dB vs mix" />)}
-          </div>
-          <p className="m-0 text-xs text-ink-faint">Split by {r.clarity.split_by ?? "Demucs"}. A sound more than 20 dB under the mix counts as not playing.</p>
-        </LiquidGlass>
-      )}
-      <LiquidGlass as="section" className="col-span-12 flex flex-col gap-2 p-5">
-        <Cap>Everything Muse Spark said</Cap>
-        <ul className="m-0 grid gap-1.5 pl-[18px] text-[13px] leading-[18px]">
-          {r.advice ? r.advice.notes.map((n, i) => <li key={i}>{n.text}</li>) : <li className="text-ink-muted">{r.advice_error ?? "No advice."}</li>}
-        </ul>
-      </LiquidGlass>
+      </section>
     </div>
   );
 }

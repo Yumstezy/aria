@@ -31,7 +31,7 @@ Frosted glass over soft blue. Show the problem as a picture first, say it in pla
 
 ## Color
 
-Two themes: **Sky** (default) and **Night** (for dark Live themes). Set `data-theme="sky|night"` on `.cp-stage`.
+Two themes: **Sky**, the light default, and **Night**, the optional dark mode. The producer switches with the Light / Dark control at the bottom of the side rail. The choice is saved and applies to the window and the strip. Set `data-theme="sky|night"` on `.cp-stage`.
 
 | Token | Sky | Night | Use |
 |---|---|---|---|
@@ -64,21 +64,23 @@ Two themes: **Sky** (default) and **Night** (for dark Live themes). Set `data-th
   - 28: window frame
   - pill: chips, tags and toggles
 - Glass: `backdrop-filter: blur(24px) saturate(140%)`, a 1px light edge and a bright top rim.
-- **Liquid glass** (Oct 27, Ian): the Apple-style look, in `ui/aria.css` as `.aria-liquid`. Use it for every panel in the window and the strip.
-  - **The light:** `.aria-lights` puts soft colored blobs behind the glass. Glass needs something to bend.
-  - **The bend:** the blurred backdrop is warped by the `#aria-liquid` SVG turbulence filter.
-  - **The face:** a faint translucent fill and a soft glow.
-  - **The edge:** thin inner highlights.
-  - Plain CSS, no React or build step.
+- Use the design system classes as they are (`cp-glass`, `cp-card`, `cp-hero`, `cp-solid`, `cp-btn`, `cp-tag`, `cp-stat`, `cp-ask-pop`). Don't restyle them per screen. Colors come from `design/ds/tokens.css` only. (Oct 27: this replaced the earlier liquid glass panels.)
 - Type in the UI is Geist (bundled), with Helvetica Neue by name as the fallback.
 - Shadow: `0 10px 30px -12px` in blue-gray (Sky) or black (Night).
 - Motion: 160 to 200ms ease-out. Charts may grow in over about 1s. Respect `prefers-reduced-motion`.
 
 ## Layout
 
-- **Device strip:** 169px tall (Live's fixed device height), about 700px wide, on the master channel. It holds the Aria mark, Check mix, Ask, a mini section map and one verdict.
+- **Device strip:** 400 x 169 on the master channel (`cp-strip is-mini`). Left: the Aria mark, Check mix, Ask and Open window. Right: one card with the next step, or the one fix with a section row and a Fix it button.
 - **Window:** a 184px side rail plus a 12 column bento. The rail holds Home, Mix check, Live analyzer, Groove match and Reference, with Ask Muse pinned at the bottom.
 - **Ask Muse** is a pop-up over the current screen, never a page.
+
+## Empty states and Ask
+
+- Never a blank card. Say what will appear and the next step, and show the result's layout greyed out (`cp-empty`, `cp-tag-idle`, `cp-vs i.is-empty`, `cp-where.is-empty`).
+- Setup steps use `cp-check`: done gets a green check, the next step is bold with a blue ring.
+- Windows and the strip paint their own ground and orbs. Never transparent over Live.
+- Ask Muse is a 400px pop-up over the current screen (`cp-ask-pop`). Each request gets one reply. A change that was asked for is done right away, with the done pill (`cp-did`) and Undo. Muse's own proposals use one `cp-suggest` card with Do it and Not now.
 
 ## Components
 

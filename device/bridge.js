@@ -22,8 +22,9 @@ const ENGINE = { host: "127.0.0.1", port: 8765 };
 const REPO = path.resolve(__dirname, "..");
 const ENGINE_DIR = path.join(REPO, "engine");
 // The React builds (ui/dist, see ui/vite.config.ts): one self-contained HTML file per screen.
-const STRIP_URL = "file://" + encodeURI(path.join(REPO, "ui", "dist", "strip", "index.html")) + "?theme=night";
-const WINDOW_URL = "file://" + encodeURI(path.join(REPO, "ui", "dist", "window", "index.html")) + "?theme=night";
+// Light (Sky) by default; Dark (Night) when the producer picks it in the window's rail. Saved in window.json.
+const pageUrl = (screen) => "file://" + encodeURI(path.join(REPO, "ui", "dist", screen, "index.html")) +
+  "?theme=" + (loadWindowPrefs().theme === "night" ? "night" : "sky");
 const LOG_DIR = path.join(os.homedir(), "Library", "Logs", "Aria");
 // Ask Muse history, kept across Live sessions. Local to this Mac, never sent anywhere.
 const HISTORY_FILE = path.join(os.homedir(), "Library", "Application Support", "Aria", "ask-history.json");
@@ -88,6 +89,7 @@ function logChanged() {
     Max.post(`Couldn't save the Ask Muse history: ${e.message}`);
   }
   toUI("ask_log", askLog);
+  pushSession();
 }
 
 function addNote(text, at = askLog.length - 1) {
@@ -305,6 +307,7 @@ async function checkMix() {
     }
     lastResult = { ...res.json, start_bar: startBar, chain: live.chain };
     toUI("mix_result", lastResult);
+    pushSession();
   } catch (e) {
     recording = null;
     toUI("error", { text: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
@@ -319,7 +322,23 @@ Max.addHandler("ready", async () => {
   toUI("engine", engineState);
   if (lastResult) toUI("mix_result", lastResult);
   toUI("ask_log", askLog);
+  pushSession();
   try { await ensureEngine(); } catch (e) { setEngine("error", e.message); }
+});
+
+// What the window shows about the set: tempo, time signature, where Aria sits, and the markers
+async function pushSession() {
+  try {
+    const live = await askLive("state", "live_state");
+    toUI("session", { tempo: live.tempo, signature: live.signature, markers: live.markers,
+                      chain: { on_main: live.chain.on_main, after: live.chain.after } });
+  } catch (e) { /* Live didn't answer; the window says what it doesn't know */ }
+}
+
+Max.addHandler("set_theme", (s) => {
+  const theme = decode(s).theme === "night" ? "night" : "sky";
+  savePrefs({ ...loadWindowPrefs(), theme });
+  toUI("theme", { theme });
 });
 Max.addHandler("check_mix", () => checkMix());
 // ---------- the window ----------
@@ -390,15 +409,15 @@ function showWindow(url) {
   Max.outlet("window", "front");
 }
 
-Max.addHandler("open_window", () => showWindow(WINDOW_URL));
+Max.addHandler("open_window", () => showWindow(pageUrl("window")));
 Max.addHandler("open_chat", (s) => {
   const prefs = loadWindowPrefs();
   const screen = (s && decode(s).screen) || prefs.screen || FALLBACK_SCREEN;
   // The side it's docked on, or the side it was last docked on
   const side = prefs.mode === "left" || prefs.mode === "right" ? prefs.mode : prefs.side === "left" ? "left" : "right";
   savePrefs({ ...prefs, mode: side, side, screen });
-  if (!windowLoaded) { windowLoaded = true; Max.outlet("window", "url", WINDOW_URL); }
-  if (!chatLoaded) { chatLoaded = true; Max.outlet("chat", "url", WINDOW_URL + "&view=chat"); }
+  if (!windowLoaded) { windowLoaded = true; Max.outlet("window", "url", pageUrl("window")); }
+  if (!chatLoaded) { chatLoaded = true; Max.outlet("chat", "url", pageUrl("window") + "&view=chat"); }
   chatOpen = true;
   mainOpen = true;
   placeStack(side, screen);
@@ -591,7 +610,8 @@ Max.addHandler("answer", async (s) => {
   if (!yes) return;
   let out;
   try { out = await apply(sg, (await askContext()).tracks); } catch (e) { out = { ok: false, text: e.message }; }
-  addNote(out.text, exchange);
+  sg.result = { ok: !!out.ok, text: out.text };   // the card becomes the done pill, with Undo
+  logChanged();
 });
 
 Max.addHandler("undo", async () => {
@@ -603,12 +623,12 @@ Max.addHandler("undo", async () => {
 Max.addHandler("clear_history", () => { askLog = []; logChanged(); });
 
 // The strip's Ask opens the window with Ask Muse open.
-Max.addHandler("open_ask", () => showWindow(WINDOW_URL + "&ask=1"));
+Max.addHandler("open_ask", () => showWindow(pageUrl("window") + "&ask=1"));
 
 // jweb also reports its own status (url loaded and so on). Nothing to do with those.
 Max.addHandler(Max.MESSAGE_TYPES.ALL, () => {});
 
 // ---------- start ----------
 
-Max.outlet("jweb", "url", STRIP_URL);
+Max.outlet("jweb", "url", pageUrl("strip"));
 ensureEngine().catch((e) => setEngine("error", e.message));

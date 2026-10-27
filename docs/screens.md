@@ -66,13 +66,17 @@ The pop-up opens over any screen from the rail button or a mapped key or pad:
 - Did it: the change is made, with Undo
 - Answered: chips with the numbers, and an offer that waits for a yes
 
+## 10 to 12 Design fixes, round 1
+
+Strip states before and after a check, Home on first run, and Mix check before the first check with Ask Muse open. See `docs/design-fixes.md`.
+
 ## 09 Device strip
 
-The 169px strip on the master channel:
+The strip on the master channel. It is 400 x 169; see `10-strip-states.png`, which replaces the older wide strip in 09:
 - Check mix
 - Ask
 - a Treble, Mids and Bass by section mini map against the pro track
 - a Chorus lift verdict
 - a link that opens the window
 
-It is shown in the Night theme over a dark Live arrangement.
+It uses the light theme by default, even over a dark Live arrangement, and switches to dark only when the producer picks it.

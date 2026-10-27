@@ -1,13 +1,16 @@
-/* Aria's look: the design tokens (design/ds/tokens.css) as Tailwind colours, Geist type,
-   and the liquid glass layers. Sky and Night switch on data-theme. */
+/* Aria's look: the design system as it is (design/ds/tokens.css and components/bundle.css, the cp-
+   classes), plus the tokens as Tailwind colours for small layout touches. Sky (light) is the default,
+   Night (dark) when the producer picks it; both switch on data-theme. Colours come from the tokens only. */
 @import "tailwindcss";
 @import "../../../design/ds/tokens.css";
+@import "../../../design/ds/components/bundle.css";
 @source "../";
 
 @theme inline {
   --font-sans: Geist, "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, Menlo, monospace;
   --color-ground: var(--ground);
+  --color-card: var(--card);
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-ink-faint: var(--ink-faint);
@@ -21,59 +24,46 @@
   --color-hairline: var(--hairline);
 }
 
-:root, [data-theme="sky"] {
-  --glass-face: rgba(255, 255, 255, 0.42);
-  --glass-row: rgba(255, 255, 255, 0.55);
-  --glass-edge: inset 1px 1px 1px 0 rgba(255, 255, 255, 0.75), inset -1px -1px 1px 0 rgba(255, 255, 255, 0.45);
-  --glass-glow: 0 4px 4px rgba(12, 30, 60, 0.06), 0 0 24px rgba(255, 255, 255, 0.35);
-  --light-1: #3d7bf0; --light-2: #8fd0ff; --light-3: #a98bff;
-  --part-vocals: #1f5fd0; --part-other: #7a4fd6; --part-bass: #0f8a83; --part-drums: #6b7a90; --part-mix: #1f5fd0;
-}
-[data-theme="night"] {
-  --glass-face: rgba(255, 255, 255, 0.06);
-  --glass-row: rgba(255, 255, 255, 0.07);
-  --glass-edge: inset 1px 1px 1px 0 rgba(255, 255, 255, 0.28), inset -1px -1px 1px 0 rgba(255, 255, 255, 0.12);
-  --glass-glow: 0 4px 4px rgba(0, 0, 0, 0.18), 0 0 24px rgba(255, 255, 255, 0.06);
-  --light-1: #1d4fb8; --light-2: #0f6f9a; --light-3: #5b3db8;
-  --part-vocals: #6cb4ff; --part-other: #b99bff; --part-bass: #4fd1c5; --part-drums: #9aa7b8; --part-mix: #6cb4ff;
+/* Each part of the mix in the waves picture, from the token palette */
+:root, [data-theme="sky"], [data-theme="night"] {
+  --part-vocals: var(--action); --part-other: var(--tile-bottom); --part-bass: var(--good); --part-drums: var(--ink-faint); --part-mix: var(--action);
 }
 
 html, body, #root { height: 100%; margin: 0; }
 body { font-family: var(--font-sans); color: var(--ink); background: var(--ground); -webkit-font-smoothing: antialiased; }
-/* Docked and popped-out windows are see-through: Max draws no background behind them, so Live shows
-   through the tint. The page can't blur what's behind its window, so it's tinted glass, not frosted. */
-html.see-through, html.see-through body { background: transparent; }
-.glass-panel {
-  /* 88%: Live is still there behind it, but faint enough that text on top stays easy to read */
-  background: color-mix(in srgb, var(--ground) 88%, transparent);
-  border-radius: 22px;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12), 0 18px 50px -20px rgb(0 0 0 / 0.6);
+
+/* Windows are never see-through: every page paints the ground and the two orbs (cp-stage), then glass.
+   A page fills its window, so the stage drops its outer padding when docked or in the strip. */
+.cp-stage.is-flush { padding: 0; min-height: 100vh; height: 100vh; }
+
+/* On the blue hero: the waves' part colours bright enough to read on blue */
+.cp-hero {
+  --ink: var(--on-tile); --ink-muted: var(--on-tile-muted); --ink-faint: var(--on-tile-muted); --hairline: color-mix(in srgb, var(--on-tile) 14%, transparent);
+  --hot: var(--hot-glow); --part-vocals: var(--on-tile); --part-other: var(--good-glow); --part-bass: var(--hot-glow); --part-drums: var(--on-tile-muted); --part-mix: var(--on-tile);
 }
 
-/* The light behind the glass: soft coloured blobs for it to bend */
-.aria-lights {
-  background:
-    radial-gradient(40% 50% at 18% 22%, color-mix(in srgb, var(--light-1) 70%, transparent), transparent 70%),
-    radial-gradient(35% 45% at 82% 18%, color-mix(in srgb, var(--light-2) 60%, transparent), transparent 70%),
-    radial-gradient(45% 55% at 70% 85%, color-mix(in srgb, var(--light-3) 55%, transparent), transparent 70%),
-    var(--ground);
-}
+/* Section rows you can tap to hear that part in Live */
+.cp-secrow button { flex: var(--n) 1 0; min-width: 0; height: 24px; border: 0; padding: 0 2px; border-radius: 6px; background: var(--well); color: var(--ink-faint);
+  font: inherit; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; cursor: pointer; }
+.cp-secrow button.is-hot { background: var(--hot); color: var(--card); }
+.cp-where button { flex: var(--n) 1 0; min-width: 0; height: 52px; box-sizing: border-box; border: 0; border-radius: 10px; background: var(--well); padding: 8px 10px;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px; font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; overflow: hidden; white-space: nowrap; }
+.cp-where button small { font-size: 11px; font-weight: 600; color: var(--good); }
+.cp-where button.is-hot { box-shadow: inset 0 0 0 2px var(--hot); }
+.cp-where button.is-hot small { color: var(--hot); }
+
+/* The done pill on the light card of the Ask pop-up (cp-did is drawn for blue bubbles) */
+.cp-ask-pop .cp-did, .cp-chat .cp-did { align-self: flex-start; height: auto; min-height: 26px; padding: 3px 4px 3px 10px; background: var(--well); color: var(--good); }
+.cp-did.is-bad { color: var(--hot); padding-right: 10px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
-/* On the gradient hero card: white text, part colours bright enough to read on blue */
-.on-hero {
-  --ink: #ffffff; --ink-muted: rgba(255, 255, 255, 0.78); --ink-faint: rgba(255, 255, 255, 0.55);
-  --hairline: rgba(255, 255, 255, 0.14); --hot: #ffb07a;
-  --part-vocals: #ffffff; --part-other: #d4c4ff; --part-bass: #7ff0e0; --part-drums: rgba(255, 255, 255, 0.45); --part-mix: #ffffff;
-}
-
 /* Scrollbars: a thin pill that stays thin on hover, no track or arrows (Live's web view is Chromium) */
-* { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.18) transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--track) transparent; }
 ::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.18); border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active { background: rgb(255 255 255 / 0.32); }
+::-webkit-scrollbar-thumb { background: var(--track); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active { background: var(--ink-faint); }

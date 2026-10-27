@@ -49,6 +49,7 @@ This is a hard rule for code, tests, UI and the video.
 - `docs/contracts.md`: the JSON that moves between the device, the bridge, the engine and the UI. Keep to it. Change it only on purpose, and update the doc in the same commit.
 - `docs/screens.md`: what each screen does. The pixels are in `design/screens/*.png` and `*.html`.
 - `DESIGN.md`: the short design reference (type, color, space, voice). `design/ds/README.md` has the full rules.
+- `docs/design-fixes.md`: the latest design corrections (round 1, Oct 27). The layouts are in `design/screens/10` to `12`. Aria fills them with its own findings, not a reference comparison, until the reference step is built.
 - `design/ds/README.md`: design rules. "Say it plainly" is the most important section.
 - `docs/ml-plan.md`: the good mix vs bad mix model. It's a parallel track for the teammate who knows ML, and it plugs into the engine later.
 
@@ -60,7 +61,7 @@ Ableton Live
     Aria.amxd (Max for Live audio effect)
       plugin~ -> sfrecord~        records the master to a wav while Mix check runs
       live.path / live.object     Live API: tempo, song time, cue points, clip file paths, EQ Eight params
-      jweb (strip, 169px tall)    the device strip UI
+      jweb (strip, 400 x 169)     the device strip UI
       jweb (window, opened)       the full Aria window
       node.script bridge.js       HTTP to the engine, routes messages to jweb and the Live API
                  |
@@ -99,7 +100,7 @@ docs/          build steps, contracts, screens
 - Use `design/ds/tokens.css` and `design/ds/components/bundle.css` as they are. Class names start with `cp-`, an internal code name. Keep it.
 - Charts come from `window.CoProducer` in `design/ds/components/bundle.js` (spectrum, sectionMap, energy, stereo, timing, arrangement, analyzer). Feed them the engine's JSON.
 - Talk to Max with `window.max.outlet(...)` and `window.max.bindInlet(...)`. Guard for `window.max` being missing. In a normal browser, the UI calls the engine directly with a real wav path, so we develop fast without Live and still see only real results.
-- Sky theme by default, Night when Live uses a dark theme. Set `data-theme` on `.cp-stage`.
+- Light (Sky) is the default theme. Dark (Night) is an option the producer picks with the Light / Dark switch at the bottom of the side rail. The bridge saves the choice in `window.json` and applies it to the window and the strip. Set `data-theme` on the root.
 - Mix check opens in Simple view: a plain verdict first, then the numbers. Detailed view is one tap away.
 - Ask Muse is a pop-up over the current screen, never a separate page.
 - The product name on screen is Aria. The logo isn't chosen yet, so keep the placeholder bars icon.

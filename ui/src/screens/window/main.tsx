@@ -4,8 +4,6 @@ import { connect } from "@/lib/aria";
 import { AriaWindow } from "./Window";
 import { ChatWindow } from "@/components/ask-muse";
 
-const theme = new URLSearchParams(location.search).get("theme") === "sky" ? "sky" : "night";
-document.documentElement.setAttribute("data-theme", theme);
 connect();
 // The same page also runs Ask Muse popped out into its own window (?view=chat)
 const chat = new URLSearchParams(location.search).get("view") === "chat";

@@ -37,3 +37,37 @@ export function problemsOf(r: Result): Problem[] {
     };
   });
 }
+
+/** The one status word for a problem's tag ("Too bright" in the design) */
+export function statusWord(p: Problem): string {
+  const f = p.findings[0];
+  if (f.kind === "masking") return p.name === "Mud" ? "Muddy" : "Buried";
+  return { resonance: "Ringing", buildup: "Build-up", harsh: "Harsh", bass_click: "Clicking" }[f.kind];
+}
+
+/** The bars a check covered */
+export function checkedBars(r: Result): [number, number] | null {
+  if (r.clarity.bars) return r.clarity.bars;
+  if (!r.start_bar) return null;
+  return [r.start_bar, r.start_bar + (r.recording.bars || 16) - 1];
+}
+
+/** The checked bars in groups (about eight of them unless a size is given), each marked hot where the
+    problem happens. Tap one to hear it. */
+export function barGroups(r: Result, p?: Problem, size?: number): { from: number; to: number; hot: boolean }[] {
+  const span = checkedBars(r);
+  if (!span) return [];
+  size = size ?? Math.max(1, Math.ceil((span[1] - span[0] + 1) / 8));
+  const out = [];
+  for (let from = span[0]; from <= span[1]; from += size) {
+    const to = Math.min(span[1], from + size - 1);
+    out.push({ from, to, hot: !!p && p.findings.some((f) => f.bars[0] <= to && f.bars[1] >= from) });
+  }
+  return out;
+}
+
+/** "bars 49 to 60" for where a problem happens */
+export function barsOf(p: Problem): string {
+  const lo = Math.min(...p.findings.map((f) => f.bars[0])), hi = Math.max(...p.findings.map((f) => f.bars[1]));
+  return lo === hi ? `bar ${lo}` : `bars ${lo} to ${hi}`;
+}

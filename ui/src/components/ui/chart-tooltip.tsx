@@ -16,12 +16,13 @@ export function ChartTooltip({ x, y, title, rows }: { x: number; y: number; titl
     setPos({ left, top });
   }, [x, y, title]);
   return createPortal(
-    <div ref={box} role="tooltip" style={pos}
-         className="pointer-events-none fixed z-[1000] whitespace-nowrap rounded-[10px] border border-white/10 bg-[rgba(12,14,20,0.94)] px-2 py-1.5 text-[11px] leading-4 text-white shadow-[0_10px_24px_-10px_rgba(0,0,0,0.7)] backdrop-blur-md">
-      <div className="mb-0.5 text-white/55">{title}</div>
+    <div ref={box} role="tooltip"
+         className="pointer-events-none fixed z-[1000] whitespace-nowrap rounded-[10px] px-2 py-1.5 text-[11px] leading-4"
+         style={{ ...pos, background: "var(--solid)", color: "var(--on-solid)", boxShadow: "var(--shadow-tile), var(--shadow-rim-tile)" }}>
+      <div className="mb-0.5" style={{ color: "var(--on-solid-muted)" }}>{title}</div>
       {rows.map((r) => (
         <div key={r.label} className="flex items-center justify-between gap-3">
-          <span className="inline-flex items-center gap-1.5 text-white/65">
+          <span className="inline-flex items-center gap-1.5" style={{ color: "var(--on-solid-muted)" }}>
             {r.color && <i className="inline-block size-2 rounded-[2px]" style={{ background: r.color }} />}{r.label}
           </span>
           <b className="font-mono font-medium tabular-nums">{r.value}</b>

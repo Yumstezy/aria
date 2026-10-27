@@ -44,9 +44,9 @@ export interface Progress { step: string; text: string; detail?: string; done?: 
 export type EngineState = "starting" | "up" | "down" | "error";
 
 export interface Setting { param: string; value?: number; option?: string; change?: number }
-export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "track_volume" | "track_eq" | "track_device" | "check_mix" | "undo"; args: Record<string, number | string> & { settings?: Setting[] } }
+export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "track_volume" | "track_eq" | "track_device" | "track_plugin" | "check_mix" | "undo"; args: Record<string, number | string> & { settings?: Setting[] } }
 export interface Done extends Action { ok: boolean; text: string }
-export interface Suggestion { type: Action["type"]; args: Action["args"]; why: string; answered?: "yes" | "no" }
+export interface Suggestion { type: Action["type"]; args: Action["args"]; why: string; answered?: "yes" | "no"; result?: { ok: boolean; text: string } }
 export interface Exchange {
   request: string; reply: string | null; done: Done[]; suggestions: Suggestion[]; error: string | null; notes: string[];
   problems?: string[];   // calls Aria dropped, and why
@@ -74,7 +74,13 @@ interface State {
   error: string | null;
   marker: { bar: number; name: string } | null;
   notice: string | null;
+  theme: Theme;
+  session: Session | null;
 }
+
+export type Theme = "sky" | "night";
+/** About the set, from Live: shown in headers and the Get started steps */
+export interface Session { tempo: number; signature: [number, number]; markers: { bar: number; name: string }[]; chain: { on_main: boolean; after: string[] } }
 
 declare global {
   interface Window {
@@ -87,8 +93,26 @@ export const inMax = typeof window !== "undefined" && !!window.max?.outlet;
 let state: State = {
   ask: { open: typeof location !== "undefined" && new URLSearchParams(location.search).get("ask") === "1", pending: null, log: [] },
   engine: { state: "starting", text: "Starting Aria" },
-  progress: null, result: null, error: null, marker: null, notice: null,
+  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null,
 };
+
+// Light (Sky) unless the producer picked Dark. Inside Live the bridge saves the choice and puts it in
+// the page's URL; in a browser it's kept in localStorage.
+function initialTheme(): Theme {
+  if (typeof location === "undefined") return "sky";
+  const q = new URLSearchParams(location.search).get("theme");
+  if (q === "night" || q === "sky") return q;
+  try { return localStorage.getItem("aria.theme") === "night" ? "night" : "sky"; } catch { return "sky"; }
+}
+function applyTheme(theme: Theme) { document.documentElement.setAttribute("data-theme", theme); }
+if (typeof document !== "undefined") applyTheme(state.theme);
+
+export function setTheme(theme: Theme) {
+  applyTheme(theme);
+  set({ theme });
+  try { localStorage.setItem("aria.theme", theme); } catch { /* storage may be off */ }
+  send("set_theme", { theme });   // the bridge saves it and tells the strip and the other windows
+}
 const listeners = new Set<() => void>();
 function set(patch: Partial<State>) {
   state = { ...state, ...patch };
@@ -136,6 +160,8 @@ export function connect() {
     on<{ request: string | null }>("ask_pending", (p) => set({ ask: { ...state.ask, pending: p.request } }));
     // The bridge owns the history (saved on this Mac) and sends all of it on every change.
     on<Exchange[]>("ask_log", (log) => set({ ask: { ...state.ask, log } }));
+    on<{ theme: Theme }>("theme", (t) => { applyTheme(t.theme); set({ theme: t.theme }); });
+    on<Session>("session", (x) => set({ session: x }));
     send("ready");   // bridge.js replies with the engine state and the latest result
   } else {
     checkEngine();
@@ -192,6 +218,12 @@ export function answerSuggestion(exchange: number, index: number, yes: boolean) 
 }
 
 export const undoLast = () => send("undo");
+
+/** Fix it: Muse gets the problem in plain words and makes the change in Live, with Undo. */
+export function fixIt(p: { name: string; short: string; findings: Finding[] }) {
+  const [a, b] = p.findings[0].bars;
+  askMuse(`Fix this: ${p.name}, bars ${a}${b !== a ? ` to ${b}` : ""}. ${p.short}`);
+}
 export const clearHistory = () => { if (!send("clear_history")) set({ ask: { ...state.ask, log: [] } }); };
 export const openAsk = () => { if (!send("open_ask")) window.open("../window/index.html?ask=1", "aria-window"); };
 
@@ -263,6 +295,6 @@ export function describe(f: Finding): { name: string; where: string; size: strin
 }
 
 export function barsLabel(r: Result) {
-  if (!r.start_bar) return "Your recording";
-  return `Bars ${r.start_bar} to ${r.start_bar + (r.recording.bars || 16) - 1}`;
+  const span = r.clarity.bars ?? (r.start_bar ? [r.start_bar, r.start_bar + (r.recording.bars || 16) - 1] : null);
+  return span ? `Bars ${span[0]} to ${span[1]}` : "Your recording";
 }

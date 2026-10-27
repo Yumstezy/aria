@@ -1,19 +1,19 @@
 // Ask Muse: you ask, Muse Spark picks tools, Aria does it in Live with Undo. Muse's own ideas
-// wait for "Do it". Two places: inline at the bottom of Mix check, and a pop-up anywhere else
-// (design screen 08). Both show the same history, which the bridge saves on this Mac.
+// wait for "Do it". It is a pop-up over whatever screen is open (cp-ask-pop, design screens 08 and 12),
+// or its own small window when popped out. Both show the same history, which the bridge saves on this Mac.
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { ArrowUp, Check, Mic, SquareArrowOutUpRight, Undo2, X } from "lucide-react";
-import { answerSuggestion, askMuse, clearHistory, closeChat, hz, openChat, setAskOpen, undoLast, useAria, type Finding, type Suggestion } from "@/lib/aria";
+import { motion } from "motion/react";
+import { answerSuggestion, askMuse, clearHistory, closeChat, hz, setAskOpen, undoLast, useAria, type Exchange, type Finding, type Suggestion } from "@/lib/aria";
+import { CheckIcon, CloseIcon, MicIcon, SendIcon, UndoIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 // Starting points built from what Aria found, so the first ask is one tap
-function starters(findings: Finding[], startBar?: number): string[] {
+function starters(findings: Finding[]): string[] {
   const out: string[] = [];
   const ringing = findings.find((f) => f.kind === "resonance" || f.kind === "harsh");
   if (ringing) out.push(`Tame the ${hz(ringing.hz!)} ${ringing.kind === "harsh" ? "harsh hits" : "ringing note"}`);
-  if (findings.some((f) => f.kind === "masking" && f.masked === "vocals")) out.push("How do I make the vocal easier to hear?");
-  if (startBar) out.push(`Mark bar ${startBar} as Check`);
+  if (findings.some((f) => f.kind === "masking" && f.masked === "vocals")) out.push("Make the vocal easier to hear");
+  out.push("Add some reverb to the vocal");
   out.push("Check my mix again");
   return out.slice(0, 4);
 }
@@ -29,90 +29,101 @@ function describeEq(a: Record<string, number | string>) {
 
 function describeSuggestion(s: Suggestion) {
   const a = s.args;
-  if (s.type === "eq_band") return describeEq(a);
-  if (s.type === "track_eq") return `"${a.track}": ${describeEq(a)}`;
-  if (s.type === "track_volume") return `"${a.track}" ${Number(a.change_db) > 0 ? "up" : "down"} ${Math.abs(Number(a.change_db))} dB`;
-  if (s.type === "track_device") {
+  if (s.type === "eq_band") return `${describeEq(a)} on Main`;
+  if (s.type === "track_eq") return `${describeEq(a)} on ${a.track}`;
+  if (s.type === "track_volume") return `${a.track} ${Number(a.change_db) > 0 ? "up" : "down"} ${Math.abs(Number(a.change_db))} dB`;
+  if (s.type === "track_device" || s.type === "track_plugin") {
     const knobs = (a.settings ?? []).map((k) => k.option ? `${k.param} ${k.option}` : k.change !== undefined ? `${k.param} ${k.change > 0 ? "+" : ""}${k.change}` : `${k.param} ${k.value}`);
-    return `${a.device} on "${a.track}"${knobs.length ? `: ${knobs.join(", ")}` : ""}`;
+    return `${s.type === "track_plugin" ? a.plugin : a.device} on ${a.track}${knobs.length ? `: ${knobs.join(", ")}` : ""}`;
   }
   if (s.type === "add_marker") return `Marker "${a.name}" at bar ${a.bar}`;
   if (s.type === "jump_to") return `Jump to bar ${a.bar}`;
   return s.type;
 }
 
-/** The conversation. `last` limits it to the newest few exchanges (inline view). */
-export function AskThread({ last, className }: { last?: number; className?: string }) {
+const changed = (type: string) => type !== "jump_to" && type !== "check_mix" && type !== "undo";
+
+/** Where the newest change Aria made is, so only that one offers Undo */
+function lastChange(log: Exchange[]): string | null {
+  for (let i = log.length - 1; i >= 0; i--) {
+    const x = log[i];
+    for (let k = x.suggestions.length - 1; k >= 0; k--) if (x.suggestions[k].result?.ok) return `${i}s${k}`;
+    for (let k = x.done.length - 1; k >= 0; k--) if (x.done[k].ok && changed(x.done[k].type)) return `${i}d${k}`;
+  }
+  return null;
+}
+
+/** The pill for a change: a check, what changed, and Undo on the newest one */
+function Did({ ok, text, undo }: { ok: boolean; text: string; undo?: boolean }) {
+  return (
+    <div className={cn("cp-did", !ok && "is-bad")} role="status">
+      {ok && <CheckIcon />}<span className="py-0.5 leading-4">{text}</span>
+      {undo && <button className="cp-btn cp-btn-sm" style={{ height: 22, padding: "0 8px", marginLeft: 4 }} onClick={undoLast}><UndoIcon style={{ width: 11, height: 11 }} />Undo</button>}
+    </div>
+  );
+}
+
+/** The conversation: one reply per request, at most one card per suggestion, never two the same. */
+export function AskThread({ className }: { className?: string }) {
   const { ask, result } = useAria();
   const scroller = useRef<HTMLDivElement>(null);
-  useEffect(() => { scroller.current?.scrollTo({ top: 1e6, behavior: "smooth" }); }, [ask.log.length, ask.pending]);
-
-  const first = last ? Math.max(0, ask.log.length - last) : 0;
-  const lastWithChange = (() => {
-    for (let i = ask.log.length - 1; i >= 0; i--) if (ask.log[i].done.some((d) => d.ok && d.type !== "jump_to" && d.type !== "check_mix")) return i;
-    return -1;
-  })();
+  useEffect(() => { scroller.current?.scrollTo({ top: 1e6, behavior: "smooth" }); }, [ask.log, ask.pending]);
+  const undoAt = lastChange(ask.log);
 
   return (
-    <div ref={scroller} className={cn("flex min-h-0 flex-col gap-2.5 overflow-y-auto pr-1.5", className)}>
+    <div ref={scroller} className={cn("cp-msgs min-h-0 overflow-y-auto", className)}>
       {ask.log.length === 0 && !ask.pending && (
-        <div className="flex flex-col gap-2 py-1">
-          <p className="m-0 text-[13px] text-white/60">Ask for a change in plain words. If you ask, it happens right away, with Undo.</p>
-          <div className="flex flex-wrap gap-1.5">
-            {starters(result?.clarity.findings ?? [], result?.start_bar).map((s) => (
-              <button key={s} onClick={() => askMuse(s)} className="rounded-full bg-white/10 px-2.5 py-1 text-left text-xs font-medium text-white/85 ring-1 ring-white/10 hover:bg-white/15">{s}</button>
-            ))}
+        <>
+          <p className="cp-meta">Ask for a change in plain words. If you ask, it happens right away, with Undo.</p>
+          <div className="cp-ask-sugs">
+            {starters(result?.clarity.findings ?? []).map((s) => <button key={s} className="cp-btn cp-btn-sm" onClick={() => askMuse(s)}>{s}</button>)}
           </div>
-        </div>
+        </>
       )}
 
-      {first > 0 && <button onClick={() => setAskOpen(true)} className="self-center text-[11.5px] text-white/50 hover:text-white/80">{first} earlier · show all</button>}
-
-      {ask.log.slice(first).map((x, j) => {
-        const i = first + j;
+      {ask.log.map((x, i) => {
+        const seen = new Set<string>();
+        // Older history kept a yes's outcome as a note, not on the suggestion: show it as the pill
+        const notes = [...x.notes];
         return (
-          <div key={i} className="flex flex-col gap-1.5">
-            <div className="self-end rounded-2xl rounded-br-md bg-white px-3 py-2 text-[13px] text-[#0b1a3a]">{x.request}</div>
-            {(x.reply || x.error) && (
-              <div className={cn("max-w-[92%] self-start rounded-2xl rounded-bl-md px-3 py-2 text-[13px] leading-[18px]", x.reply ? "bg-[var(--tile-base)]" : "bg-white/8 text-[#ffb07a]")}>
-                {x.reply ?? x.error}
-              </div>
-            )}
-            {x.done.map((d, k) => (
-              <div key={k} className={cn("flex items-center gap-2 self-start rounded-full px-2.5 py-1 text-xs", d.ok ? "bg-[#5fdba6]/15 text-[#8ff0c4]" : "bg-white/8 text-[#ffb07a]")}>
-                {d.ok && <Check size={12} />}<span>{d.text}</span>
-                {d.ok && i === lastWithChange && k === x.done.length - 1 && (
-                  <button onClick={undoLast} className="ml-1 inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-semibold text-[#0b1a3a]"><Undo2 size={11} />Undo</button>
-                )}
-              </div>
-            ))}
+          <div key={i} className="cp-msgs">
+            <div className="cp-bubble is-user">{x.request}</div>
+            {x.reply ? <div className="cp-bubble is-bot"><span>{x.reply}</span></div>
+              : x.error ? <Did ok={false} text={x.error} /> : null}
+            {x.done.map((d, k) => <Did key={k} ok={d.ok} text={d.text} undo={undoAt === `${i}d${k}`} />)}
             {/* Calls Aria skipped, so a reply never looks done when it wasn't */}
-            {x.reply && (x.problems ?? []).map((p, k) => (
-              <span key={"p" + k} className="self-start rounded-full bg-white/8 px-2.5 py-1 text-xs text-[#ffb07a]">{p}</span>
-            ))}
-            {x.suggestions.map((s, k) => (
-              <div key={"s" + k} className="flex flex-col gap-1.5 self-start rounded-2xl bg-white/8 p-2.5 text-xs ring-1 ring-white/10">
-                <span className="text-white/60">Muse suggests</span>
-                <b className="text-[13px] font-semibold">{describeSuggestion(s)}</b>
-                <span className="text-white/70">{s.why}</span>
-                {s.answered ? <span className="text-white/50">{s.answered === "yes" ? "Done." : "Skipped."}</span> : (
-                  <div className="flex gap-1.5">
-                    <button onClick={() => answerSuggestion(i, k, true)} className="rounded-full bg-white px-2.5 py-1 font-semibold text-[#0b1a3a]">Do it</button>
-                    <button onClick={() => answerSuggestion(i, k, false)} className="rounded-full px-2.5 py-1 font-semibold text-white/70 hover:bg-white/10">Not now</button>
+            {x.reply && (x.problems ?? []).map((p, k) => <Did key={"p" + k} ok={false} text={p} />)}
+            {x.suggestions.map((s, k) => {
+              const what = describeSuggestion(s);
+              if (seen.has(what)) return null;
+              seen.add(what);
+              if (s.answered === "yes") {
+                const text = s.result?.text ?? notes.shift() ?? `Doing it: ${what}`;
+                return <Did key={"s" + k} ok={s.result?.ok ?? true} text={text} undo={undoAt === `${i}s${k}`} />;
+              }
+              if (s.answered === "no") return <span key={"s" + k} className="cp-meta">Skipped: {what}</span>;
+              return (
+                <div key={"s" + k} className="cp-suggest">
+                  <span className="cp-cap">Muse suggests</span>
+                  <span className="cp-tile-title">{what}</span>
+                  <span className="cp-meta">{s.why} You can undo it.</span>
+                  <div className="cp-row">
+                    <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={() => answerSuggestion(i, k, true)}>Do it</button>
+                    <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={() => answerSuggestion(i, k, false)}>Not now</button>
                   </div>
-                )}
-              </div>
-            ))}
-            {x.notes.map((n, k) => <span key={"n" + k} className="self-start text-[11.5px] text-white/50">{n}</span>)}
+                </div>
+              );
+            })}
+            {notes.map((n, k) => <span key={"n" + k} className="cp-meta">{n}</span>)}
           </div>
         );
       })}
 
       {ask.pending && (
-        <div className="flex flex-col gap-1.5">
-          <div className="self-end rounded-2xl rounded-br-md bg-white px-3 py-2 text-[13px] text-[#0b1a3a]">{ask.pending}</div>
-          <div className="flex items-center gap-1 self-start rounded-2xl rounded-bl-md bg-[var(--tile-base)] px-3 py-2.5" aria-label="Muse is thinking">
-            {[0, 1, 2].map((d) => <motion.i key={d} className="size-1.5 rounded-full bg-white/80" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: d * 0.15 }} />)}
+        <div className="cp-msgs">
+          <div className="cp-bubble is-user">{ask.pending}</div>
+          <div className="cp-bubble is-bot" aria-label="Muse is thinking" style={{ display: "flex", gap: 4, padding: "13px 14px" }}>
+            {[0, 1, 2].map((d) => <motion.i key={d} className="size-1.5 rounded-full bg-on-action" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: d * 0.15 }} />)}
           </div>
         </div>
       )}
@@ -129,112 +140,68 @@ export function useVoice(placeholder: string, soonText = VOICE_SOON) {
   return { placeholder: soon ? soonText : placeholder, press: () => setSoon(true) };
 }
 
-export function VoiceButton({ onPress, small }: { onPress: () => void; small?: boolean }) {
-  return (
-    <button type="button" onClick={onPress} aria-label="Talk to Muse" title="Talk to Muse"
-            className={cn("grid shrink-0 place-items-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/10 transition-colors hover:bg-white/18 hover:text-white",
-                          small ? "size-6" : "size-8")}>
-      <Mic size={small ? 12 : 14} />
-    </button>
-  );
-}
-
-export function AskInput({ autoFocus, className }: { autoFocus?: boolean; className?: string }) {
+export function AskInput({ autoFocus }: { autoFocus?: boolean }) {
   const { ask } = useAria();
   const [text, setText] = useState("");
-  const voice = useVoice("Ask Muse to change something");
+  const voice = useVoice("Ask, or tell Muse what to change");
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => { if (autoFocus) input.current?.focus(); }, [autoFocus]);
   return (
-    <form className={cn("flex items-center gap-2", className)} onSubmit={(e) => { e.preventDefault(); if (text.trim()) { askMuse(text); setText(""); } }}>
-      <VoiceButton onPress={voice.press} />
-      <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder={voice.placeholder}
-             className="min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/40" />
-      <button type="submit" disabled={!text.trim() || !!ask.pending} aria-label="Send"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-[#0b1a3a] disabled:opacity-35"><ArrowUp size={15} /></button>
+    <form className="cp-composer" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { askMuse(text); setText(""); } }}>
+      <button type="button" className="cp-icon-btn" aria-label="Ask by voice" onClick={voice.press}><MicIcon /></button>
+      <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder={voice.placeholder} aria-label="Ask Muse" />
+      <button type="submit" className={cn("cp-icon-btn", text.trim() && "is-on")} disabled={!text.trim() || !!ask.pending} aria-label="Send"><SendIcon /></button>
     </form>
   );
 }
 
-const PANEL = { background: "rgba(16, 22, 38, 0.86)", backdropFilter: "blur(24px) saturate(160%)", WebkitBackdropFilter: "blur(24px) saturate(160%)" };
-
-/** Inline at the bottom of Mix check: the newest exchanges and the prompt. */
-export function InlineAsk() {
-  const { ask } = useAria();
-  return (
-    <section className="flex flex-col gap-2 overflow-hidden rounded-[24px] px-4 pb-2 pt-3.5 text-white ring-1 ring-white/12" style={PANEL} aria-label="Ask Muse">
-      <div className="flex items-center gap-2">
-        <b className="text-sm">Ask Muse</b>
-        <span className="text-xs text-white/50">about this check</span>
-        <div className="ml-auto flex items-center gap-1">
-          {ask.log.length > 0 && <button onClick={() => setAskOpen(true)} className="rounded-full px-2 py-0.5 text-xs text-white/55 hover:bg-white/10 hover:text-white">History</button>}
-          <button onClick={openChat} title="Pop out into its own window" aria-label="Pop out Ask Muse"
-                  className="grid size-7 place-items-center rounded-full text-white/60 hover:bg-white/10 hover:text-white"><SquareArrowOutUpRight size={14} /></button>
-        </div>
-      </div>
-      <AskThread last={2} className="max-h-[320px]" />
-      <AskInput className="border-t border-white/10 pt-2" />
-    </section>
-  );
-}
-
 /** Clear, asking once more before it deletes the history. */
-function ClearButton({ className }: { className?: string }) {
+function ClearButton() {
   const [sure, setSure] = useState(false);
   useEffect(() => { if (sure) { const t = setTimeout(() => setSure(false), 3000); return () => clearTimeout(t); } }, [sure]);
   return (
-    <button onClick={() => { if (sure) { clearHistory(); setSure(false); } else setSure(true); }}
-            className={cn("rounded-full px-2 py-0.5 text-xs hover:bg-white/10", sure ? "text-[#ffb07a]" : "text-white/50 hover:text-white", className)}>
+    <button className="cp-btn cp-btn-ghost cp-btn-sm" style={{ marginLeft: "auto", color: sure ? "var(--hot)" : undefined }}
+            onClick={() => { if (sure) { clearHistory(); setSure(false); } else setSure(true); }}>
       {sure ? "Clear all?" : "Clear"}
     </button>
   );
 }
 
-/** Ask Muse popped out into its own small window that floats over Live. */
-export function ChatWindow() {
+function Head({ onClose }: { onClose: () => void }) {
   const { ask, result } = useAria();
-  useEffect(() => { document.documentElement.classList.add("see-through"); }, []);
   return (
-    <div className="glass-panel flex h-screen flex-col overflow-hidden text-white">
-      <div className="flex h-full flex-col">
-        <div className="flex items-center gap-2 px-4 pb-2 pt-3.5">
-          <b className="text-sm">Ask Muse</b>
-          <span className="text-xs text-white/50">{result ? "about Mix check" : "about your set"}</span>
-          <div className="ml-auto flex items-center gap-1">
-            {ask.log.length > 0 && <ClearButton />}
-            <button onClick={closeChat} title="Close" aria-label="Close Ask Muse" className="grid size-7 place-items-center rounded-full text-white/60 hover:bg-white/10"><X size={15} /></button>
-          </div>
-        </div>
-        <AskThread className="flex-1 px-4 pb-2" />
-        <AskInput autoFocus className="border-t border-white/10 px-3 py-2.5" />
-      </div>
+    <div className="cp-ask-head">
+      <b>Ask Muse</b><span className="cp-ask-ctx">{result ? "about Mix check" : "about your set"}</span>
+      {ask.log.length > 0 && <ClearButton />}
+      <button className="cp-icon-btn cp-ask-x" style={ask.log.length ? { marginLeft: 0 } : undefined} aria-label="Close" onClick={onClose}><CloseIcon /></button>
     </div>
   );
 }
 
-/** The pop-up: the whole history. */
-export function AskMuse({ narrow }: { narrow?: boolean }) {
-  const { ask, result } = useAria();
+/** Ask Muse popped out into its own small window that floats over Live. It paints its own ground. */
+export function ChatWindow() {
   return (
-    <AnimatePresence>
-      {ask.open && (
-        <motion.div
-          initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.98 }}
-          transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
-          className={cn("fixed z-[900] flex flex-col overflow-hidden rounded-[24px] text-white shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)] ring-1 ring-white/12",
-                        narrow ? "inset-x-3 bottom-3 top-16" : "bottom-[148px] left-[56px] max-h-[min(560px,calc(100vh-140px))] w-[380px]")}
-          style={PANEL} role="dialog" aria-label="Ask Muse"
-        >
-          <div className="flex items-center gap-2 px-4 pb-2 pt-3.5">
-            <b className="text-sm">Ask Muse</b>
-            <span className="text-xs text-white/50">{result ? "about Mix check" : "about your set"}</span>
-            {ask.log.length > 0 && <ClearButton className="ml-auto" />}
-            <button onClick={() => setAskOpen(false)} aria-label="Close" className={cn("grid size-7 place-items-center rounded-full text-white/60 hover:bg-white/10", !ask.log.length && "ml-auto")}><X size={15} /></button>
-          </div>
-          <AskThread className="flex-1 px-4 pb-2" />
-          <AskInput autoFocus className="border-t border-white/10 px-3 py-2.5" />
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div className="cp-stage is-tight" style={{ height: "100vh", minHeight: 0 }}>
+      <section className="cp-ask-pop is-static cp-chat" style={{ height: "calc(100vh - 32px)", boxSizing: "border-box" }} aria-label="Ask Muse">
+        <Head onClose={closeChat} />
+        <AskThread className="flex-1" />
+        <AskInput autoFocus />
+      </section>
+    </div>
+  );
+}
+
+/** The pop-up over the current screen, anchored bottom left by the rail's Ask Muse button. */
+export function AskMuse({ narrow }: { narrow?: boolean }) {
+  const { ask } = useAria();
+  if (!ask.open) return null;
+  return (
+    <section className="cp-ask-pop" role="dialog" aria-label="Ask Muse"
+             style={narrow ? { position: "fixed", left: 12, right: 12, bottom: 12, width: "auto", maxHeight: "calc(100vh - 80px)" }
+                           : { maxHeight: "calc(100% - 44px)" }}>
+      <Head onClose={() => setAskOpen(false)} />
+      <AskThread />
+      <AskInput autoFocus />
+    </section>
   );
 }

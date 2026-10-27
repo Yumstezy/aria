@@ -332,3 +332,31 @@ body { margin: 0; font-family: var(--font-sans); color: var(--ink); background: 
 .cp-where span small { font-size: 11px; font-weight: 600; color: var(--good); }
 .cp-where span.is-hot { box-shadow: inset 0 0 0 2px var(--hot); }
 .cp-where span.is-hot small { color: var(--hot); }
+
+/* Empty states, setup checklist, and suggestions that wait for a yes */
+.cp-tag-idle { color: var(--ink-faint); }
+.cp-vs i.is-empty::after { width: 0; }
+.cp-empty { border: 1.5px dashed var(--track); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.cp-hero .cp-empty, .cp-solid .cp-empty { border-color: rgba(255,255,255,0.35); }
+.cp-check { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.cp-check li { display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 20px; }
+.cp-check i { flex: none; width: 20px; height: 20px; box-sizing: border-box; border-radius: var(--radius-pill); border: 1.5px solid var(--track); display: grid; place-items: center; }
+.cp-check li.is-done { color: var(--ink-muted); }
+.cp-check li.is-done i { background: var(--good); border-color: transparent; }
+.cp-check li.is-done i::after { content: ""; width: 9px; height: 5px; margin-top: -2px; border-left: 2px solid var(--card); border-bottom: 2px solid var(--card); transform: rotate(-45deg); }
+.cp-check li.is-next { font-weight: 600; }
+.cp-check li.is-next i { border-color: var(--action); box-shadow: 0 0 0 3px var(--action-glow); }
+.cp-suggest { display: grid; gap: 4px; padding: 12px 14px; border-radius: 16px; background: var(--well); border: 1px solid var(--card-edge); }
+.cp-suggest .cp-row { margin-top: 6px; }
+.cp-where.is-empty span { color: var(--ink-faint); }
+.cp-where.is-empty span small { color: var(--ink-faint); }
+
+/* Mini strip: the device itself is 400 x 169 */
+.cp-strip.is-mini { width: 400px; height: 169px; grid-template-columns: 108px minmax(0, 1fr); gap: 8px; padding: 10px; border-radius: 0; border: 0; }
+.cp-strip.is-mini .cp-tile { padding: 10px 12px; border-radius: 14px; }
+.cp-strip.is-mini .cp-mark b { font-size: 13px; }
+.cp-strip.is-mini .cp-mark svg { width: 22px; height: 22px; }
+.cp-secrow { display: flex; gap: 3px; }
+.cp-secrow span { flex: var(--n) 1 0; min-width: 0; height: 24px; border-radius: 6px; background: var(--well); color: var(--ink-faint); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; }
+.cp-secrow span.is-hot { background: var(--hot); color: var(--card); }
+.cp-secrow span.is-watch { box-shadow: inset 0 0 0 1.5px var(--watch); color: var(--watch); }

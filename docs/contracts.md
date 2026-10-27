@@ -258,10 +258,13 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
   - `open_chat {screen}`: pop Ask Muse out. The main window shrinks to what to fix, with the chat stacked under it on the docked edge.
   - `close_chat`: close the chat; the main window takes its full docked height again.
   - `close_window`: close the main window only. A popped-out chat stays and takes the full docked height.
+  - `set_theme {theme: "sky" | "night"}`: the Light / Dark switch. The bridge saves it in `window.json`, puts it in every page's URL (`?theme=`) and sends `theme` to every page.
 - Device to UI:
   - `ask_pending {request | null}`
+  - `theme {theme}`: apply this theme now.
+  - `session {tempo, signature, markers: [{bar, name}], chain: {on_main, after}}`: about the set, sent on `ready`, after a check and after every ask. Home uses it for the header and the Get started steps.
   - `ask_log [exchange]`: the whole history, sent on `ready` and on every change. The bridge owns it and saves it in `~/Library/Application Support/Aria/ask-history.json` (last 100).
-  - An exchange is `{request, reply, done: [{type, args, ok, text}], suggestions: [{type, args, why, answered?}], problems: [text], error, notes: [text], at}`.
+  - An exchange is `{request, reply, done: [{type, args, ok, text}], suggestions: [{type, args, why, answered?, result?: {ok, text}}], problems: [text], error, notes: [text], at}`.
 
 Actions Muse may call: `jump_to`, `add_marker`, `eq_band`, `track_volume`, `track_eq`, `track_device`, `track_plugin`, `check_mix`, `undo`, and `suggest` for any of the first seven.
 
