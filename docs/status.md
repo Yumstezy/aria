@@ -287,6 +287,29 @@ Ian's call: use React for the front end so it can look better, using component l
 5. **The old plain files** (`ui/app.js`, `window.js`, `aria.css`) are removed once the React versions pass in Live.
 6. **Then** Fix it for me and Ask Muse are built in React.
 
+## Now: Ask Muse (Oct 27, Ian's pick for "step 3")
+
+You type a request, Muse Spark picks tools, and Aria does it in Live with Undo. If you ask, it happens right away. If Muse suggests something on its own, it waits for a yes.
+
+**Tools in this version** (the action menu in `docs/contracts.md`, limited to what exists today):
+
+| Tool | Does | Limits |
+|---|---|---|
+| `jump_to` | moves the playhead to a bar | bar 1 or later |
+| `add_marker` | adds a named marker at a bar (renames one already there) | name up to 32 characters |
+| `eq_band` | one bell band on an EQ Eight at the end of Main (Aria adds one if there isn't one), old values kept for Undo | 20 Hz to 20 kHz, -6 to +6 dB, Q 0.3 to 12 |
+| `check_mix` | runs a Check mix | none |
+| `undo` | undoes the last change Aria made | none |
+
+**Pieces:**
+- **Engine:** `POST /muse/ask` sends the request plus context (latest findings, bars, playhead, tempo) to Muse Spark with these tools. It validates every call and drops anything off the menu or out of range. It returns `{reply, actions, suggestions}`.
+- **Bridge:** applies `actions` in order through `live.js`, pushes undo entries, and sends the outcome to the UI. Suggestions wait for "Do it".
+- **`live.js`:** `eq_band` finds or adds EQ Eight at the end of Main, uses a free band, and sets frequency, gain and Q by reading back each parameter's own display value (so Hz, dB and Q are exact). Undo restores the previous values.
+- **UI:** an Ask Muse pop-up over the window (from design screen 08): a text box, suggestion chips from the findings, Muse's reply, a "Done" pill with Undo, and "Do it / Not now" for suggestions. The strip's Ask opens the window with the pop-up open.
+- **Voice** (Muse Voice Transcribe works, from Step 1.4) comes after typed requests pass.
+
+Pass: in Live, three typed requests work in a row, each with a working Undo: "jump to bar 17", "add a marker called Drop at bar 33", and "cut 3 dB at 3 kHz".
+
 ## Next
 - **Ian:**
   - Re-add `device/Aria.amxd`: the device file changed, because it now has the window.
