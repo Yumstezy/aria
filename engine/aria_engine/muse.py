@@ -14,6 +14,7 @@ from openai import OpenAI, OpenAIError
 
 KINDS = {"resonance", "buildup", "harsh", "masking", "bass_click"}
 TIMEOUT_SEC = 20
+SHORT_WORDS = 12          # the one-line version shown before the full note
 MAX_TOKENS = 1500
 # A cut Muse may suggest, within the action menu in docs/contracts.md (eq_band gain -6 to +6 dB)
 CUT_DB = (-6.0, -0.5)
@@ -53,10 +54,11 @@ Rules:
   - bass_click: in words. Check the bass sample's start, add a few milliseconds of fade-in on the bass notes, or soften the attack. "fix" is null.
 - If there are no findings, say nothing stuck out in these bars, and that Key tracks mode (Aria Ear on the main tracks) can show which sounds clash.
 - Short sentences. No emojis, no exclamation marks, no em dashes.
+- For each note also write "short": what a listener notices, at most 10 words, no numbers. Example: "Words get lost under the drums".
 
 Answer with JSON only:
 {"summary": "one sentence, the most useful thing to know",
- "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
+ "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click", "short": "at most 10 words", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
 
 
 def _numbers(text):
@@ -147,7 +149,9 @@ def validate(raw, measured, context, findings, has_reference=False):
         extra |= {round(abs(v), 2) for v in extra}
         if not ok(n["text"], extra):
             continue
-        notes.append({"finding": i, "kind": n["kind"], "text": n["text"].strip(), "fix": fix})
+        short = n.get("short")
+        short = short.strip() if isinstance(short, str) and len(short.split()) <= SHORT_WORDS and ok(short) else None
+        notes.append({"finding": i, "kind": n["kind"], "short": short, "text": n["text"].strip(), "fix": fix})
 
     fix_numbers = {round(abs(v), 2) for n in notes for v in (n["fix"] or {}).values() if isinstance(v, (int, float))}
     if not ok(data["summary"], fix_numbers | {-x for x in fix_numbers}):

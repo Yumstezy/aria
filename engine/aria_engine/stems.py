@@ -132,6 +132,42 @@ def masking(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, releva
     return findings
 
 
+def space(sounds, rate):
+    """Who owns which space: each sound's level against the rest of the mix, per range.
+
+    Returns {sound: {range: {"vs_rest_db": float, "lives_here": bool}} or None}. None
+    when the sound isn't really in this part of the song. vs_rest_db is the median over
+    the moments it plays there; lives_here is False where the sound has little energy,
+    and the UI leaves those cells empty instead of showing a number."""
+    names = list(sounds)
+    levels, totals = {}, []
+    for n in names:
+        _, levels[n], total = _range_levels(_mono(sounds[n]), rate, N_FFT, HOP)
+        totals.append((n, total))
+    mix_total = 10 * np.log10(sum(10 ** (t / 10) for _, t in totals) + 1e-12)
+    loud = mix_total >= mix_total.max() - QUIET_DB
+    mix_level = 10 * np.log10(np.mean(sum(10 ** (t / 10) for _, t in totals)[loud]) + 1e-12)
+    mix_range = {r: 10 * np.log10(sum(10 ** (levels[n][r] / 10) for n in names) + 1e-12) for r in RANGES}
+
+    out = {}
+    for n, total in totals:
+        if 10 * np.log10(np.mean(10 ** (total[loud] / 10)) + 1e-12) < mix_level - PRESENT_DB:
+            out[n] = None
+            continue
+        typical = {r: np.median(levels[n][r][loud]) for r in RANGES}
+        strongest = max(typical.values())
+        cells = {}
+        for r in RANGES:
+            mine = levels[n][r]
+            rest = 10 * np.log10(sum(10 ** (levels[o][r] / 10) for o in names if o != n) + 1e-12)
+            plays = loud & (mine >= mine[loud].max() - ACTIVE_DB) & (mine >= mix_range[r] - AUDIBLE_DB)
+            lives = bool(typical[r] >= strongest - MATTERS_DB and plays.sum() >= 4)
+            cells[r] = {"vs_rest_db": round(float(np.median((mine - rest)[plays])), 1) if lives else None,
+                        "lives_here": lives}
+        out[n] = cells
+    return out
+
+
 def bass_clicks(bass, drums, rate, tempo=None, start_beat=None, beats_per_bar=4.0):
     """Sharp top-end bursts at bass note starts that aren't drum hits. Returns [] or [finding]."""
     def bands(sig):

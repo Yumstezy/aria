@@ -81,25 +81,24 @@
 
     <div data-mix-body hidden>
       <div class="cp-bento" data-simple>
-        <section class="cp-tile cp-hero span-7" style="min-height: 228px; gap: 10px;">
-          <span class="cp-cap">What Aria heard</span>
+        <section class="cp-tile cp-card span-12 aria-verdict-tile">
           <span class="aria-verdict" data-verdict></span>
           <span class="aria-verdict-line" data-verdict-line></span>
-          <div class="cp-score cp-push" data-score></div>
         </section>
-        <section class="cp-tile cp-solid span-5" style="min-height: 228px; gap: 8px;" data-fixfirst>
-          <span class="cp-cap">Fix first</span>
-          <h2 class="cp-tile-title" style="font-size: 20px; line-height: 25px;" data-fix-title></h2>
-          <p class="cp-body is-quiet" style="margin: 0;" data-fix-line></p>
-          <div class="cp-row cp-push">
-            <button class="cp-btn cp-btn-primary" data-action="fix-it" data-label="Fix it for me" hidden>Fix it for me</button>
-            <button class="cp-btn cp-btn-ghost" data-hear>Hear it in Live</button>
+
+        <section class="cp-tile cp-card span-7" style="gap: 14px;">
+          <div class="cp-spread"><span class="cp-cap">Who owns which space</span><span class="cp-meta" data-map-note></span></div>
+          <div class="aria-map" data-map></div>
+          <div class="aria-map-key" data-map-key>
+            <span><i class="is-owns"></i>Comes through</span>
+            <span><i class="is-shares"></i>Shares the space</span>
+            <span><i class="is-covered"></i>Covered</span>
           </div>
         </section>
-        <div class="cp-bento span-12" style="display: contents;" data-cards></div>
-        <section class="cp-tile cp-card span-12" style="gap: 12px;">
-          <div class="cp-spread"><span class="cp-cap">Where it happens</span><span class="cp-meta">Click a bar to hear it</span></div>
-          <div class="cp-where" data-where></div>
+
+        <section class="cp-tile cp-card span-5" style="gap: 8px;">
+          <span class="cp-cap">What to fix</span>
+          <ol class="aria-problems" data-problems></ol>
         </section>
       </div>
 

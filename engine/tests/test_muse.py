@@ -111,3 +111,12 @@ def test_eq_fix_on_a_buried_vocal_is_dropped():
         "notes": [{"finding": 0, "kind": "masking", "text": "Bring the vocals up.",
                    "fix": {"type": "eq_band", "freq_hz": 2000, "gain_db": -3, "q": 1}}]}))
     assert advice["notes"][0]["fix"] is None
+
+
+def test_short_line_is_kept_when_short_and_dropped_when_long():
+    long = " ".join(["word"] * 20)
+    advice, _ = advise({"summary": "A note around 339 Hz rings.",
+                        "notes": [{"finding": 0, "kind": "resonance", "short": "A ringing note in the low mids", "text": "It rings.", "fix": None},
+                                  {"finding": 1, "kind": "harsh", "short": long, "text": "Hits poke out.", "fix": None}]})
+    assert advice["notes"][0]["short"] == "A ringing note in the low mids"
+    assert advice["notes"][1]["short"] is None

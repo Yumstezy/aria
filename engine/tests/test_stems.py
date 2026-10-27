@@ -73,3 +73,16 @@ def test_clicks_at_bass_note_starts_are_found():
 
 def test_clean_bass_notes_have_no_clicks():
     assert stems.bass_clicks(bass_notes(click=False), np.zeros(SECONDS * RATE), RATE, **TIMING) == []
+
+
+def test_space_shows_who_owns_each_range():
+    sounds = {"vocals": noise(1000, 3500, -30, 1), "drums": noise(1000, 4000, -20, 2), "bass": noise(40, 140, -15, 3)}
+    sp = stems.space(sounds, RATE)
+    assert sp["vocals"]["presence"]["lives_here"] and sp["vocals"]["presence"]["vs_rest_db"] <= -6
+    assert sp["bass"]["low"]["lives_here"] and sp["bass"]["low"]["vs_rest_db"] > 0
+    assert sp["bass"]["presence"] == {"vs_rest_db": None, "lives_here": False}
+
+
+def test_space_marks_absent_sounds():
+    sounds = {"vocals": noise(1000, 3500, -75, 1), "drums": noise(1000, 4000, -20, 2), "bass": noise(40, 140, -15, 3)}
+    assert stems.space(sounds, RATE)["vocals"] is None

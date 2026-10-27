@@ -72,20 +72,60 @@ a { color: inherit; text-decoration: none; }
 .aria-finding-size { color: var(--ink-muted); }
 .aria-clear { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-muted); }
 
-/* Window: Mix check */
-.aria-verdict { font-size: 34px; line-height: 38px; font-weight: 700; letter-spacing: -0.03em; }
-.aria-verdict-line { font-size: 14px; line-height: 20px; color: var(--on-tile-muted); max-width: 520px; }
-.aria-card-meta { margin-top: auto; align-self: flex-start; padding: 4px 8px; border: 0; border-radius: var(--radius-sm);
-  background: var(--well); color: var(--ink-muted); font: 500 11.5px/16px var(--font-mono); cursor: pointer; }
-.aria-card-meta:hover { box-shadow: inset 0 0 0 1px var(--action); }
-.cp-where [role="button"] { cursor: pointer; }
-.cp-where [role="button"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* Window: Mix check. Picture first, a few words second, numbers on request (DESIGN.md). */
+.aria-verdict-tile { flex-direction: row; align-items: baseline; gap: 16px; padding: 16px 20px; }
+.aria-verdict { font-size: 24px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+.aria-verdict-line { font-size: 14px; line-height: 20px; color: var(--ink-muted); }
+
+/* Who owns which space */
+.aria-map { display: grid; grid-template-columns: 120px repeat(4, minmax(0, 1fr)); gap: 6px; align-items: stretch; }
+.aria-map-head { font-size: 12px; font-weight: 600; color: var(--ink); text-align: center; }
+.aria-map-head small { display: block; font: 500 10.5px/14px var(--font-mono); color: var(--ink-faint); }
+.aria-map-part { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; }
+.aria-cell { height: 46px; border-radius: 10px; display: grid; place-items: center; background: var(--well); }
+.aria-cell.is-empty { background: transparent; border: 1.5px dashed var(--hairline); }
+.aria-cell.is-absent { background: transparent; }
+.aria-cell.is-owns { background: color-mix(in srgb, var(--action) 55%, transparent); }
+.aria-cell.is-shares { background: color-mix(in srgb, var(--action) 18%, var(--well)); }
+.aria-cell.is-covered { background: color-mix(in srgb, var(--watch) calc(25% + var(--depth, 0.3) * 55%), transparent); }
+.aria-cell.is-flagged { box-shadow: inset 0 0 0 2px var(--hot); cursor: pointer; }
+.aria-cell.is-flagged:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.aria-cell b { font: 600 12px/1 var(--font-mono); color: var(--ink); }
+.aria-map-key { display: flex; gap: 16px; font-size: 12px; color: var(--ink-muted); }
+.aria-map-key span { display: inline-flex; align-items: center; gap: 6px; }
+.aria-map-key i { width: 14px; height: 10px; border-radius: 3px; }
+.aria-map-key i.is-owns { background: color-mix(in srgb, var(--action) 55%, transparent); }
+.aria-map-key i.is-shares { background: color-mix(in srgb, var(--action) 18%, var(--well)); }
+.aria-map-key i.is-covered { background: color-mix(in srgb, var(--watch) 65%, transparent); }
+
+/* What to fix: one row each, open for the full note */
+.aria-problems { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.aria-problem { border-radius: 12px; background: var(--well); }
+.aria-problem-head { width: 100%; display: grid; grid-template-columns: 10px minmax(0, 1fr) 14px; gap: 10px; align-items: start;
+  padding: 10px 12px; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.aria-problem-head:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 12px; }
+.aria-dot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--watch); }
+.aria-problem-titles { display: grid; gap: 2px; min-width: 0; }
+.aria-problem-top { display: flex; align-items: center; gap: 8px; }
+.aria-problem-top b { font-size: 14px; font-weight: 600; }
+.aria-problem-short { font-size: 12.5px; line-height: 17px; color: var(--ink-muted); }
+.aria-chip { font: 500 11px/18px var(--font-mono); padding: 0 7px; border-radius: var(--radius-pill); background: var(--card); color: var(--ink-muted); white-space: nowrap; }
+.aria-chevron { width: 8px; height: 8px; margin-top: 6px; border-right: 2px solid var(--ink-faint); border-bottom: 2px solid var(--ink-faint); transform: rotate(45deg); transition: transform 160ms ease-out; }
+.aria-problem.is-open .aria-chevron { transform: rotate(225deg); margin-top: 9px; }
+.aria-problem-more { display: none; padding: 0 12px 12px 32px; }
+.aria-problem.is-open .aria-problem-more { display: grid; gap: 8px; }
+.aria-problem-more p { margin: 0; font-size: 13px; line-height: 18px; color: var(--ink); }
+.aria-facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.aria-problem-none { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-muted); padding: 8px 0; }
+
+/* Detailed view */
 .aria-numbers { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px 16px; }
 .aria-number { display: flex; flex-direction: column; gap: 2px; }
 .aria-number-value { font: 500 22px/28px var(--font-mono); color: var(--ink); }
 .aria-number-value small { font-size: 12px; color: var(--ink-muted); }
 .aria-number-value.is-missing { font: 500 13px/28px var(--font-sans); color: var(--ink-faint); }
 .aria-notes { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; line-height: 18px; color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .aria-chevron { transition: none; } }
 /* The design CSS sets display on these components, which would override the hidden attribute. */
 .aria-window [hidden] { display: none !important; }
 

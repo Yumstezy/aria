@@ -78,3 +78,4 @@ def test_split_mode_puts_stem_findings_first(tmp_path, monkeypatch):
     assert body["clarity"]["findings"][0]["kind"] == "masking"
     assert body["clarity"]["findings"][0]["masked"] == "vocals"
     assert set(body["clarity"]["stems"]) == {"vocals", "drums", "bass", "other"}
+    assert body["clarity"]["space"]["vocals"]["presence"]["vs_rest_db"] < 0

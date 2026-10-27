@@ -34,86 +34,153 @@
     $('[data-detailed]').hidden = !on;
   }
 
-  // Short status word per finding, for tags (DESIGN.md: one plain word, color never alone).
-  function word(f) {
-    return { masking: f.masked === 'other' && f.range === 'low-mid' ? 'Muddy' : 'Buried', bass_click: 'Clicks',
-             resonance: 'Rings', harsh: 'Harsh', buildup: 'Builds up' }[f.kind] || 'Sticks out';
-  }
+  var PARTS = [['vocals', 'Vocal'], ['other', 'Synths and keys'], ['bass', 'Bass'], ['drums', 'Drums and loops']];
+  var RANGES = [['low', 'Low', '30–150 Hz'], ['low-mid', 'Low-mid', '150–400 Hz'], ['mid', 'Mid', '400 Hz–1 kHz'], ['presence', 'Presence', '1–4 kHz']];
+  var COVERED_DB = -3, OWNS_DB = 3;   // same 3 dB line the engine uses for "covered"
 
-  function noteFor(r, i) {
+  function notesFor(r, indexes) {
     var notes = (r.advice && r.advice.notes) || [];
-    for (var k = 0; k < notes.length; k++) if (notes[k].finding === i) return notes[k];
-    return null;
+    return notes.filter(function (n) { return indexes.indexOf(n.finding) >= 0; });
   }
 
-  function barsLabel(f) { return 'Bars ' + f.bars[0] + (f.bars[1] !== f.bars[0] ? ' to ' + f.bars[1] : ''); }
+  // One row per problem: the same sound covered in two ranges is one problem.
+  function problems(r) {
+    var findings = (r.clarity || {}).findings || [], groups = [], byKey = {};
+    findings.forEach(function (f, i) {
+      var key = f.kind === 'masking' ? 'masking:' + f.masked : f.kind + ':' + i;
+      if (!byKey[key]) { byKey[key] = { findings: [], indexes: [] }; groups.push(byKey[key]); }
+      byKey[key].findings.push(f);
+      byKey[key].indexes.push(i);
+    });
+    return groups.map(function (g) {
+      var f = g.findings[0], notes = notesFor(r, g.indexes);
+      var lo = Math.min.apply(null, g.findings.map(function (x) { return x.hz_range[0]; }));
+      var hi = Math.max.apply(null, g.findings.map(function (x) { return x.hz_range[1]; }));
+      var short = notes.map(function (n) { return n.short; }).filter(Boolean)[0];
+      return {
+        name: Aria.describe(f)[0], findings: g.findings, notes: notes,
+        where: f.kind === 'bass_click' ? 'Note starts' : f.kind === 'resonance' || f.kind === 'harsh' ? Aria.describe(f)[1] : Aria.hzRange([lo, hi]),
+        // Before Muse answers, or if it couldn't, describe the measurement itself.
+        short: short || Aria.describe(f)[3] || '',
+        fix: notes.map(function (n) { return n.fix; }).filter(Boolean)[0] || null,
+        bar: f.bars[0],
+      };
+    });
+  }
+
+  function renderMap(r, list) {
+    var map = $('[data-map]'), space = (r.clarity || {}).space;
+    map.textContent = '';
+    $('[data-map-key]').hidden = !space;
+    if (!space) {
+      map.appendChild(el('p', 'cp-meta', 'The space map appears when Aria splits your mix into parts.'));
+      $('[data-map-note]').textContent = '';
+      return;
+    }
+    $('[data-map-note]').textContent = 'vs the rest of the mix';
+    var flagged = {};
+    ((r.clarity || {}).findings || []).forEach(function (f) { if (f.kind === 'masking') flagged[f.masked + ':' + f.range] = f; });
+
+    map.appendChild(el('span', ''));
+    RANGES.forEach(function (rg) {
+      var head = el('span', 'aria-map-head', rg[1]);
+      head.appendChild(el('small', '', rg[2]));
+      map.appendChild(head);
+    });
+    PARTS.forEach(function (p) {
+      map.appendChild(el('span', 'aria-map-part', p[1]));
+      var cells = space[p[0]];
+      RANGES.forEach(function (rg) {
+        var cell = el('span', 'aria-cell');
+        if (!cells) { cell.classList.add('is-absent'); cell.title = p[1] + ' isn\'t playing in these bars.'; map.appendChild(cell); return; }
+        var c = cells[rg[0]];
+        if (!c || !c.lives_here) { cell.classList.add('is-empty'); cell.title = 'Not much ' + p[1].toLowerCase() + ' in this range.'; map.appendChild(cell); return; }
+        var v = c.vs_rest_db;
+        cell.classList.add(v >= OWNS_DB ? 'is-owns' : v > COVERED_DB ? 'is-shares' : 'is-covered');
+        if (v <= COVERED_DB) cell.style.setProperty('--depth', Math.min(1, -v / 15).toFixed(2));
+        cell.title = p[1] + ' sits ' + Math.abs(v).toFixed(1) + ' dB ' + (v >= 0 ? 'over' : 'under') + ' the rest of the mix in ' + rg[2] + '.';
+        var f = flagged[p[0] + ':' + rg[0]];
+        if (f) {
+          cell.classList.add('is-flagged');
+          cell.appendChild(el('b', '', f.gap_db.toFixed(0) + ' dB'));
+          cell.setAttribute('role', 'button');
+          cell.tabIndex = 0;
+          var open = function () {
+            var i = list.findIndex(function (pr) { return pr.findings.indexOf(f) >= 0; });
+            if (i >= 0) toggle(i, true);
+          };
+          cell.addEventListener('click', open);
+          cell.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+        }
+        map.appendChild(cell);
+      });
+    });
+  }
+
+  function toggle(i, forceOpen) {
+    document.querySelectorAll('.aria-problem').forEach(function (row, k) {
+      var open = k === i ? (forceOpen || !row.classList.contains('is-open')) : false;
+      row.classList.toggle('is-open', open);
+      row.querySelector('.aria-problem-head').setAttribute('aria-expanded', String(open));
+    });
+  }
+
+  function renderProblems(list) {
+    var box = $('[data-problems]');
+    box.textContent = '';
+    if (!list.length) {
+      var li = el('li', 'aria-problem-none');
+      li.appendChild(el('span', 'cp-tag cp-tag-good', 'Clear'));
+      li.appendChild(document.createTextNode(' Nothing sticks out in these bars.'));
+      box.appendChild(li);
+      return;
+    }
+    list.forEach(function (p, i) {
+      var row = el('li', 'aria-problem');
+      var head = el('button', 'aria-problem-head');
+      head.appendChild(el('i', 'aria-dot'));
+      var titles = el('span', 'aria-problem-titles');
+      var top = el('span', 'aria-problem-top');
+      top.appendChild(el('b', '', p.name));
+      top.appendChild(el('span', 'aria-chip', p.where));
+      titles.appendChild(top);
+      titles.appendChild(el('span', 'aria-problem-short', p.short));
+      head.appendChild(titles);
+      head.appendChild(el('span', 'aria-chevron', ''));
+      head.addEventListener('click', function () { toggle(i); });
+      row.appendChild(head);
+
+      var more = el('div', 'aria-problem-more');
+      p.notes.forEach(function (n) { more.appendChild(el('p', '', n.text)); });
+      var facts = el('div', 'aria-facts');
+      p.findings.forEach(function (f) {
+        var d = Aria.describe(f);
+        facts.appendChild(el('span', 'aria-chip', d[1] + ' · ' + d[2] + ' · bars ' + f.bars[0] + (f.bars[1] !== f.bars[0] ? '–' + f.bars[1] : '')));
+      });
+      more.appendChild(facts);
+      var actions = el('div', 'cp-row');
+      var hear = el('button', 'cp-btn cp-btn-sm', 'Hear it in Live');
+      hear.addEventListener('click', function () { Aria.send('jump_to', { bar: p.bar }); });
+      actions.appendChild(hear);
+      if (p.fix) {
+        var fix = el('button', 'cp-btn cp-btn-primary cp-btn-sm', 'Fix it for me');
+        fix.addEventListener('click', function () { Aria.notice('Fix it for me is coming next.'); });
+        actions.appendChild(fix);
+      }
+      more.appendChild(actions);
+      row.appendChild(more);
+      box.appendChild(row);
+    });
+    toggle(0, true);   // the first one is "fix first", open by default
+  }
 
   function renderSimple(r) {
-    var findings = (r.clarity || {}).findings || [];
-    var n = findings.length;
-
-    // Verdict hero
+    var list = problems(r);
+    var n = list.length;
     $('[data-verdict]').textContent = n === 0 ? 'Nothing sticks out' : n === 1 ? '1 thing to fix' : n + ' things to fix';
     $('[data-verdict-line]').textContent = r.advice ? r.advice.summary : (r.advice_error || '');
-    var score = $('[data-score]');
-    score.textContent = '';
-    findings.forEach(function (f) {
-      var s = el('span'); var i = el('i', 'is-watch'); s.appendChild(i); s.appendChild(document.createTextNode(Aria.describe(f)[0])); score.appendChild(s);
-    });
-    if (!n) { var ok = el('span'); ok.appendChild(el('i', 'is-good')); ok.appendChild(document.createTextNode('Clear in these bars')); score.appendChild(ok); }
-
-    // Fix first: the strongest finding, in Muse's words when there are some
-    var fix = $('[data-fixfirst]');
-    fix.hidden = n === 0;
-    if (n) {
-      var top = findings[0], d = Aria.describe(top), note = noteFor(r, 0);
-      $('[data-fix-title]').textContent = d[0] + (top.kind === 'masking' ? ' in ' + Aria.hzRange(top.hz_range) : '');
-      $('[data-fix-line]').textContent = note ? note.text : d[3];
-      var fixBtn = $('[data-action="fix-it"]');
-      fixBtn.hidden = !(note && note.fix);
-      if (note && note.fix) fixBtn.setAttribute('data-fix', JSON.stringify(note.fix));
-      $('[data-hear]').setAttribute('data-bar', top.bars[0]);
-    }
-
-    // One card per finding
-    var cards = $('[data-cards]');
-    cards.textContent = '';
-    findings.forEach(function (f, i) {
-      var d = Aria.describe(f), note = noteFor(r, i);
-      var card = el('section', 'cp-tile cp-card cp-stat span-' + (n === 1 ? 12 : n === 2 ? 6 : 4));
-      var head = el('div', 'cp-stat-head');
-      head.appendChild(el('span', 'cp-stat-name', d[0]));
-      head.appendChild(el('span', 'cp-tag cp-tag-watch cp-stat-word', word(f)));
-      card.appendChild(head);
-      card.appendChild(el('p', 'cp-stat-line', note ? note.text : d[3]));
-      var meta = el('button', 'aria-card-meta cp-mono', d[1] + ' · ' + d[2] + ' · ' + barsLabel(f));
-      meta.title = 'Jump to bar ' + f.bars[0];
-      meta.addEventListener('click', function () { Aria.send('jump_to', { bar: f.bars[0] }); });
-      card.appendChild(meta);
-      cards.appendChild(card);
-    });
-
-    // Where it happens: one block per recorded bar, outlined where something sticks out
-    var where = $('[data-where]');
-    where.textContent = '';
-    var first = r.start_bar || (r.clarity && r.clarity.bars && r.clarity.bars[0]);
-    var count = (r.recording && r.recording.bars) || 8;
-    if (!first) { where.appendChild(el('p', 'cp-meta', 'Bar numbers appear when Check mix runs inside Live.')); return; }
-    for (var b = first; b < first + count; b++) {
-      var hits = findings.filter(function (f) { return b >= f.bars[0] && b <= f.bars[1]; });
-      // The design's cp-where blocks are spans; make each one a keyboard-reachable button.
-      var block = el('span', hits.length ? 'is-hot' : '');
-      block.setAttribute('role', 'button');
-      block.tabIndex = 0;
-      block.style.setProperty('--n', 1);
-      block.title = hits.length ? hits.map(function (f) { return Aria.describe(f)[0]; }).join(', ') : 'Nothing sticks out';
-      block.appendChild(document.createTextNode('Bar ' + b));
-      block.appendChild(el('small', '', hits.length ? (hits.length === 1 ? Aria.describe(hits[0])[0] : hits.length + ' things') : 'Clear'));
-      var jump = (function (bar) { return function () { Aria.send('jump_to', { bar: bar }); }; })(b);
-      block.addEventListener('click', jump);
-      block.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); } });
-      where.appendChild(block);
-    }
+    renderMap(r, list);
+    renderProblems(list);
   }
 
   function number(label, value, unit, why) {
@@ -189,8 +256,6 @@
     document.querySelectorAll('[data-seg]').forEach(function (b) {
       b.addEventListener('click', function () { setDetail(b.getAttribute('data-seg') === 'detailed'); });
     });
-    var hear = $('[data-hear]');
-    if (hear) hear.addEventListener('click', function () { Aria.send('jump_to', { bar: Number(hear.getAttribute('data-bar')) }); });
     setView('home');
     setDetail(false);
   }

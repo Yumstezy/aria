@@ -217,10 +217,10 @@ Max.addHandler("ready", async () => {
 });
 Max.addHandler("check_mix", () => checkMix());
 Max.addHandler("open_window", () => {
-  if (!windowLoaded) {
-    windowLoaded = true;
-    Max.outlet("window", "url", WINDOW_URL);
-  }
+  // Load the page every time, so the window always shows the latest UI files.
+  // The page says "ready" when it loads, and the bridge replays the latest result.
+  windowLoaded = true;
+  Max.outlet("window", "url", WINDOW_URL);
   Max.outlet("window", "front");
 });
 Max.addHandler("jump_to", (s) => toLive("jump", decode(s).bar));

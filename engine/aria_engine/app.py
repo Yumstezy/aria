@@ -106,6 +106,7 @@ def find_clarity(audio, rate, tempo, start_beat, beats_per_bar):
     mix_power = sum(np.mean(np.asarray(a, dtype=np.float64) ** 2) for a in stem_audio.values())
     found["stems"] = {name: round(float(10 * np.log10(np.mean(np.asarray(a, dtype=np.float64) ** 2) / mix_power + 1e-12)), 1)
                       for name, a in stem_audio.items()}
+    found["space"] = stems.space(stem_audio, stem_rate)
     split_found = stems.masking(stem_audio, stem_rate, relevant=stems.SPLIT_RELEVANT, **timing)
     split_found += stems.bass_clicks(stem_audio["bass"], stem_audio["drums"], stem_rate, **timing)
     for f in split_found:
