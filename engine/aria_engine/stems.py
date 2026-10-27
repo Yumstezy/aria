@@ -37,6 +37,10 @@ ACTIVE_DB = 30.0       # a sound plays in a range when within this of its own lo
 MATTERS_DB = 6.0       # a range matters to a sound when within this of its strongest range
 AUDIBLE_DB = 20.0      # a sound counts as present when within this of the whole mix in that range.
                        # Further under, it's absent (or separation bleed), not buried.
+PRESENT_DB = 20.0      # and overall within this of the whole mix, or it isn't in this part of the song.
+                       # Ian's new track has no vocal there: Demucs' vocals stem sat 24.5 dB under the
+                       # mix, faint synth bleed, and was reported "buried". Real vocals in the muddy and
+                       # good mixes sat 4 to 16 dB under.
 COVER_DB = 3.0         # another sound at least this much louder covers it
 MIN_SHARE = 0.5        # covered for at least this share of the time it plays there
 TOP_N = 3
@@ -48,7 +52,7 @@ CLICK_AUDIBLE_DB = 50.0  # and is within this of the note's own low end. Measure
                          # real bass starts sit about 40 dB under the note in both the muddy and the
                          # good mix; a test sine's 5 ms fade splatter sits at -67 dB. What separates
                          # the muddy mix is consistency (CLICK_MIN_SHARE), not level.
-CLICK_MIN_STARTS = 4
+CLICK_MIN_STARTS = 8      # fewer clean note starts is too little evidence (Ian's new track: 4)
 CLICK_MIN_SHARE = 0.85   # muddy mix: 98% of starts in every window; good mix: 79% in one window
 
 
@@ -76,17 +80,21 @@ def masking(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, releva
     names = list(sounds)
     if len(names) < 2:
         return []
-    levels, totals, times = {}, [], None
+    levels, levels_total, totals, times = {}, {}, [], None
     for n in names:
-        times, levels[n], total = _range_levels(_mono(sounds[n]), rate, N_FFT, HOP)
-        totals.append(10 ** (total / 10))
+        times, levels[n], levels_total[n] = _range_levels(_mono(sounds[n]), rate, N_FFT, HOP)
+        totals.append(10 ** (levels_total[n] / 10))
     mix_total = 10 * np.log10(np.sum(totals, axis=0) + 1e-12)
     mix_range = {r: 10 * np.log10(sum(10 ** (levels[n][r] / 10) for n in names) + 1e-12) for r in RANGES}
     loud = mix_total >= mix_total.max() - QUIET_DB
+    mix_level = 10 * np.log10(np.mean(np.sum(totals, axis=0)[loud]) + 1e-12)
     bars = _frame_bars(times, tempo, start_beat, beats_per_bar)
 
     findings = []
     for victim in names:
+        own_level = 10 * np.log10(np.mean(10 ** (levels_total[victim][loud] / 10)) + 1e-12)
+        if own_level < mix_level - PRESENT_DB:
+            continue  # not in this part of the song (or only bleed from other sounds)
         typical = {r: np.median(levels[victim][r][loud]) for r in RANGES}
         strongest = max(typical.values())
         for r, (lo, hi) in RANGES.items():
