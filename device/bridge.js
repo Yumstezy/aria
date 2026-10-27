@@ -142,6 +142,8 @@ function waitForPlaying(timeoutMs) {
 
 Max.addHandler("live_state", (s) => { const w = waiters.live_state; delete waiters.live_state; if (w) w(decode(s)); });
 Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete waiters.marker_done; if (w) w(decode(s)); });
+Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
+Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
 Max.addHandler("live_error", (s) => toUI("error", decode(s)));
 Max.addHandler("live_playing", (on) => {
   if (waiters.live_playing) waiters.live_playing(on === 1);
@@ -234,6 +236,88 @@ Max.addHandler("add_marker", async (s) => {
     toUI("error", { text: e.message });
   }
 });
+// ---------- Ask Muse ----------
+
+// One action from Muse's menu, applied in Live. Returns { ok, text } for the UI.
+async function apply(action) {
+  const a = action.args || {};
+  switch (action.type) {
+    case "jump_to":
+      toLive("jump", a.bar);
+      return { ok: true, text: `Moved the playhead to bar ${a.bar}.` };
+    case "add_marker": {
+      const m = await askLive("marker", "marker_done", a.bar, a.name);
+      return { ok: true, text: `Marker "${m.name}" at bar ${m.bar}.` };
+    }
+    case "eq_band":
+      return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q);
+    case "undo":
+      return await askLive("undo", "undo_done");
+    case "check_mix":
+      checkMix();
+      return { ok: true, text: "Started a Mix check." };
+    default:
+      return { ok: false, text: `Aria can't do "${action.type}" yet.` };
+  }
+}
+
+async function askContext() {
+  let live = null;
+  try { live = await askLive("state", "live_state"); } catch (e) { /* Live didn't answer; Muse gets less context */ }
+  const r = lastResult;
+  return {
+    findings: r ? r.clarity.findings : [],
+    bars: r && r.start_bar ? [r.start_bar, r.start_bar + (r.recording.bars || BARS) - 1] : null,
+    tempo: live ? live.tempo : null,
+    playhead_bar: live ? Math.floor(live.song_beat / live.beats_per_bar) + 1 : null,
+    markers: live ? live.markers : [],
+  };
+}
+
+let asking = false;
+Max.addHandler("ask", async (s) => {
+  if (asking) return;
+  asking = true;
+  const { text } = decode(s);
+  toUI("ask_pending", { request: text });
+  try {
+    await ensureEngine();
+    const res = await request("POST", "/muse/ask", { text, context: await askContext() }, ANALYZE_TIMEOUT_MS);
+    if (res.status !== 200 || !res.json) throw new UserError(`Muse couldn't answer (HTTP ${res.status}).`);
+    const done = [];
+    for (const action of res.json.actions) {
+      try { done.push({ ...action, ...(await apply(action)) }); }
+      catch (e) { done.push({ ...action, ok: false, text: e.message }); }
+    }
+    toUI("ask_reply", { request: text, reply: res.json.reply, done, suggestions: res.json.suggestions, error: res.json.error });
+  } catch (e) {
+    toUI("ask_reply", { request: text, reply: null, done: [], suggestions: [], error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
+  } finally {
+    asking = false;
+  }
+});
+
+// A suggestion the producer said yes to. Checked by the engine already.
+Max.addHandler("do_action", async (s) => {
+  const action = decode(s);
+  let out;
+  try { out = await apply(action); } catch (e) { out = { ok: false, text: e.message }; }
+  toUI("action_done", { ...action, ...out });
+});
+
+Max.addHandler("undo", async () => {
+  let out;
+  try { out = await askLive("undo", "undo_done"); } catch (e) { out = { ok: false, text: e.message }; }
+  toUI("undo_done", out);
+});
+
+// The strip's Ask opens the window with Ask Muse open.
+Max.addHandler("open_ask", () => {
+  windowLoaded = true;
+  Max.outlet("window", "url", WINDOW_URL + "&ask=1");
+  Max.outlet("window", "front");
+});
+
 // jweb also reports its own status (url loaded and so on). Nothing to do with those.
 Max.addHandler(Max.MESSAGE_TYPES.ALL, () => {});
 

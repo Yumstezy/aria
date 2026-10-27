@@ -43,7 +43,13 @@ export interface Result {
 export interface Progress { step: string; text: string; detail?: string; done?: number; total?: number }
 export type EngineState = "starting" | "up" | "down" | "error";
 
+export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "check_mix" | "undo"; args: Record<string, number | string> }
+export interface Done extends Action { ok: boolean; text: string }
+export interface Suggestion { type: Action["type"]; args: Action["args"]; why: string; answered?: "yes" | "no" }
+export interface Exchange { request: string; reply: string | null; done: Done[]; suggestions: Suggestion[]; error: string | null; notes: string[] }
+
 interface State {
+  ask: { open: boolean; pending: string | null; log: Exchange[] };
   engine: { state: EngineState; text: string };
   progress: Progress | null;
   result: Result | null;
@@ -61,6 +67,7 @@ declare global {
 export const inMax = typeof window !== "undefined" && !!window.max?.outlet;
 
 let state: State = {
+  ask: { open: typeof location !== "undefined" && new URLSearchParams(location.search).get("ask") === "1", pending: null, log: [] },
   engine: { state: "starting", text: "Starting Aria" },
   progress: null, result: null, error: null, marker: null, notice: null,
 };
@@ -69,6 +76,7 @@ function set(patch: Partial<State>) {
   state = { ...state, ...patch };
   listeners.forEach((l) => l());
 }
+export const useAriaSnapshot = () => state;
 export function useAria() {
   return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => state);
 }
@@ -107,6 +115,10 @@ export function connect() {
     on<Result>("mix_result", (r) => set({ result: r, progress: null, error: null }));
     on<{ text: string }>("error", (e) => set({ error: e?.text || "Something went wrong.", progress: null }));
     on<{ bar: number; name: string }>("marker_done", (m) => set({ marker: m }));
+    on<{ request: string }>("ask_pending", (p) => set({ ask: { ...state.ask, open: true, pending: p.request } }));
+    on<Exchange>("ask_reply", (x) => set({ ask: { ...state.ask, pending: null, log: [...state.ask.log, { ...x, notes: [] }] } }));
+    on<Done>("action_done", (d) => addNote(d.text));
+    on<{ ok: boolean; text: string }>("undo_done", (u) => addNote(u.text));
     send("ready");   // bridge.js replies with the engine state and the latest result
   } else {
     checkEngine();
@@ -132,13 +144,53 @@ export async function checkMix() {
   }
 }
 
+// ---------- Ask Muse ----------
+
+function addNote(text: string) {
+  const log = [...state.ask.log];
+  if (log.length) log[log.length - 1] = { ...log[log.length - 1], notes: [...log[log.length - 1].notes, text] };
+  set({ ask: { ...state.ask, log } });
+}
+
+export const setAskOpen = (open: boolean) => set({ ask: { ...state.ask, open } });
+
+export async function askMuse(text: string) {
+  text = text.trim();
+  if (!text || state.ask.pending) return;
+  if (send("ask", { text })) { set({ ask: { ...state.ask, pending: text } }); return; }
+  // Development in a normal browser: ask the engine directly. Nothing is applied without Live.
+  set({ ask: { ...state.ask, pending: text } });
+  try {
+    const r = state.result;
+    const res = await fetch(ENGINE + "/muse/ask", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, context: { findings: r?.clarity.findings ?? [], bars: null, tempo: r?.recording.tempo ?? null, playhead_bar: null, markers: [] } }),
+    });
+    const body = await res.json();
+    const done: Done[] = (body.actions ?? []).map((a: Action) => ({ ...a, ok: false, text: `Would ${a.type.replace("_", " ")} in Live (not connected).` }));
+    set({ ask: { ...state.ask, pending: null, log: [...state.ask.log, { request: text, reply: body.reply, done, suggestions: body.suggestions ?? [], error: body.error, notes: [] }] } });
+  } catch {
+    set({ ask: { ...state.ask, pending: null, log: [...state.ask.log, { request: text, reply: null, done: [], suggestions: [], error: "The engine is not running.", notes: [] }] } });
+  }
+}
+
+export function answerSuggestion(exchange: number, index: number, yes: boolean) {
+  const log = state.ask.log.map((x, i) => i !== exchange ? x : { ...x, suggestions: x.suggestions.map((sg, k) => k !== index ? sg : { ...sg, answered: (yes ? "yes" : "no") as "yes" | "no" }) });
+  set({ ask: { ...state.ask, log } });
+  const sg = state.ask.log[exchange].suggestions[index];
+  if (yes) send("do_action", { type: sg.type, args: sg.args });
+}
+
+export const undoLast = () => send("undo");
+export const openAsk = () => { if (!send("open_ask")) window.open("../window/index.html?ask=1", "aria-window"); };
+
 export const jumpTo = (bar: number) => send("jump_to", { bar });
 export const openWindow = () => { if (!send("open_window")) window.open("../window/index.html", "aria-window"); };
 export const addMarker = (bar: number) => send("add_marker", { bar, name: "Aria check" });
 
 /** For previews and tests: show a result without the device (window.Aria.showResult in the console). */
 export function showResult(r: Result) { set({ result: r, progress: null, error: null }); }
-if (typeof window !== "undefined") (window as unknown as { Aria: unknown }).Aria = { showResult };
+if (typeof window !== "undefined") (window as unknown as { Aria: unknown }).Aria = { showResult, askMuse: (t: string) => askMuse(t) };
 
 // ---------- plain words for what the engine found (DESIGN.md: words first, numbers as detail) ----------
 

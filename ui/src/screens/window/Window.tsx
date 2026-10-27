@@ -10,8 +10,9 @@ import { GradientCard } from "@/components/ui/gradient-card";
 import { TickGauge } from "@/components/tick-gauge";
 import { CountUp } from "@/components/count-up";
 import { Segmented } from "@/components/ui/segmented";
+import { AskMuse } from "@/components/ask-muse";
 import { problemsOf, type Problem } from "@/lib/problems";
-import { barsLabel, checkMix, describe, jumpTo, notice, soundName, useAria, type Result } from "@/lib/aria";
+import { barsLabel, checkMix, describe, jumpTo, notice, setAskOpen, soundName, useAria, useAriaSnapshot, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
 type View = "home" | "mixcheck";
@@ -61,6 +62,7 @@ export function AriaWindow() {
             : <Simple r={result} open={open} setOpen={setOpen} />}
         </main>
       </div>
+      <AskMuse />
     </div>
   );
 }
@@ -84,7 +86,7 @@ function Rail({ view, setView }: { view: View; setView: (v: View) => void }) {
         {item(null, "Reference", <Columns2 size={18} />)}
       </nav>
       <div className="mt-auto grid gap-1.5">
-        <Button variant="primary" className="h-11 w-full text-sm" onClick={() => notice("Ask Muse is coming next.")}><Mic size={16} /> Ask Muse</Button>
+        <Button variant="primary" className="h-11 w-full text-sm" onClick={() => setAskOpen(!useAriaSnapshot().ask.open)}><Mic size={16} /> Ask Muse</Button>
         <span className="text-xs text-ink-faint">or hold your mapped key</span>
       </div>
     </aside>

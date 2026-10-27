@@ -5,7 +5,7 @@ import { ArrowUpRight, Mic, Play } from "lucide-react";
 import { GradientCard } from "@/components/ui/gradient-card";
 import { MiniWaves } from "@/components/mini-waves";
 import { CountUp } from "@/components/count-up";
-import { checkMix, notice, openWindow, useAria } from "@/lib/aria";
+import { checkMix, openAsk, openWindow, useAria } from "@/lib/aria";
 import { problemsOf } from "@/lib/problems";
 import { cn } from "@/lib/utils";
 
@@ -38,7 +38,7 @@ export function Strip() {
         <button onClick={checkMix} disabled={busy} className={cn(PILL, "bg-action text-on-action disabled:opacity-60")}>
           <Play size={11} fill="currentColor" />{busy ? "Checking" : result ? "Again" : "Check"}
         </button>
-        <button onClick={() => notice("Ask Muse is coming next.")} className={cn(PILL, "bg-white/8 text-ink-muted ring-1 ring-white/10")}><Mic size={12} />Ask</button>
+        <button onClick={openAsk} className={cn(PILL, "bg-white/8 text-ink-muted ring-1 ring-white/10")}><Mic size={12} />Ask</button>
         <button onClick={openWindow} className={cn(PILL, "bg-white/8 text-ink-muted ring-1 ring-white/10")}><ArrowUpRight size={13} />Open</button>
       </div>
 
