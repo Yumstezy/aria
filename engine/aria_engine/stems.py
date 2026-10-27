@@ -168,6 +168,50 @@ def space(sounds, rate):
     return out
 
 
+SPECTRUM_LO, SPECTRUM_HI, SPECTRUM_STEPS_PER_OCT = 30.0, 16000.0, 6
+
+
+def spectra(sounds, rate):
+    """Each sound's average spectrum, for the window's picture of where every part sits.
+
+    About 1/6-octave points from 30 Hz to 16 kHz, averaged over the moments the mix is
+    playing, in dB relative to the mix's loudest point (so the top of the picture is 0).
+    A sound that isn't really in this part of the song is None and isn't drawn."""
+    names = list(sounds)
+    power, totals, freqs = {}, [], None
+    for n in names:
+        freqs, _, z = stft(_mono(sounds[n]), fs=rate, nperseg=N_FFT, noverlap=N_FFT - HOP, boundary=None, padded=False)
+        power[n] = np.abs(z) ** 2
+        totals.append(power[n].sum(axis=0))
+    mix_frames = 10 * np.log10(np.sum(totals, axis=0) + 1e-12)
+    loud = mix_frames >= mix_frames.max() - QUIET_DB
+    mix_level = 10 * np.log10(np.mean(np.sum(totals, axis=0)[loud]) + 1e-12)
+
+    hi = min(SPECTRUM_HI, rate / 2 * 0.95)
+    count = int(np.floor(np.log2(hi / SPECTRUM_LO) * SPECTRUM_STEPS_PER_OCT)) + 1
+    centres = SPECTRUM_LO * 2 ** (np.arange(count) / SPECTRUM_STEPS_PER_OCT)
+    half = 2 ** (0.5 / SPECTRUM_STEPS_PER_OCT)
+
+    def curve(p):
+        mean = p[:, loud].mean(axis=1)
+        out = []
+        for c in centres:
+            idx = (freqs >= c / half) & (freqs < c * half)
+            if not np.any(idx):
+                idx = np.zeros_like(freqs, dtype=bool)
+                idx[np.argmin(np.abs(freqs - c))] = True
+            out.append(10 * np.log10(mean[idx].sum() + 1e-12))
+        return np.array(out)
+
+    mix_curve = curve(sum(power.values()))
+    top = mix_curve.max()
+    parts = {}
+    for n in names:
+        level = 10 * np.log10(np.mean(power[n].sum(axis=0)[loud]) + 1e-12)
+        parts[n] = None if level < mix_level - PRESENT_DB else [round(float(v - top), 1) for v in curve(power[n])]
+    return {"hz": [round(float(c)) for c in centres], "mix": [round(float(v - top), 1) for v in mix_curve], "parts": parts}
+
+
 def bass_clicks(bass, drums, rate, tempo=None, start_beat=None, beats_per_bar=4.0):
     """Sharp top-end bursts at bass note starts that aren't drum hits. Returns [] or [finding]."""
     def bands(sig):

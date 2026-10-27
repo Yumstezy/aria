@@ -44,6 +44,8 @@
   function showEngine(state, detail) {
     var el = $('[data-engine]');
     if (el) {
+      // Only show the engine when it needs attention. When it's up, there's nothing to say.
+      el.hidden = state === 'up';
       el.className = 'cp-tag ' + (state === 'up' ? 'cp-tag-good' : state === 'error' || state === 'down' ? 'cp-tag-hot' : '');
       el.textContent = state === 'up' ? 'Engine connected' : state === 'error' || state === 'down' ? 'Engine not running' : 'Starting Aria';
       el.title = detail || '';

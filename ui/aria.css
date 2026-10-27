@@ -1,4 +1,12 @@
 /* Aria page layout and empty states. Components come from design/ds/components/bundle.css. */
+
+/* Type: Geist everywhere (bundled under the OFL in design/ds/fonts), Helvetica Neue by name as the
+   fallback on a Mac. No Helvetica font files are shipped (CLAUDE.md, Licenses). Ian's call, Oct 27. */
+:root {
+  --font-sans: Geist, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, Menlo, monospace;
+}
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 a { color: inherit; text-decoration: none; }
 
@@ -77,26 +85,44 @@ a { color: inherit; text-decoration: none; }
 .aria-verdict { font-size: 24px; line-height: 30px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
 .aria-verdict-line { font-size: 14px; line-height: 20px; color: var(--ink-muted); }
 
-/* Who owns which space */
-.aria-map { display: grid; grid-template-columns: 120px repeat(4, minmax(0, 1fr)); gap: 6px; align-items: stretch; }
-.aria-map-head { font-size: 12px; font-weight: 600; color: var(--ink); text-align: center; }
-.aria-map-head small { display: block; font: 500 10.5px/14px var(--font-mono); color: var(--ink-faint); }
-.aria-map-part { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; }
-.aria-cell { height: 46px; border-radius: 10px; display: grid; place-items: center; background: var(--well); }
-.aria-cell.is-empty { background: transparent; border: 1.5px dashed var(--hairline); }
-.aria-cell.is-absent { background: transparent; }
-.aria-cell.is-owns { background: color-mix(in srgb, var(--action) 55%, transparent); }
-.aria-cell.is-shares { background: color-mix(in srgb, var(--action) 18%, var(--well)); }
-.aria-cell.is-covered { background: color-mix(in srgb, var(--watch) calc(25% + var(--depth, 0.3) * 55%), transparent); }
-.aria-cell.is-flagged { box-shadow: inset 0 0 0 2px var(--hot); cursor: pointer; }
-.aria-cell.is-flagged:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.aria-cell b { font: 600 12px/1 var(--font-mono); color: var(--ink); }
-.aria-map-key { display: flex; gap: 16px; font-size: 12px; color: var(--ink-muted); }
-.aria-map-key span { display: inline-flex; align-items: center; gap: 6px; }
-.aria-map-key i { width: 14px; height: 10px; border-radius: 3px; }
-.aria-map-key i.is-owns { background: color-mix(in srgb, var(--action) 55%, transparent); }
-.aria-map-key i.is-shares { background: color-mix(in srgb, var(--action) 18%, var(--well)); }
-.aria-map-key i.is-covered { background: color-mix(in srgb, var(--watch) 65%, transparent); }
+/* Where each part sits: a filled frequency curve per part */
+:root, [data-theme="sky"] { --part-vocals: #1f5fd0; --part-other: #7a4fd6; --part-bass: #0f8a83; --part-drums: #6b7a90; --part-mix: #1f5fd0; }
+[data-theme="night"] { --part-vocals: #6cb4ff; --part-other: #b99bff; --part-bass: #4fd1c5; --part-drums: #9aa7b8; --part-mix: #6cb4ff; }
+.aria-waves { width: 100%; height: auto; display: block; }
+.aria-grid { stroke: var(--hairline); stroke-width: 1; }
+.aria-axis { font: 500 10.5px var(--font-mono); fill: var(--ink-faint); }
+.aria-wave-fill { opacity: 0.2; }
+.aria-wave.is-quiet .aria-wave-fill { opacity: 0.06; }
+.aria-wave.is-quiet .aria-wave-line { opacity: 0.35; }
+.aria-wave.is-quiet .aria-wave-name { opacity: 0.5; }
+.aria-wave-line { fill: none; stroke-width: 2; }
+.aria-wave-name { font: 600 11.5px var(--font-sans); }
+.aria-wave.is-vocals .aria-wave-fill, .aria-wave.is-vocals .aria-wave-name { fill: var(--part-vocals); }
+.aria-wave.is-vocals .aria-wave-line { stroke: var(--part-vocals); }
+.aria-wave.is-other .aria-wave-fill, .aria-wave.is-other .aria-wave-name { fill: var(--part-other); }
+.aria-wave.is-other .aria-wave-line { stroke: var(--part-other); }
+.aria-wave.is-bass .aria-wave-fill, .aria-wave.is-bass .aria-wave-name { fill: var(--part-bass); }
+.aria-wave.is-bass .aria-wave-line { stroke: var(--part-bass); }
+.aria-wave.is-drums .aria-wave-fill, .aria-wave.is-drums .aria-wave-name { fill: var(--part-drums); }
+.aria-wave.is-drums .aria-wave-line { stroke: var(--part-drums); }
+.aria-wave.is-mix .aria-wave-fill, .aria-wave.is-mix .aria-wave-name { fill: var(--part-mix); }
+.aria-wave.is-mix .aria-wave-line { stroke: var(--part-mix); }
+.aria-zone { cursor: pointer; }
+.aria-zone rect { fill: var(--hot); opacity: 0.12; }
+.aria-zone text { font: 600 11px var(--font-sans); fill: var(--hot); }
+.aria-zone:hover rect { opacity: 0.2; }
+.aria-wave { animation: aria-rise 900ms ease-out both; }
+@keyframes aria-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.aria-wave-key { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--ink-muted); }
+.aria-wave-key span { display: inline-flex; align-items: center; gap: 6px; }
+.aria-wave-key i { width: 14px; height: 3px; border-radius: 2px; }
+.aria-wave-key .is-vocals i { background: var(--part-vocals); }
+.aria-wave-key .is-other i { background: var(--part-other); }
+.aria-wave-key .is-bass i { background: var(--part-bass); }
+.aria-wave-key .is-drums i { background: var(--part-drums); }
+.aria-wave-key .is-mix i { background: var(--part-mix); }
+.aria-wave-key .is-absent { color: var(--ink-faint); }
+@media (prefers-reduced-motion: reduce) { .aria-wave { animation: none; } }
 
 /* What to fix: one row each, open for the full note */
 .aria-problems { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }

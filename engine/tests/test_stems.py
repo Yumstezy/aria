@@ -86,3 +86,14 @@ def test_space_shows_who_owns_each_range():
 def test_space_marks_absent_sounds():
     sounds = {"vocals": noise(1000, 3500, -75, 1), "drums": noise(1000, 4000, -20, 2), "bass": noise(40, 140, -15, 3)}
     assert stems.space(sounds, RATE)["vocals"] is None
+
+
+def test_spectra_put_each_part_where_it_plays():
+    sounds = {"vocals": noise(1000, 3500, -25, 1), "bass": noise(40, 140, -15, 3), "ghost": noise(1000, 3500, -80, 4)}
+    sp = stems.spectra(sounds, RATE)
+    hz = np.array(sp["hz"])
+    bass, vocals = np.array(sp["parts"]["bass"]), np.array(sp["parts"]["vocals"])
+    assert bass[hz < 120].max() > bass[(hz > 1000) & (hz < 3000)].max() + 30
+    assert vocals[(hz > 1000) & (hz < 3000)].max() > vocals[hz < 120].max() + 30
+    assert sp["parts"]["ghost"] is None
+    assert max(sp["mix"]) == 0.0

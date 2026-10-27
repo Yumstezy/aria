@@ -68,53 +68,116 @@
     });
   }
 
-  function renderMap(r, list) {
-    var map = $('[data-map]'), space = (r.clarity || {}).space;
-    map.textContent = '';
-    $('[data-map-key]').hidden = !space;
-    if (!space) {
-      map.appendChild(el('p', 'cp-meta', 'The space map appears when Aria splits your mix into parts.'));
-      $('[data-map-note]').textContent = '';
-      return;
-    }
-    $('[data-map-note]').textContent = 'vs the rest of the mix';
-    var flagged = {};
-    ((r.clarity || {}).findings || []).forEach(function (f) { if (f.kind === 'masking') flagged[f.masked + ':' + f.range] = f; });
+  var SVG = 'http://www.w3.org/2000/svg';
+  var W = 640, H = 300, PAD_B = 24, PAD_T = 26, LO = 30, HI = 16000, FLOOR_DB = -60;
+  var PART_ORDER = ['drums', 'bass', 'other', 'vocals'];          // drawn back to front
+  var PART_NAME = { vocals: 'Vocal', other: 'Synths and keys', bass: 'Bass', drums: 'Drums and loops', mix: 'Your mix' };
 
-    map.appendChild(el('span', ''));
-    RANGES.forEach(function (rg) {
-      var head = el('span', 'aria-map-head', rg[1]);
-      head.appendChild(el('small', '', rg[2]));
-      map.appendChild(head);
+  function sv(tag, attrs, parent) {
+    var e = document.createElementNS(SVG, tag);
+    Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function X(hz) { return (Math.log10(hz) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO)) * W; }
+  function Y(db) { return PAD_T + (1 - (Math.max(db, FLOOR_DB) - FLOOR_DB) / -FLOOR_DB) * (H - PAD_T - PAD_B); }
+
+  // Smooth curve through points (Catmull-Rom as cubic Bezier)
+  function smooth(pts) {
+    var d = 'M' + pts[0][0].toFixed(1) + ',' + pts[0][1].toFixed(1);
+    for (var i = 0; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      d += 'C' + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + ',' + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) + ' ' +
+           (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + ',' + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) + ' ' +
+           p2[0].toFixed(1) + ',' + p2[1].toFixed(1);
+    }
+    return d;
+  }
+
+  // Display only: average each point with its neighbours (about half an octave) so the
+  // curves read as shapes, not spikes. The engine's numbers stay as measured.
+  function displaySmooth(values) {
+    return values.map(function (v, i) {
+      var a = values[i - 1] === undefined ? v : values[i - 1], b = values[i + 1] === undefined ? v : values[i + 1];
+      return (a + 2 * v + b) / 4;
     });
-    PARTS.forEach(function (p) {
-      map.appendChild(el('span', 'aria-map-part', p[1]));
-      var cells = space[p[0]];
-      RANGES.forEach(function (rg) {
-        var cell = el('span', 'aria-cell');
-        if (!cells) { cell.classList.add('is-absent'); cell.title = p[1] + ' isn\'t playing in these bars.'; map.appendChild(cell); return; }
-        var c = cells[rg[0]];
-        if (!c || !c.lives_here) { cell.classList.add('is-empty'); cell.title = 'Not much ' + p[1].toLowerCase() + ' in this range.'; map.appendChild(cell); return; }
-        var v = c.vs_rest_db;
-        cell.classList.add(v >= OWNS_DB ? 'is-owns' : v > COVERED_DB ? 'is-shares' : 'is-covered');
-        if (v <= COVERED_DB) cell.style.setProperty('--depth', Math.min(1, -v / 15).toFixed(2));
-        cell.title = p[1] + ' sits ' + Math.abs(v).toFixed(1) + ' dB ' + (v >= 0 ? 'over' : 'under') + ' the rest of the mix in ' + rg[2] + '.';
-        var f = flagged[p[0] + ':' + rg[0]];
-        if (f) {
-          cell.classList.add('is-flagged');
-          cell.appendChild(el('b', '', f.gap_db.toFixed(0) + ' dB'));
-          cell.setAttribute('role', 'button');
-          cell.tabIndex = 0;
-          var open = function () {
-            var i = list.findIndex(function (pr) { return pr.findings.indexOf(f) >= 0; });
-            if (i >= 0) toggle(i, true);
-          };
-          cell.addEventListener('click', open);
-          cell.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
-        }
-        map.appendChild(cell);
+  }
+
+  function renderWaves(r, list) {
+    var svg = $('[data-waves]'), key = $('[data-wave-key]'), sp = (r.clarity || {}).spectra;
+    svg.textContent = '';
+    key.textContent = '';
+    if (!sp) { $('[data-waves-note]').textContent = ''; return; }
+    var split = (r.clarity || {}).mode === 'split';
+    $('[data-waves-note]').textContent = split ? 'Each part, split from your mix' : 'Your whole mix';
+
+    // Frequency grid and labels
+    [50, 100, 200, 500, 1000, 2000, 5000, 10000].forEach(function (hz) {
+      sv('line', { x1: X(hz), x2: X(hz), y1: PAD_T - 6, y2: H - PAD_B, 'class': 'aria-grid' }, svg);
+      var t = sv('text', { x: X(hz), y: H - 6, 'class': 'aria-axis', 'text-anchor': 'middle' }, svg);
+      t.textContent = hz >= 1000 ? hz / 1000 + 'k' : hz;
+    });
+
+    // Problem zones behind the waves: where a part is covered, or a ringing note or harsh hits
+    var findings = (r.clarity || {}).findings || [];
+    findings.forEach(function (f) {
+      var lo = f.kind === 'resonance' || f.kind === 'harsh' ? f.hz * 0.92 : f.hz_range[0];
+      var hi = f.kind === 'resonance' || f.kind === 'harsh' ? f.hz * 1.08 : f.hz_range[1];
+      if (f.kind === 'bass_click') return;          // a click is about timing, not where it sits
+      var zone = sv('g', { 'class': 'aria-zone' }, svg);
+      sv('rect', { x: X(lo), y: PAD_T - 6, width: Math.max(4, X(hi) - X(lo)), height: H - PAD_B - PAD_T + 6 }, zone);
+      var label = sv('text', { x: (X(lo) + X(hi)) / 2, y: 14, 'text-anchor': 'middle' }, zone);
+      label.textContent = Aria.describe(f)[0] + ' ' + (f.kind === 'masking' ? f.gap_db.toFixed(0) : '+' + f.size_db.toFixed(0)) + ' dB';
+      zone.addEventListener('click', function () {
+        var i = list.findIndex(function (p) { return p.findings.indexOf(f) >= 0; });
+        if (i >= 0) toggle(i, true);
       });
     });
+
+    // The parts a problem is about stand out; the others step back.
+    var involved = {};
+    findings.forEach(function (f) {
+      if (f.kind === 'masking') involved[f.masked] = true;
+      if (f.kind === 'bass_click') involved.bass = true;
+    });
+    var anyInvolved = Object.keys(involved).length > 0;
+
+    // The waves, back to front, each a filled curve with its name on its peak
+    var names = split ? PART_ORDER.filter(function (n) { return sp.parts[n]; }) : ['mix'];
+    var labels = [];
+    names.forEach(function (n) {
+      var values = displaySmooth(split ? sp.parts[n] : sp.mix);
+      var pts = sp.hz.map(function (hz, i) { return [X(hz), Y(values[i])]; });
+      var line = smooth(pts);
+      var g = sv('g', { 'class': 'aria-wave is-' + n + (anyInvolved && !involved[n] && split ? ' is-quiet' : '') }, svg);
+      sv('path', { d: line + 'L' + W + ',' + (H - PAD_B) + 'L0,' + (H - PAD_B) + 'Z', 'class': 'aria-wave-fill' }, g);
+      sv('path', { d: line, 'class': 'aria-wave-line' }, g);
+      var peak = values.indexOf(Math.max.apply(null, values));
+      labels.push({ g: g, name: PART_NAME[n] || n, x: Math.min(W - 50, Math.max(50, X(sp.hz[peak]))), y: Y(values[peak]) - 6 });
+      var item = el('span', 'is-' + n);
+      item.appendChild(el('i'));
+      item.appendChild(document.createTextNode(PART_NAME[n] || n));
+      key.appendChild(item);
+    });
+    // Names on the peaks, nudged up so no two overlap
+    labels.sort(function (a, b) { return b.y - a.y; });
+    var placed = [];
+    labels.forEach(function (l) {
+      var width = l.name.length * 6.2;
+      placed.forEach(function (p) {
+        if (Math.abs(p.x - l.x) < (width + p.width) / 2 + 4 && Math.abs(p.y - l.y) < 13) l.y = Math.min(l.y, p.y - 13);
+      });
+      l.y = Math.max(PAD_T - 2, l.y);
+      l.width = width;
+      placed.push(l);
+      var t = sv('text', { x: l.x, y: l.y, 'text-anchor': 'middle', 'class': 'aria-wave-name' }, l.g);
+      t.textContent = l.name;
+    });
+    if (split) {
+      Object.keys(sp.parts).forEach(function (n) {
+        if (!sp.parts[n]) key.appendChild(el('span', 'is-absent', (PART_NAME[n] || n) + ': not playing here'));
+      });
+    }
   }
 
   function toggle(i, forceOpen) {
@@ -179,7 +242,7 @@
     var n = list.length;
     $('[data-verdict]').textContent = n === 0 ? 'Nothing sticks out' : n === 1 ? '1 thing to fix' : n + ' things to fix';
     $('[data-verdict-line]').textContent = r.advice ? r.advice.summary : (r.advice_error || '');
-    renderMap(r, list);
+    renderWaves(r, list);
     renderProblems(list);
   }
 
