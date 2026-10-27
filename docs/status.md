@@ -310,12 +310,28 @@ You type a request, Muse Spark picks tools, and Aria does it in Live with Undo. 
 
 Pass: in Live, three typed requests work in a row, each with a working Undo: "jump to bar 17", "add a marker called Drop at bar 33", and "cut 3 dB at 3 kHz".
 
+### Fixes from Ian's first Ask Muse session in Live (Oct 27)
+- **Jump, then Play started from the old spot.** When Live is stopped, Play starts from the start marker, not the playhead. `jump` now moves that too: `Song.start_time` if this Live has it, else a jump to a marker at the bar (adding a temporary one and removing it). The Max console says which way it went (`jump: ...`). **Ian: check this.**
+- **"Cut the mud" did nothing and the strip went blank.** `live.js` crashed: EQ Eight's width knob is named `Q` in Live 12 (`1 Q A`), not `Resonance`. Fixed. A missing knob now gives a clear message, not a crash.
+- **A reply said "done" when nothing happened.** The engine now matches a near track name when only one track fits ("new vocal" finds "NEW VOCAL 2"). A dropped call comes back as a reason ("No track called ... Tracks: ..."), and the reply that claimed it was done is dropped.
+- **The strip went blank on an empty reply.** It now always shows a line: the reply, the error, the reason a call was dropped, or "Muse didn't say anything back."
+- **Hard to see the window and Live together.** The window has two sizes: **Full**, and **Side**, a tall panel docked on the right that floats over Live. The button is next to Check again; the choice is remembered. In Side, everything stacks in one column.
+- **Chat history.** The bridge keeps the Ask Muse history in `~/Library/Application Support/Aria/ask-history.json` (last 100), and both the strip and the window show it. Clear asks once more before it deletes.
+- **Ask inline.** The Ask Muse box and the latest two exchanges sit at the bottom of Mix check.
+- **Voice** isn't in yet. Muse Voice Transcribe works (step 1.4). The open question is the microphone: whether `jweb` can record it, or whether it goes through Live's input.
+
+### The big change: device control
+See `docs/device-control.md`. "Cut the mids using Pro-Q 4", "raise it by .4 dB", "add some spacey reverb", with autocomplete of tracks, devices and plugins. Spike on Oct 28.
+
 ## Next
 - **Ian:**
+  - Re-add `device/Aria.amxd` (the window can now be sized and float).
+  - Try: "jump to bar 17" while stopped, then press Play; "cut the mud on <synth track>"; the Side button.
+  - Send a few `.adv` presets with words for their sound, and your most-used plugins (see `docs/device-control.md`, "From Ian").
   - Re-add `device/Aria.amxd`: the device file changed, because it now has the window.
   - Check mix, then "Open window", and look at Simple and Detailed.
   - The ML data on Oct 27.
-- **Claude:** item 2, Fix it for me with Undo on EQ Eight.
+- **Claude:** the device-control spike (S1 to S5), then `set_param` with Undo.
 
 ## Decisions so far
 - The build started Oct 26.

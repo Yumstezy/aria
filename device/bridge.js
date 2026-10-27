@@ -24,6 +24,14 @@ const ENGINE_DIR = path.join(REPO, "engine");
 const STRIP_URL = "file://" + encodeURI(path.join(REPO, "ui", "dist", "strip", "index.html")) + "?theme=night";
 const WINDOW_URL = "file://" + encodeURI(path.join(REPO, "ui", "dist", "window", "index.html")) + "?theme=night";
 const LOG_DIR = path.join(os.homedir(), "Library", "Logs", "Aria");
+// Ask Muse history, kept across Live sessions. Local to this Mac, never sent anywhere.
+const HISTORY_FILE = path.join(os.homedir(), "Library", "Application Support", "Aria", "ask-history.json");
+const HISTORY_MAX = 100;
+// The window's size and place: "full" (a big window) or "side" (a tall panel docked right,
+// floating over Live so both stay in view). Remembered between sessions.
+const WINDOW_FILE = path.join(os.homedir(), "Library", "Application Support", "Aria", "window.json");
+const FULL = { w: 1200, h: 860 };
+const SIDE_W = 460;
 const REC_DIR = path.join(os.tmpdir(), "aria");
 const BARS = 16;   // 16 bars, so a check covers a whole phrase (Ian, Oct 27)
 const START_TIMEOUT_MS = 20000;
@@ -37,6 +45,7 @@ let busy = false;
 let windowLoaded = false;
 let lastResult = null;    // so a window opened later shows the latest Check mix
 const waiters = {};       // live.js reply name -> resolve function
+let askLog = loadHistory();   // every Ask Muse exchange; the strip and window both show it
 
 const encode = (obj) => encodeURIComponent(JSON.stringify(obj));
 const decode = (s) => JSON.parse(decodeURIComponent(s));
@@ -50,6 +59,35 @@ const toLive = (...args) => Max.outlet("live", ...args);
 const toRec = (...args) => Max.outlet("rec", ...args);
 
 class UserError extends Error {}
+
+// ---------- Ask Muse history ----------
+
+function loadHistory() {
+  try {
+    const log = JSON.parse(fs.readFileSync(HISTORY_FILE, "utf8"));
+    return Array.isArray(log) ? log.slice(-HISTORY_MAX) : [];
+  } catch (e) {
+    return [];   // no history yet, or unreadable: start fresh
+  }
+}
+
+// Save and show. Every change to the log goes through here.
+function logChanged() {
+  askLog = askLog.slice(-HISTORY_MAX);
+  try {
+    fs.mkdirSync(path.dirname(HISTORY_FILE), { recursive: true });
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(askLog));
+  } catch (e) {
+    Max.post(`Couldn't save the Ask Muse history: ${e.message}`);
+  }
+  toUI("ask_log", askLog);
+}
+
+function addNote(text, at = askLog.length - 1) {
+  if (!askLog[at]) return;
+  askLog[at].notes = [...(askLog[at].notes || []), text];
+  logChanged();
+}
 
 // ---------- engine ----------
 
@@ -217,15 +255,53 @@ async function checkMix() {
 Max.addHandler("ready", async () => {
   toUI("engine", engineState);
   if (lastResult) toUI("mix_result", lastResult);
+  toUI("ask_log", askLog);
   try { await ensureEngine(); } catch (e) { setEngine("error", e.message); }
 });
 Max.addHandler("check_mix", () => checkMix());
-Max.addHandler("open_window", () => {
+// ---------- the window ----------
+
+function loadWindowPrefs() {
+  try { return JSON.parse(fs.readFileSync(WINDOW_FILE, "utf8")); } catch (e) { return { mode: "full", screen: null }; }
+}
+
+// Size and place the window for a mode. Side needs the screen size, which only the page knows.
+function placeWindow({ mode, screen }) {
+  let x, y, w, h;
+  if (mode === "side" && screen) {
+    w = SIDE_W;
+    h = Math.max(600, screen.h - 40);
+    x = screen.x + screen.w - w - 8;
+    y = screen.y + 32;
+  } else {
+    ({ w, h } = FULL);
+    x = 120; y = 90;
+  }
+  Max.outlet("window", "window", "size", x, y, x + w, y + h);
+  Max.outlet("window", "window", "flags", mode === "side" ? "float" : "nofloat");
+  Max.outlet("window", "window", "exec");
+  Max.outlet("window", "script", "sendbox", "aria-window-ui", "presentation_rect", 0, 0, w, h);
+}
+
+function showWindow(url) {
   // Load the page every time, so the window always shows the latest UI files.
   // The page says "ready" when it loads, and the bridge replays the latest result.
   windowLoaded = true;
-  Max.outlet("window", "url", WINDOW_URL);
+  Max.outlet("window", "url", url);
+  placeWindow(loadWindowPrefs());
   Max.outlet("window", "front");
+}
+
+Max.addHandler("open_window", () => showWindow(WINDOW_URL));
+Max.addHandler("window_mode", (s) => {
+  const prefs = decode(s);
+  try {
+    fs.mkdirSync(path.dirname(WINDOW_FILE), { recursive: true });
+    fs.writeFileSync(WINDOW_FILE, JSON.stringify(prefs));
+  } catch (e) {
+    Max.post(`Couldn't save the window size: ${e.message}`);
+  }
+  placeWindow(prefs);
 });
 Max.addHandler("jump_to", (s) => toLive("jump", decode(s).bar));
 Max.addHandler("add_marker", async (s) => {
@@ -302,34 +378,41 @@ Max.addHandler("ask", async (s) => {
       try { done.push({ ...action, ...(await apply(action, context.tracks)) }); }
       catch (e) { done.push({ ...action, ok: false, text: e.message }); }
     }
-    toUI("ask_reply", { request: text, reply: res.json.reply, done, suggestions: res.json.suggestions, error: res.json.error });
+    askLog.push({ request: text, reply: res.json.reply, done, suggestions: res.json.suggestions,
+                  problems: res.json.problems || [], error: res.json.error, notes: [], at: Date.now() });
   } catch (e) {
-    toUI("ask_reply", { request: text, reply: null, done: [], suggestions: [], error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
+    askLog.push({ request: text, reply: null, done: [], suggestions: [], problems: [], notes: [], at: Date.now(),
+                  error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
   } finally {
+    toUI("ask_pending", { request: null });
+    logChanged();
     asking = false;
   }
 });
 
-// A suggestion the producer said yes to. Checked by the engine already.
-Max.addHandler("do_action", async (s) => {
-  const action = decode(s);
+// The producer answered one of Muse's suggestions. Yes runs it (the engine already checked it).
+Max.addHandler("answer", async (s) => {
+  const { exchange, index, yes } = decode(s);
+  const sg = askLog[exchange] && askLog[exchange].suggestions[index];
+  if (!sg || sg.answered) return;
+  sg.answered = yes ? "yes" : "no";
+  logChanged();
+  if (!yes) return;
   let out;
-  try { out = await apply(action, (await askContext()).tracks); } catch (e) { out = { ok: false, text: e.message }; }
-  toUI("action_done", { ...action, ...out });
+  try { out = await apply(sg, (await askContext()).tracks); } catch (e) { out = { ok: false, text: e.message }; }
+  addNote(out.text, exchange);
 });
 
 Max.addHandler("undo", async () => {
   let out;
   try { out = await askLive("undo", "undo_done"); } catch (e) { out = { ok: false, text: e.message }; }
-  toUI("undo_done", out);
+  addNote(out.text);
 });
 
+Max.addHandler("clear_history", () => { askLog = []; logChanged(); });
+
 // The strip's Ask opens the window with Ask Muse open.
-Max.addHandler("open_ask", () => {
-  windowLoaded = true;
-  Max.outlet("window", "url", WINDOW_URL + "&ask=1");
-  Max.outlet("window", "front");
-});
+Max.addHandler("open_ask", () => showWindow(WINDOW_URL + "&ask=1"));
 
 // jweb also reports its own status (url loaded and so on). Nothing to do with those.
 Max.addHandler(Max.MESSAGE_TYPES.ALL, () => {});

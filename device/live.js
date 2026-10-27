@@ -102,8 +102,52 @@ function play() {
   if (one(song, "is_playing") !== 1) song.call("start_playing");
 }
 
+// Move the playhead to <bar>. When Live is stopped, Play starts from the start marker
+// (where the producer last clicked), not the playhead, so move that too:
+// Song.start_time where this Live has it, else jump to a marker at the bar
+// (a locator jump moves the start marker), adding a temporary one if there is none.
+let pendingStart = null;
+
 function jump(bar) {
-  song.set("current_song_time", (bar - 1) * beatsPerBar());
+  const beats = (bar - 1) * beatsPerBar();
+  song.set("current_song_time", beats);
+  if (one(song, "is_playing") === 1) return;
+  if (String(song.info).indexOf("property start_time") >= 0) {
+    song.set("start_time", beats);
+    post("jump: start_time " + beats + "\n");
+    return;
+  }
+  const existing = cueAt(beats);
+  if (existing) { existing.call("jump"); post("jump: existing marker\n"); return; }
+  pendingStart = { beats: beats };
+  const t = new LiveAPI(function (args) {
+    if (!pendingStart || args[0] !== "current_song_time" || Math.abs(args[1] - beats) >= 0.01) return;
+    t.property = "";
+    outlet(0, "defer", "start_cue_add");
+  }, "live_set");
+  t.property = "current_song_time";
+}
+
+function start_cue_add() {
+  const c = new LiveAPI(function (args) {
+    if (!pendingStart || args[0] !== "cue_points" || !cueAt(pendingStart.beats)) return;
+    c.property = "";
+    outlet(0, "defer", "start_cue_jump");
+  }, "live_set");
+  c.property = "cue_points";
+  song.call("set_or_delete_cue");
+}
+
+function start_cue_jump() {
+  const cue = pendingStart && cueAt(pendingStart.beats);
+  if (cue) cue.call("jump");
+  outlet(0, "defer", "start_cue_remove");
+}
+
+function start_cue_remove() {
+  if (pendingStart && cueAt(pendingStart.beats)) song.call("set_or_delete_cue");
+  post("jump: temporary marker\n");
+  pendingStart = null;
 }
 
 function cueAt(beats) {
@@ -178,7 +222,10 @@ function name_cue() {
 // ---------- EQ: one bell band on an EQ Eight on Main, with Undo ----------
 
 const EQ_CLASS = "Eq8";
-const BAND_PARAM = /^(\d) (Filter On|Filter Type|Frequency|Gain|Resonance) A$/;
+// EQ Eight's knobs in Live 12: "1 Filter On A", "1 Filter Type A", "1 Frequency A", "1 Gain A", "1 Q A"
+// (found in Live's own resources; the width knob is "Q", not "Resonance")
+const BAND_PARAM = /^(\d) (Filter On|Filter Type|Frequency|Gain|Q) A$/;
+const BAND_KNOBS = ["Filter On", "Filter Type", "Frequency", "Gain", "Q"];
 let pendingEq = null;
 
 function mainTrack() { return new LiveAPI("live_set master_track"); }
@@ -258,7 +305,13 @@ function applyEq(device, added, freq, gain, q, index) {
   }
   if (!band) { send("eq_done", { ok: false, text: "All eight bands on your EQ Eight are in use. Free one, then ask again." }); return; }
   const b = bands[band];
-  const keep = ["Filter On", "Filter Type", "Frequency", "Gain", "Resonance"].map(function (k) {
+  const missing = BAND_KNOBS.filter(function (k) { return !b[k]; });
+  if (missing.length) {
+    post("EQ Eight band " + band + " is missing " + missing.join(", ") + "\n");
+    send("eq_done", { ok: false, text: "Aria couldn't find EQ Eight's " + missing.join(", ") + " knob. Tell Claude: the names changed." });
+    return;
+  }
+  const keep = BAND_KNOBS.map(function (k) {
     return { id: Number(b[k].id), value: one(b[k], "value") };
   });
   undoStack.push({ kind: "eq", params: keep, deviceId: added ? Number(device.id) : null, band: band, track: index === undefined ? -1 : index });
@@ -269,7 +322,7 @@ function applyEq(device, added, freq, gain, q, index) {
   const shown = {
     freq: setByDisplay(b["Frequency"], freq),
     gain: setByDisplay(b["Gain"], gain),
-    q: setByDisplay(b["Resonance"], q)
+    q: setByDisplay(b["Q"], q)
   };
   b["Filter On"].set("value", 1);
   const where = index === undefined || index < 0 ? "Main" : "\"" + one(trackAt(index), "name") + "\"";

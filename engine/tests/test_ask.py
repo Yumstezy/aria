@@ -89,3 +89,19 @@ def test_track_tools_need_a_real_track_name():
     assert out["actions"] == [{"type": "track_volume", "args": {"track": "Vocal", "change_db": 2.0}},
                               {"type": "track_eq", "args": {"track": "LEADS", "freq_hz": 2000, "gain_db": -3.0, "q": 1.0}}]
     assert out["dropped"] == 1
+
+
+def test_a_near_track_name_matches_only_when_one_track_fits():
+    tracks = ["Kick", "NEW VOCAL 2", "Vocal Chops", "Bass"]
+    assert ask.match_track("new vocal", tracks) == "NEW VOCAL 2"
+    assert ask.match_track("  bass ", tracks) == "Bass"
+    assert ask.match_track("vocal", tracks) is None     # two tracks fit, so don't guess
+    assert ask.match_track("Pad", tracks) is None
+
+
+def test_a_dropped_call_says_why_instead_of_claiming_it_was_done():
+    out = ask.ask("make the new vocal louder", TRACKS, client=client_for(msg(
+        "Done, the new vocal is 2 dB louder.", call("track_volume", track="Vox Male 7", change_db=2))))
+    assert out["actions"] == [] and out["reply"] is None
+    assert out["problems"] and 'No track called "Vox Male 7"' in out["problems"][0]
+    assert out["error"] == out["problems"][0]

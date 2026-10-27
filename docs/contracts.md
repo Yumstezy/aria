@@ -246,6 +246,22 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
   - `groove_result {...}`
   - `error {text}`
 
+### Ask Muse messages (as built, Oct 27)
+
+- UI to device:
+  - `ask {text}`: one request. The bridge adds context and calls `POST /muse/ask`.
+  - `answer {exchange, index, yes}`: the producer answered a suggestion. Yes runs it.
+  - `undo`: undo the last change Aria made.
+  - `clear_history`
+  - `open_ask`: open the window with the Ask pop-up open.
+  - `window_mode {mode: "full" | "side", screen: {x, y, w, h}}`: size and place the window. Side floats over Live. Saved in `~/Library/Application Support/Aria/window.json`.
+- Device to UI:
+  - `ask_pending {request | null}`
+  - `ask_log [exchange]`: the whole history, sent on `ready` and on every change. The bridge owns it and saves it in `~/Library/Application Support/Aria/ask-history.json` (last 100).
+  - An exchange is `{request, reply, done: [{type, args, ok, text}], suggestions: [{type, args, why, answered?}], problems: [text], error, notes: [text], at}`.
+
+`POST /muse/ask` returns `{reply, actions, suggestions, dropped, problems, error}`. `problems` gives one plain sentence per dropped call. When calls were dropped and none ran, `reply` is null, so a reply never claims a change that didn't happen.
+
 ## Answer key
 
 `test-pack/answer-key.json`:

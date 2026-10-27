@@ -114,6 +114,27 @@ def _allowed(context, request, actions):
     return allowed
 
 
+def match_track(name, tracks):
+    """The set's track this name means: an exact match ignoring case, else the one track
+    whose name contains it or is contained in it. None when nothing or more than one fits."""
+    want = " ".join(str(name or "").lower().split())
+    if not want:
+        return None
+    for t in tracks:
+        if " ".join(t.lower().split()) == want:
+            return t
+    near = [t for t in tracks if want in t.lower() or t.lower() in want]
+    return near[0] if len(near) == 1 else None
+
+
+def why_dropped(name, args, tracks=()):
+    """One plain sentence on why a call was dropped, for the producer."""
+    if name in ("track_volume", "track_eq") and isinstance(args, dict) and not match_track(args.get("track"), tracks):
+        shown = ", ".join(f'"{t}"' for t in tracks[:8]) or "none"
+        return f'No track called "{args.get("track")}" in this set. Tracks: {shown}.'
+    return f"Muse asked for {name.replace('_', ' ')} with values outside Aria's limits, so Aria skipped it."
+
+
 def check_action(name, args, tracks=()):
     """Return the cleaned args if this call is on the menu and in range, else None.
     Track tools must name a track that exists in the set."""
@@ -121,8 +142,7 @@ def check_action(name, args, tracks=()):
         return None
     try:
         if name in ("track_volume", "track_eq"):
-            names = {t.lower(): t for t in tracks}
-            track = names.get(str(args.get("track", "")).strip().lower())
+            track = match_track(args.get("track"), tracks)
             if not track:
                 return None
             if name == "track_volume":
@@ -148,8 +168,8 @@ def check_action(name, args, tracks=()):
 
 
 def interpret(message, context, request):
-    """Turn Muse's reply into {reply, actions, suggestions, dropped}. Exposed for tests."""
-    actions, suggestions, dropped = [], [], 0
+    """Turn Muse's reply into {reply, actions, suggestions, dropped, problems}. Exposed for tests."""
+    actions, suggestions, dropped, problems = [], [], 0, []
     tracks = [t["name"] if isinstance(t, dict) else str(t) for t in context.get("tracks") or []]
     for call in getattr(message, "tool_calls", None) or []:
         name = call.function.name
@@ -165,10 +185,12 @@ def interpret(message, context, request):
                 suggestions.append({"type": args["action"], "args": inner, "why": why})
             else:
                 dropped += 1
+                problems.append(why_dropped(str(args.get("action")), args.get("args"), tracks))
             continue
         cleaned = check_action(name, args, tracks)
         if cleaned is None:
             dropped += 1
+            problems.append(why_dropped(name, args, tracks))
         else:
             actions.append({"type": name, "args": cleaned})
 
@@ -177,7 +199,9 @@ def interpret(message, context, request):
         allowed = _allowed(context, request, actions + [{"args": s["args"]} for s in suggestions])
         if any(round(n, 2) not in allowed for n in _numbers(reply)):
             reply = None   # cited a number we don't have; the actions themselves still stand
-    return {"reply": reply, "actions": actions, "suggestions": suggestions, "dropped": dropped}
+    if problems and not actions:
+        reply = None   # it would say it was done, and nothing was
+    return {"reply": reply, "actions": actions, "suggestions": suggestions, "dropped": dropped, "problems": problems}
 
 
 # Everyday names for the split parts, so Muse never says "other"
@@ -193,14 +217,14 @@ def friendly(context):
 
 
 def ask(request, context, client=None):
-    """Returns {reply, actions, suggestions, dropped, error}."""
+    """Returns {reply, actions, suggestions, dropped, problems, error}."""
     request = (request or "").strip()
     context = friendly(context or {})
     if not request:
-        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "error": "Say what you'd like Muse to do."}
+        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "problems": [], "error": "Say what you'd like Muse to do."}
     key = os.environ.get("MODEL_API_KEY", "").strip()
     if client is None and not key:
-        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0,
+        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "problems": [],
                 "error": "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."}
     if client is None:
         client = OpenAI(api_key=key, base_url=os.environ.get("MUSE_BASE_URL", "https://api.meta.ai/v1"),
@@ -212,13 +236,14 @@ def ask(request, context, client=None):
             messages=[{"role": "system", "content": PROMPT},
                       {"role": "user", "content": json.dumps({"context": context, "request": request})}])
     except OpenAIError as e:
-        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0,
+        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "problems": [],
                 "error": f"Muse Spark is unavailable right now ({type(e).__name__})."}
     if not res.choices:
-        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "error": "Muse Spark returned an empty reply."}
+        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "problems": [], "error": "Muse Spark returned an empty reply."}
     out = interpret(res.choices[0].message, context, request)
-    out["error"] = None if (out["reply"] or out["actions"] or out["suggestions"]) else "Muse Spark didn't answer that one."
+    out["error"] = (None if (out["reply"] or out["actions"] or out["suggestions"])
+                    else " ".join(out["problems"]) or "Muse Spark didn't answer that one.")
     # Local engine log only (~/Library/Logs/Aria/engine.log): what was asked and what Muse did
     print(f"ask: {request!r} -> actions={out['actions']} suggestions={len(out['suggestions'])} "
-          f"dropped={out['dropped']} reply={out['reply']!r} error={out['error']!r}", flush=True)
+          f"dropped={out['dropped']} problems={out['problems']} reply={out['reply']!r} error={out['error']!r}", flush=True)
     return out

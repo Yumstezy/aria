@@ -6,7 +6,7 @@ import { ArrowUp, ArrowUpRight, Check, Mic, Play, Undo2, X } from "lucide-react"
 import { GradientCard } from "@/components/ui/gradient-card";
 import { MiniWaves } from "@/components/mini-waves";
 import { CountUp } from "@/components/count-up";
-import { askMuse, checkMix, openWindow, undoLast, useAria } from "@/lib/aria";
+import { askMuse, checkMix, openWindow, outcome, undoLast, useAria } from "@/lib/aria";
 import { problemsOf } from "@/lib/problems";
 import { cn } from "@/lib/utils";
 
@@ -38,14 +38,14 @@ function StripAsk({ onClose }: { onClose: () => void }) {
         {ask.pending ? <span className="text-ink-muted">Muse is on it…</span>
           : last ? (
             <>
-              <p className={`m-0 line-clamp-2 ${last.error ? "text-hot" : ""}`}>{last.reply ?? last.error ?? last.notes[last.notes.length - 1]}</p>
+              <p className={`m-0 line-clamp-2 ${outcome(last).bad ? "text-hot" : ""}`}>{outcome(last).text}</p>
               {changed.length > 0 && (
                 <div className="mt-1 flex items-center gap-1.5">
                   <span className="inline-flex min-w-0 items-center gap-1 truncate rounded-full bg-[#5fdba6]/20 px-1.5 text-[10.5px] leading-[18px] text-[#bff7dc]"><Check size={10} className="shrink-0" /><span className="truncate">{changed[changed.length - 1].text}</span></span>
                   {canUndo && <button onClick={undoLast} className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-white px-1.5 text-[10.5px] font-semibold leading-[18px] text-[#0b1a3a]"><Undo2 size={10} />Undo</button>}
                 </div>
               )}
-              {last.notes.length > 0 && last.reply && <p className="m-0 mt-0.5 truncate text-[10.5px] text-ink-faint">{last.notes[last.notes.length - 1]}</p>}
+              {last.notes.length > 0 && <p className="m-0 mt-0.5 truncate text-[10.5px] text-ink-faint">{last.notes[last.notes.length - 1]}</p>}
             </>
           ) : <span className="text-ink-muted">Ask for a change, like "make the vocal easier to hear".</span>}
       </div>

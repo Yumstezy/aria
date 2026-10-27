@@ -43,10 +43,27 @@ export interface Result {
 export interface Progress { step: string; text: string; detail?: string; done?: number; total?: number }
 export type EngineState = "starting" | "up" | "down" | "error";
 
-export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "check_mix" | "undo"; args: Record<string, number | string> }
+export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "track_volume" | "track_eq" | "check_mix" | "undo"; args: Record<string, number | string> }
 export interface Done extends Action { ok: boolean; text: string }
 export interface Suggestion { type: Action["type"]; args: Action["args"]; why: string; answered?: "yes" | "no" }
-export interface Exchange { request: string; reply: string | null; done: Done[]; suggestions: Suggestion[]; error: string | null; notes: string[] }
+export interface Exchange {
+  request: string; reply: string | null; done: Done[]; suggestions: Suggestion[]; error: string | null; notes: string[];
+  problems?: string[];   // calls Aria dropped, and why
+  at?: number;
+}
+
+/** The one line that says how an exchange went, so the strip is never blank. */
+export function outcome(x: Exchange): { text: string; bad: boolean } {
+  if (x.reply) return { text: x.reply, bad: false };
+  if (x.error) return { text: x.error, bad: true };
+  if (x.problems?.length) return { text: x.problems[0], bad: true };
+  const failed = x.done.find((d) => !d.ok);
+  if (failed) return { text: failed.text, bad: true };
+  const did = x.done.filter((d) => d.ok);
+  if (did.length) return { text: did[did.length - 1].text, bad: false };
+  if (x.suggestions.length) return { text: "Muse has a suggestion. Open Ask to see it.", bad: false };
+  return { text: "Muse didn't say anything back. Try asking another way.", bad: true };
+}
 
 interface State {
   ask: { open: boolean; pending: string | null; log: Exchange[] };
@@ -115,10 +132,9 @@ export function connect() {
     on<Result>("mix_result", (r) => set({ result: r, progress: null, error: null }));
     on<{ text: string }>("error", (e) => set({ error: e?.text || "Something went wrong.", progress: null }));
     on<{ bar: number; name: string }>("marker_done", (m) => set({ marker: m }));
-    on<{ request: string }>("ask_pending", (p) => set({ ask: { ...state.ask, open: true, pending: p.request } }));
-    on<Exchange>("ask_reply", (x) => set({ ask: { ...state.ask, pending: null, log: [...state.ask.log, { ...x, notes: [] }] } }));
-    on<Done>("action_done", (d) => addNote(d.text));
-    on<{ ok: boolean; text: string }>("undo_done", (u) => addNote(u.text));
+    on<{ request: string | null }>("ask_pending", (p) => set({ ask: { ...state.ask, pending: p.request } }));
+    // The bridge owns the history (saved on this Mac) and sends all of it on every change.
+    on<Exchange[]>("ask_log", (log) => set({ ask: { ...state.ask, log } }));
     send("ready");   // bridge.js replies with the engine state and the latest result
   } else {
     checkEngine();
@@ -146,12 +162,6 @@ export async function checkMix() {
 
 // ---------- Ask Muse ----------
 
-function addNote(text: string) {
-  const log = [...state.ask.log];
-  if (log.length) log[log.length - 1] = { ...log[log.length - 1], notes: [...log[log.length - 1].notes, text] };
-  set({ ask: { ...state.ask, log } });
-}
-
 export const setAskOpen = (open: boolean) => set({ ask: { ...state.ask, open } });
 
 export async function askMuse(text: string) {
@@ -168,23 +178,29 @@ export async function askMuse(text: string) {
     });
     const body = await res.json();
     const done: Done[] = (body.actions ?? []).map((a: Action) => ({ ...a, ok: false, text: `Would ${a.type.replace("_", " ")} in Live (not connected).` }));
-    set({ ask: { ...state.ask, pending: null, log: [...state.ask.log, { request: text, reply: body.reply, done, suggestions: body.suggestions ?? [], error: body.error, notes: [] }] } });
+    set({ ask: { ...state.ask, pending: null, log: [...state.ask.log, { request: text, reply: body.reply, done, suggestions: body.suggestions ?? [], problems: body.problems ?? [], error: body.error, notes: [] }] } });
   } catch {
     set({ ask: { ...state.ask, pending: null, log: [...state.ask.log, { request: text, reply: null, done: [], suggestions: [], error: "The engine is not running.", notes: [] }] } });
   }
 }
 
 export function answerSuggestion(exchange: number, index: number, yes: boolean) {
+  if (send("answer", { exchange, index, yes })) return;
   const log = state.ask.log.map((x, i) => i !== exchange ? x : { ...x, suggestions: x.suggestions.map((sg, k) => k !== index ? sg : { ...sg, answered: (yes ? "yes" : "no") as "yes" | "no" }) });
   set({ ask: { ...state.ask, log } });
-  const sg = state.ask.log[exchange].suggestions[index];
-  if (yes) send("do_action", { type: sg.type, args: sg.args });
 }
 
 export const undoLast = () => send("undo");
+export const clearHistory = () => { if (!send("clear_history")) set({ ask: { ...state.ask, log: [] } }); };
 export const openAsk = () => { if (!send("open_ask")) window.open("../window/index.html?ask=1", "aria-window"); };
 
 export const jumpTo = (bar: number) => send("jump_to", { bar });
+
+/** Side: a tall panel docked right that floats over Live. Full: the big window. */
+export function setWindowMode(mode: "side" | "full") {
+  const sc = window.screen as Screen & { availLeft?: number; availTop?: number };
+  send("window_mode", { mode, screen: { x: sc.availLeft ?? 0, y: sc.availTop ?? 0, w: sc.availWidth, h: sc.availHeight } });
+}
 export const openWindow = () => { if (!send("open_window")) window.open("../window/index.html", "aria-window"); };
 export const addMarker = (bar: number) => send("add_marker", { bar, name: "Aria check" });
 

@@ -9,7 +9,7 @@
     v8 live.js ──► route defer ──┤ (everything else)
                        └──► deferlow ──► v8 live.js   (Live API changes from notifications)
     live.thisdevice ──► v8 live.js                    (Live API ready)
-    p window: routepass front ──► thispatcher (opens it), else ──► jweb (ui/index.html) ──► out to the bridge
+    p window: routepass front window script ──► thispatcher (open, size, float), else ──► jweb ──► out to the bridge
 
 Run:  python3.11 device/tools/make_aria_amxd.py
 """
@@ -23,8 +23,9 @@ WINDOW_W, WINDOW_H = 1200.0, 860.0
 
 
 def window_patcher(template):
-    """The Aria window: a floating window with its own jweb (ui/index.html).
-    "front" opens it; everything else goes to the page. The page's messages come back out."""
+    """The Aria window: a floating window with its own jweb (ui/dist/window).
+    "front", "window ..." (size, float) and "script ..." (resize the page) go to thispatcher;
+    everything else goes to the page. The page's messages come back out."""
     inner = {k: v for k, v in template.items() if k not in ("boxes", "lines", "project")}
     inner.update({
         "rect": [120.0, 90.0, 120.0 + WINDOW_W, 90.0 + WINDOW_H],
@@ -32,15 +33,16 @@ def window_patcher(template):
         "boxes": [
             {"box": {"id": "w-in", "maxclass": "inlet", "numinlets": 0, "numoutlets": 1, "outlettype": [""],
                      "patching_rect": [8.0, 8.0, 30.0, 30.0]}},
-            obj("w-route", "routepass front", [8.0, 50.0, 90.0, 22.0], 1, 2),   # routepass keeps the word "front" for thispatcher
+            obj("w-route", "routepass front window script", [8.0, 50.0, 180.0, 22.0], 1, 4),   # routepass keeps the first word for thispatcher
             obj("w-this", "thispatcher", [8.0, 90.0, 70.0, 22.0], 1, 2),
-            {"box": {**FONT, "id": "w-ui", "maxclass": "jweb", "numinlets": 1, "numoutlets": 1, "outlettype": [""],
+            {"box": {**FONT, "id": "w-ui", "varname": "aria-window-ui", "maxclass": "jweb", "numinlets": 1, "numoutlets": 1, "outlettype": [""],
                      "patching_rect": [100.0, 90.0, 400.0, 280.0],
                      "presentation": 1, "presentation_rect": [0.0, 0.0, WINDOW_W, WINDOW_H], "rendermode": 0, "url": ""}},
             {"box": {"id": "w-out", "maxclass": "outlet", "numinlets": 1, "numoutlets": 0,
                      "patching_rect": [100.0, 400.0, 30.0, 30.0]}},
         ],
-        "lines": [wire("w-in", "w-route"), wire("w-route", "w-this", 0, 0), wire("w-route", "w-ui", 1, 0), wire("w-ui", "w-out")],
+        "lines": [wire("w-in", "w-route"), wire("w-route", "w-this", 0, 0), wire("w-route", "w-this", 1, 0),
+                  wire("w-route", "w-this", 2, 0), wire("w-route", "w-ui", 3, 0), wire("w-ui", "w-out")],
     })
     return inner
 
