@@ -125,8 +125,29 @@ function setEngine(state, text, extra) {
   toUI("engine", engineState);
 }
 
+// Newest change to the engine's code on disk
+function engineCodeTime() {
+  const dir = path.join(ENGINE_DIR, "aria_engine");
+  try {
+    return Math.max(...fs.readdirSync(dir).filter((f) => f.endsWith(".py")).map((f) => fs.statSync(path.join(dir, f)).mtimeMs / 1000));
+  } catch (e) {
+    return 0;
+  }
+}
+
+// An engine started before the code changed runs the old code. Stop it so a fresh one starts.
+async function stopIfStale(h) {
+  if (!h.pid || !h.code_time || engineCodeTime() <= h.code_time + 1) return false;
+  Max.post(`Engine code changed since it started. Restarting it (pid ${h.pid}).`);
+  try { process.kill(h.pid, "SIGTERM"); } catch (e) { return false; }
+  for (let i = 0; i < 20 && (await health()); i++) await sleep(250);
+  engineChild = null;
+  return true;
+}
+
 async function ensureEngine() {
   let h = await health();
+  if (h && (await stopIfStale(h))) h = null;
   if (h) { setEngine("up", "Engine connected", { muse: h.muse }); return h; }
 
   if (!fs.existsSync(path.join(ENGINE_DIR, ".venv", "bin", "uvicorn"))) {

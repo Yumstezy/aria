@@ -323,14 +323,35 @@ function shapeValue(param, opts) {
   return fits[0].i;
 }
 
+// A band that's on but changes nothing: a bell or shelf at 0 dB (cuts and notches always change the sound)
+function isFlat(b) {
+  const type = String(b["Filter Type"].call("str_for_value", one(b["Filter Type"], "value")));
+  if (!/bell|shelf/i.test(type)) return false;
+  const g = displayed(b["Gain"], one(b["Gain"], "value"));
+  return g !== null && Math.abs(g) < 0.05;
+}
+
 function applyEq(device, added, freq, gain, q, index, opts) {
   opts = opts || { shape: "bell", steep: false };
   const bands = bandParams(device);
   const order = BAND_ORDER[opts.shape];
   let band = null;
-  for (let i = 0; i < order.length; i++) {
+  // A cut replaces the cut already there ("make it a hard cut"), so two never stack
+  if (/_cut$/.test(opts.shape)) {
+    for (let i = 0; i < order.length && !band; i++) {
+      const b = bands[order[i]];
+      if (b && b["Filter On"] && one(b["Filter On"], "value") === 1 &&
+          SHAPES[opts.shape].test(String(b["Filter Type"].call("str_for_value", one(b["Filter Type"], "value"))))) band = order[i];
+    }
+  }
+  // A free band: switched off, or on but doing nothing (a fresh EQ Eight has bands 1 to 4 on, flat at 0 dB)
+  for (let i = 0; i < order.length && !band; i++) {
     const b = bands[order[i]];
-    if (b && b["Filter On"] && one(b["Filter On"], "value") === 0) { band = order[i]; break; }
+    if (b && b["Filter On"] && one(b["Filter On"], "value") === 0) band = order[i];
+  }
+  for (let i = 0; i < order.length && !band; i++) {
+    const b = bands[order[i]];
+    if (b && b["Filter Type"] && b["Gain"] && isFlat(b)) band = order[i];
   }
   if (!band) { send("eq_done", { ok: false, text: "The EQ Eight bands for that are all in use. Free one, then ask again." }); return; }
   const b = bands[band];

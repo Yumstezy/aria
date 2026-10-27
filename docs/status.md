@@ -323,6 +323,10 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
   - Muse sees the last 3 exchanges, so "it" works.
   - The prompt says to call a tool for every part of a request and to describe only what it called. Em dashes are stripped from replies.
   - Replayed against Muse Spark, Ian's three requests from the log now each call the right tools.
+- **Third session (Oct 27): the engine was running old code.** It had started at 12:44, so the EQ shapes never reached Muse. It asked "how many dB?" and then made a -6 dB bell. Fixes:
+  - `/health` now reports the engine's pid and when its code was loaded. The bridge restarts the engine when the code on disk is newer.
+  - A cut reuses the cut already on the track instead of stacking a second one.
+  - A band that's on but flat (a fresh EQ Eight has bands 1 to 4 on at 0 dB) counts as free.
 - **Voice** isn't in yet. Muse Voice Transcribe works (step 1.4). The open question is the microphone: whether `jweb` can record it, or whether it goes through Live's input.
 
 ### The big change: device control

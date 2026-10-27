@@ -14,6 +14,9 @@ import soundfile as sf
 from aria_engine import __version__, analysis, ask, clarity, muse, split, stems
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
+# When the code this engine runs was last changed. The bridge compares it with the files on disk
+# and restarts an engine that's running old code (a Live session can outlive an update).
+CODE_TIME = max(f.stat().st_mtime for f in Path(__file__).parent.glob("*.py"))
 MAX_FILE_BYTES = 500 * 1024 * 1024
 
 @asynccontextmanager
@@ -61,6 +64,8 @@ def health():
     return {
         "status": "ok",
         "version": __version__,
+        "pid": os.getpid(),
+        "code_time": CODE_TIME,
         "muse": {
             "key_set": bool(os.environ.get("MODEL_API_KEY", "").strip()),
             "model": os.environ.get("MUSE_MODEL") or None,
