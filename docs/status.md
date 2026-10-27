@@ -181,12 +181,28 @@ Pass condition (from `docs/build-steps.md`): `uvicorn` serves `/health`, `pytest
 4. Open `ui/index.html` in Chrome. It should look like `design/screens/01-home.png`, but with empty states instead of numbers, and show "Engine connected".
 5. Stop the engine and reload the page. It should say the engine isn't running.
 
+## Done: Step 3, clarity in master mode (Oct 26)
+
+- `engine/aria_engine/clarity.py` finds ringing notes (resonances), low-mid build-ups and harsh hits in the recording, each with a frequency, bars, size in dB and share of the time.
+- **On generated noise:** clean pink noise gives no findings. Each planted problem is found where it was planted.
+- **On Ian's own stems** (BELIEVE IT, summed, bars 93 to 108; local only, not in git):
+  - The plain mix gives one finding: harsh hits at about 2.1 kHz from bar 98, 7.9 dB above the band. **Ian to check by ear.**
+  - A planted +9 dB at 340 Hz is found first, at 339 Hz.
+  - A planted +6 to +9 dB build-up at 200 to 400 Hz is found at the right bar in 5 of 6 placements. **Known limit:** +6 dB over only the last 4 of 16 bars was missed. A change has to last a few bars to stand out from the music's own bar-to-bar movement of 5 to 10 dB.
+- **Design lessons:**
+  - Measuring a band against the whole mix flagged the drop itself (the sub coming in) as a build-up, so bands are compared with their neighbours instead.
+  - Judging bar by bar was noise, so build-ups use a change point over averages.
+- **On Ian's latest real Check mix** nothing stuck out, and Muse said so instead of inventing a problem.
+- **Muse advises on findings with a fix,** for example a -4.5 dB narrow cut at 339 Hz, in about 2 s. The validator now accepts "around 340 Hz" for a measured 339 Hz. Before that change it rejected 3 replies in 4.
+- **The strip shows "What sticks out":** rows you can click to jump the playhead.
+
 ## Next
-- **Claude:** Step 3, clarity in master mode (resonances, build-ups, harsh spots, with bars). Then Step 4, Aria Ear and track clashes.
 - **Ian:**
-  - Confirm the marker naming.
-  - Say whether the stems in `~/Downloads/BELIEVE IT STEMS` are his to use. If yes, Claude builds test mixes with planted problems from them, kept out of git unless Ian says otherwise.
-- **ML teammate:** follow `ml/README.md`. Ian provides the EDM mixes. Send Claude his GitHub username for an invite.
+  - Reload Aria and try Check mix on a busy section.
+  - Listen at bar 98 of BELIEVE IT for the 2.1 kHz hits.
+  - Confirm the "Aria check" marker name.
+- **Claude:** Step 4, Aria Ear and track clashes (key tracks mode).
+- **ML teammate:** `ml/README.md`. Send Claude his GitHub username.
 
 ## Decisions so far
 - The build started Oct 26.
