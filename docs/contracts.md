@@ -78,7 +78,44 @@ With no reference, the engine compares nothing. It returns what it measured and 
 - `width` is the side share of the band's energy: 0 is mono, 1 is all side.
 - `advice` is `null` when there's no key, the call fails, or nothing valid comes back. `advice_error` then says why in plain words. There is no fallback text.
 - Validation drops any advice note that cites a number not in `measured` or the request, or that says "too X" without a reference.
-- Sending `reference_path` returns 501 until build step 4.
+- Sending `reference_path` returns 501 until build step 8.
+
+### Clarity findings (build step 3, master mode)
+
+`/mix/analyze` also returns what sticks out in the recording, and takes `beats_per_bar` so findings map to bars:
+
+```json
+"clarity": {
+  "mode": "master",
+  "bars": [93, 108],
+  "findings": [
+    { "kind": "resonance", "hz": 339, "hz_range": [329, 349], "size_db": 9.7, "share": 0.97, "bars": [93, 108] },
+    { "kind": "buildup", "hz_range": [247, 311], "size_db": 6.5, "share": 0.5, "bars": [101, 108] },
+    { "kind": "harsh", "hz": 2153, "hz_range": [2091, 2216], "size_db": 7.9, "bursts_per_bar": 1.2, "share": 0.05, "bars": [98, 108] }
+  ]
+}
+```
+
+- **`resonance`:** a narrow peak `size_db` above its 1-octave neighbourhood, for `share` of the frames with content.
+- **`buildup`:** a 1/3-octave band between 120 Hz and 1 kHz whose average from `bars[0]` is `size_db` higher against its neighbours, and in itself.
+- **`harsh`:** bursts between 2 and 6 kHz at least 6 dB above that band's usual margin, `bursts_per_bar` times per bar.
+- At most 3 findings, strongest first. An empty list means nothing stuck out. It is never padded.
+- `unmeasured` replaces `findings` content when the recording is too short.
+
+Advice is now about the findings:
+
+```json
+"advice": {
+  "summary": "A ringing note around 339 Hz sticks out most in these bars.",
+  "notes": [ { "finding": 0, "kind": "resonance",
+               "text": "It sits 9.7 dB above the frequencies around it for 97 percent of the time.",
+               "fix": { "type": "eq_band", "freq_hz": 339, "gain_db": -4.5, "q": 6.0 } } ]
+}
+```
+
+- `finding` indexes `clarity.findings`. Notes pointing at a missing finding, or of the wrong kind, are dropped.
+- `fix` is null, or an `eq_band` cut inside the finding's frequency range, between -6 and -0.5 dB, Q between 0.3 and 12. Anything else is dropped.
+- Numbers in the text must come from the measurements, the findings or the fix. A frequency may be rounded to 10 Hz or given inside a finding's range ("around 340 Hz").
 
 ```json
 {

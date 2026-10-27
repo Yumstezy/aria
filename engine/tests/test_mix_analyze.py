@@ -21,8 +21,8 @@ def test_analyze_returns_measurements_and_says_why_no_advice(tmp_path, monkeypat
 def test_analyze_passes_measurements_to_muse(tmp_path, monkeypatch):
     seen = {}
 
-    def fake_advise(measured, context):
-        seen.update(measured=measured, context=context)
+    def fake_advise(measured, context, findings=None):
+        seen.update(measured=measured, context=context, findings=findings)
         return {"summary": "ok", "notes": []}, None
 
     monkeypatch.setattr(muse, "advise", fake_advise)
@@ -31,6 +31,8 @@ def test_analyze_passes_measurements_to_muse(tmp_path, monkeypatch):
     assert body["advice_by"] == "Muse Spark"
     assert seen["context"] == {"bars": 8, "tempo": 150.0}
     assert seen["measured"] == body["measured"]
+    assert seen["findings"] == body["clarity"]["findings"]
+    assert body["clarity"]["mode"] == "master"
 
 
 def test_silent_recording_skips_muse(tmp_path, monkeypatch):

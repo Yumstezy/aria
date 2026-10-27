@@ -65,29 +65,6 @@
 
   // ---------- strip states ----------
 
-  function fmt(value, unit, digits) {
-    if (value === null || value === undefined) return null;
-    var n = Number(value).toFixed(digits === undefined ? 1 : digits);
-    return unit ? n + ' ' + unit : n;
-  }
-
-  // Number large, unit small, so values fit Live's narrow strip.
-  function setMeasure(key, value, reason) {
-    var el = $('[data-measure="' + key + '"]');
-    if (!el) return;
-    el.textContent = '';
-    el.classList.toggle('is-missing', value === null);
-    el.title = value === null ? (reason || '') : '';
-    if (value === null) { el.textContent = 'Not measured'; return; }
-    var parts = String(value).split(' ');
-    el.appendChild(document.createTextNode(parts[0]));
-    if (parts[1]) {
-      var unit = document.createElement('small');
-      unit.textContent = ' ' + parts.slice(1).join(' ');
-      el.appendChild(unit);
-    }
-  }
-
   function stripState(state) {
     ['idle', 'progress', 'result', 'error'].forEach(function (s) { show('[data-state="' + s + '"]', s === state); });
   }
@@ -104,8 +81,6 @@
   }
 
   function showResult(r) {
-    var m = r.measured || {};
-    var why = m.unmeasured || {};
     stripState('result');
     text('[data-result-where]', r.start_bar ? 'Bars ' + r.start_bar + ' to ' + (r.start_bar + (r.recording.bars || 8) - 1) : 'Your recording');
     // Aria hears only what comes before it. Say so when that isn't the whole mix.
@@ -118,18 +93,7 @@
       where.title = !c ? '' : !c.on_main ? 'Aria is on "' + c.track + '", so it only hears that track. Put it on Main.'
         : c.after.length ? 'Aria hears your mix before ' + c.after.join(', ') + '. Drag Aria to the end of Main to measure what listeners hear.' : '';
     }
-    setMeasure('loudness', fmt(m.integrated_lufs, 'LUFS'), why.integrated_lufs || why.all);
-    setMeasure('peak', fmt(m.true_peak_dbtp, 'dBTP'), why.all);
-    ['bass', 'mids', 'treble'].forEach(function (b) {
-      setMeasure(b, fmt((m.bands_db || {})[b], 'dB'), why['bands_db.' + b] || why.all);
-    });
-    var w = m.width || {};
-    // Width per band as a percentage of side energy: Bass · Mids · Treble.
-    var widths = ['bass', 'mids', 'treble'].map(function (b) { return w[b] === null || w[b] === undefined ? null : Math.round(w[b] * 100); });
-    setMeasure('width', widths.every(function (x) { return x === null; }) ? null : widths.map(function (x) { return x === null ? 'n/a' : x; }).join('·') + ' %',
-      why['width.mids'] || why.all);
-    var wEl = $('[data-measure="width"]');
-    if (wEl && !wEl.classList.contains('is-missing')) wEl.title = 'Side share of each band: Bass · Mids · Treble. 0% is mono.';
+    renderFindings((r.clarity || {}).findings || []);
 
     text('[data-advice-title]', r.advice ? 'Advice by Muse Spark' : 'No advice');
     text('[data-advice]', r.advice ? r.advice.summary : r.advice_error || 'Muse Spark did not answer.');
@@ -142,6 +106,36 @@
     if (mark) { mark.setAttribute('data-bar', r.start_bar); mark.disabled = false; mark.textContent = 'Mark bar ' + r.start_bar + ' in Live'; }
     var btn = $('[data-action="check-mix"]');
     if (btn) { btn.disabled = false; btn.textContent = 'Check again'; }
+  }
+
+  // Everyday names for what the engine found (DESIGN.md: plain words first, numbers as detail).
+  var KIND_WORD = { resonance: 'Ringing note', buildup: 'Build-up', harsh: 'Harsh hits' };
+
+  function hz(v) { return v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz'; }
+
+  function renderFindings(findings) {
+    var list = $('[data-findings]');
+    if (!list) return;
+    list.textContent = '';
+    show('[data-clear]', findings.length === 0);
+    findings.forEach(function (f) {
+      var li = document.createElement('li');
+      var btn = document.createElement('button');
+      btn.className = 'aria-finding';
+      btn.title = 'Bars ' + f.bars[0] + (f.bars[1] !== f.bars[0] ? ' to ' + f.bars[1] : '') + '. Click to jump there.';
+      var where = f.kind === 'buildup' ? hz(f.hz_range[0]) + ' to ' + hz(f.hz_range[1]) : hz(f.hz);
+      [['aria-finding-kind', KIND_WORD[f.kind] || f.kind], ['aria-finding-hz', where],
+       ['aria-finding-size', '+' + Number(f.size_db).toFixed(1) + ' dB'],
+       ['aria-finding-bars', 'bar ' + f.bars[0]]].forEach(function (p) {
+        var span = document.createElement('span');
+        span.className = p[0];
+        span.textContent = p[1];
+        btn.appendChild(span);
+      });
+      btn.addEventListener('click', function () { send('jump_to', { bar: f.bars[0] }); });
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
   }
 
   function showError(e) {

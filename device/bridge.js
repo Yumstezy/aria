@@ -187,7 +187,7 @@ async function checkMix() {
 
     toUI("progress", { step: "analyze", text: "Measuring and asking Muse Spark" });
     const res = await request("POST", "/mix/analyze",
-      { mix_path: file, start_beat: live.song_beat, tempo: live.tempo, bars: BARS }, ANALYZE_TIMEOUT_MS);
+      { mix_path: file, start_beat: live.song_beat, tempo: live.tempo, bars: BARS, beats_per_bar: live.beats_per_bar }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
     }

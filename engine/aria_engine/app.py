@@ -7,8 +7,9 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import soundfile as sf
 
-from aria_engine import __version__, analysis, muse
+from aria_engine import __version__, analysis, clarity, muse
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 MAX_FILE_BYTES = 500 * 1024 * 1024
@@ -64,6 +65,7 @@ class MixRequest(BaseModel):
     start_beat: Optional[float] = None
     tempo: Optional[float] = None
     bars: Optional[int] = None
+    beats_per_bar: Optional[float] = None
     reference_path: Optional[str] = None
 
 
@@ -86,20 +88,25 @@ def mix_analyze(req: MixRequest):
         raise HTTPException(501, "Comparing with a reference isn't built yet.")
 
     try:
-        measured = analysis.measure(str(path))
-    except analysis.AnalysisError as e:
-        raise HTTPException(400, str(e))
+        audio, rate = sf.read(str(path), always_2d=True, dtype="float64")
+    except (RuntimeError, sf.LibsndfileError) as e:
+        raise HTTPException(400, f"Can't read {path.name} as audio: {e}")
+    measured = analysis.measure_array(audio, rate)
+    found = clarity.analyze(audio, rate, tempo=req.tempo, start_beat=req.start_beat,
+                            beats_per_bar=req.beats_per_bar or 4.0)
+    found["mode"] = "master"
 
     context = {k: v for k, v in {"bars": req.bars, "tempo": req.tempo}.items() if v is not None}
     if "all" in measured["unmeasured"]:
         advice, advice_error = None, "Nothing to advise on: " + measured["unmeasured"]["all"]
     else:
-        advice, advice_error = muse.advise(measured, context)
+        advice, advice_error = muse.advise(measured, context, findings=found["findings"])
 
     return {
         "recording": {"path": str(path), "start_beat": req.start_beat, "tempo": req.tempo, "bars": req.bars},
         "reference": None,
         "measured": measured,
+        "clarity": found,
         "advice": advice,
         "advice_by": "Muse Spark" if advice else None,
         "advice_error": advice_error,

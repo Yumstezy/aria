@@ -1,8 +1,10 @@
-"""Muse Spark client. Turns measurements into advice JSON, or says why it can't.
+"""Muse Spark client. Turns clarity findings into advice JSON, or says why it can't.
 
-Muse Spark gets measured numbers only. Its reply is validated, and any note that
-breaks the rules is dropped. If there's no key, the call fails, or nothing valid
-comes back, advice is None with the reason. There is no canned fallback text.
+Muse Spark gets measured numbers only: the clarity findings (what sticks out, where,
+by how much) plus loudness as background. Advice is about clarity, never loudness.
+Its reply is validated, and anything that breaks the rules is dropped. If there's no
+key, the call fails, or nothing valid comes back, advice is None with the reason.
+There is no canned fallback text.
 """
 import json
 import os
@@ -10,60 +12,100 @@ import re
 
 from openai import OpenAI, OpenAIError
 
-ASPECTS = {"loudness", "true_peak", "bass", "mids", "treble", "width"}
+KINDS = {"resonance", "buildup", "harsh"}
 TIMEOUT_SEC = 20
 MAX_TOKENS = 1500
+# A cut Muse may suggest, within the action menu in docs/contracts.md (eq_band gain -6 to +6 dB)
+CUT_DB = (-6.0, -0.5)
+Q_RANGE = (0.3, 12.0)
 
 # Without a reference there is nothing to compare against, so these verdicts are off limits.
 COMPARISON = re.compile(r"\btoo (bright|dark|dull|quiet|loud|wide|narrow|thin|muddy|harsh|boomy|light|heavy)\b", re.I)
 # Numbers the advice may cite besides measured values: 0 dBTP, band edges in Hz and kHz.
 CONSTANTS = {0.0, 250.0, 2.0, 2000.0}
 
-PROMPT_NO_REFERENCE = """You are Aria, a calm co-producer inside Ableton Live, talking to a music producer.
-You get measurements of a few bars of their mix as JSON. Use only those numbers. Never invent a number.
-A field that is null was not measured. Don't guess it.
+PROMPT = """You are Aria, a calm co-producer inside Ableton Live, talking to an EDM producer.
+A good mix is clear: every sound has its own space. Your job is to explain what sticks out in their mix
+and how to make space. Loudness and true peak are background only. Never build advice around them.
 
-There is no reference track yet, so you can't judge the mix against anything:
-- Never say anything is too bright, too quiet, too wide or similar.
-- You may describe what was measured in plain words: which band carries the most energy, whether the mix is mostly centred or spread wide (width 0 is mono, 1 is all side).
-- You may flag what is objectively true without a reference: a true peak above 0 dBTP will clip on export.
+You get JSON:
+- "findings": what Aria measured sticking out in a few bars of the mix, strongest first. Each has a kind:
+  - "resonance": a narrow peak at "hz" standing "size_db" above its neighbouring frequencies for "share" of the time
+  - "buildup": the range "hz_range" growing "size_db" louder than its neighbours from the first of "bars"
+  - "harsh": short bursts at "hz", "size_db" above that band's usual level, "bursts_per_bar" times per bar
+  "bars" is [first, last]. "share" is a fraction (0.97 means 97 percent of the time).
+- "measured": loudness and band levels, for background.
 
-How to write:
-- Producer words, not engineer words: Bass, Mids, Treble, Loudness, Width.
-- Plain words first, then the number as detail, written with its sign and unit like -9.1 LUFS or 0.4 dBTP.
+Rules:
+- Use only numbers from the JSON. Never invent a number.
+- There is no reference track. Never say "too bright", "too muddy" or similar. Say what sticks out and by how much.
+- Producer words first, numbers as detail: "a ringing note around 340 Hz", then "9.7 dB above the frequencies around it".
+- Say what it means for a listener in a few words.
+- For each finding, one concrete fix. If it's an EQ cut, also give it as "fix": {"type": "eq_band", "freq_hz": number inside the finding's range, "gain_db": a cut from -6 to -0.5, "q": 0.3 to 12}.
+- If there are no findings, say nothing stuck out in these bars, and that Key tracks mode (Aria Ear on the main tracks) can show which sounds clash.
 - Short sentences. No emojis, no exclamation marks, no em dashes.
-- The summary is the one most useful thing to know. If nothing is wrong objectively, say so and suggest loading a track they want to sound like, so Aria can compare.
-- One note per aspect at most, and skip aspects with nothing useful to say.
 
-Answer with JSON only, in this shape:
-{"summary": "one sentence", "notes": [{"aspect": "loudness|true_peak|bass|mids|treble|width", "text": "one sentence", "uses": ["measured field names you relied on"]}]}"""
+Answer with JSON only:
+{"summary": "one sentence, the most useful thing to know",
+ "notes": [{"finding": 0, "kind": "resonance|buildup|harsh", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
 
 
 def _numbers(text):
     return [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", text)]
 
 
-def _allowed_numbers(measured, context):
+def _allowed_numbers(measured, context, findings):
     allowed = set(CONSTANTS)
 
     def add(v):
+        if isinstance(v, bool):
+            return
         if isinstance(v, (int, float)):
             for x in (v, abs(v)):
                 allowed.update({round(x, 2), round(x, 1), float(round(x))})
+        elif isinstance(v, (list, tuple)):
+            for x in v:
+                add(x)
+        elif isinstance(v, dict):
+            for x in v.values():
+                add(x)
 
-    for k, v in measured.items():
-        if isinstance(v, dict):
-            for vv in v.values():
-                add(vv)
-        else:
-            add(v)
-    for v in context.values():
-        add(v)
+    add({k: v for k, v in measured.items() if k != "unmeasured"})
+    add(context)
+    for f in findings:
+        add(f)
+        if "share" in f:
+            add(round(f["share"] * 100))                     # 0.97 -> "97 percent"
+        for hz in [f.get("hz")] + list(f.get("hz_range") or []):
+            if hz:
+                add(round(hz, -1))                           # 339 Hz -> "around 340 Hz"
+                add(round(hz / 1000, 1))                     # 2153 Hz -> "2.2 kHz"
+                add(round(hz / 1000, 2))
     return allowed
 
 
-def validate(raw, measured, context, has_reference):
-    """Return (advice, error). Drops any note that cites a number we didn't measure."""
+def _in_measured_range(n, findings):
+    """A frequency inside a finding's measured range ("around 340 Hz" for 329 to 349 Hz)."""
+    return any(f.get("hz_range") and f["hz_range"][0] <= n <= f["hz_range"][1] for f in findings)
+
+
+def _valid_fix(fix, finding):
+    """An eq_band cut inside the finding's frequency range and the action menu's limits."""
+    if not isinstance(fix, dict) or fix.get("type") != "eq_band":
+        return None
+    try:
+        freq, gain, q = float(fix["freq_hz"]), float(fix["gain_db"]), float(fix["q"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    lo, hi = finding.get("hz_range") or [finding.get("hz"), finding.get("hz")]
+    if not (lo * 0.9 <= freq <= hi * 1.1 and CUT_DB[0] <= gain <= CUT_DB[1] and Q_RANGE[0] <= q <= Q_RANGE[1]):
+        return None
+    return {"type": "eq_band", "freq_hz": round(freq), "gain_db": round(gain, 1), "q": round(q, 1)}
+
+
+def validate(raw, measured, context, findings, has_reference=False):
+    """Return (advice, error). Drops any note that cites a number we didn't measure,
+    judges without a reference, or points at a finding that doesn't exist."""
     try:
         data = json.loads(raw or "")
     except json.JSONDecodeError:
@@ -71,29 +113,36 @@ def validate(raw, measured, context, has_reference):
     if not isinstance(data, dict) or not isinstance(data.get("summary"), str) or not data["summary"].strip():
         return None, "Muse Spark's reply had no summary."
 
-    allowed = _allowed_numbers(measured, context)
+    allowed = _allowed_numbers(measured, context, findings)
 
-    def ok(text):
-        if any(round(n, 2) not in allowed for n in _numbers(text)):
+    def ok(text, extra=()):
+        if any(round(n, 2) not in allowed | set(extra) and not _in_measured_range(n, findings) for n in _numbers(text)):
             return False
         return has_reference or not COMPARISON.search(text)
 
-    if not ok(data["summary"]):
-        return None, "Muse Spark's summary used a number or a comparison we didn't measure."
-
     notes = []
     for n in data.get("notes") or []:
-        if not isinstance(n, dict) or n.get("aspect") not in ASPECTS or not isinstance(n.get("text"), str):
+        if not isinstance(n, dict) or not isinstance(n.get("text"), str):
             continue
-        if not ok(n["text"]):
+        i = n.get("finding")
+        if not isinstance(i, int) or not 0 <= i < len(findings) or n.get("kind") != findings[i]["kind"]:
             continue
-        notes.append({"aspect": n["aspect"], "text": n["text"].strip(),
-                      "uses": [u for u in n.get("uses") or [] if isinstance(u, str)]})
+        fix = _valid_fix(n.get("fix"), findings[i])
+        extra = {round(v, 2) for v in (fix or {}).values() if isinstance(v, (int, float))}
+        extra |= {round(abs(v), 2) for v in extra}
+        if not ok(n["text"], extra):
+            continue
+        notes.append({"finding": i, "kind": n["kind"], "text": n["text"].strip(), "fix": fix})
+
+    fix_numbers = {round(abs(v), 2) for n in notes for v in (n["fix"] or {}).values() if isinstance(v, (int, float))}
+    if not ok(data["summary"], fix_numbers | {-x for x in fix_numbers}):
+        return None, "Muse Spark's summary used a number or a comparison we didn't measure."
     return {"summary": data["summary"].strip(), "notes": notes}, None
 
 
-def advise(measured, context, client=None):
-    """Ask Muse Spark for advice on measured numbers. Returns (advice, error)."""
+def advise(measured, context, findings=None, client=None):
+    """Ask Muse Spark for clarity advice on measured findings. Returns (advice, error)."""
+    findings = findings or []
     key = os.environ.get("MODEL_API_KEY", "").strip()
     if client is None and not key:
         return None, "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."
@@ -102,14 +151,14 @@ def advise(measured, context, client=None):
         client = OpenAI(api_key=key, base_url=os.environ.get("MUSE_BASE_URL", "https://api.meta.ai/v1"),
                         timeout=TIMEOUT_SEC, max_retries=1)
     model = os.environ.get("MUSE_MODEL", "muse-spark-1.3")
-    payload = {**context, "reference": None, "measured": {k: v for k, v in measured.items() if k != "unmeasured"},
-               "not_measured": measured.get("unmeasured", {})}
+    payload = {**context, "reference": None, "findings": findings,
+               "measured": {k: v for k, v in measured.items() if k != "unmeasured"}}
 
     try:
         res = client.chat.completions.create(
             model=model, max_tokens=MAX_TOKENS, reasoning_effort="minimal",
             response_format={"type": "json_object"},
-            messages=[{"role": "system", "content": PROMPT_NO_REFERENCE},
+            messages=[{"role": "system", "content": PROMPT},
                       {"role": "user", "content": json.dumps(payload)}])
     except OpenAIError as e:
         return None, f"Muse Spark is unavailable right now ({type(e).__name__})."
@@ -117,4 +166,4 @@ def advise(measured, context, client=None):
     raw = res.choices[0].message.content if res.choices else None
     if not raw:
         return None, "Muse Spark returned an empty reply."
-    return validate(raw, measured, context, has_reference=False)
+    return validate(raw, measured, context, findings)
