@@ -281,10 +281,10 @@ export const undoLast = () => send("undo");
 export const listenTracks = () => { if (send("listen_tracks")) set({ ears: { busy: true, text: "Finding your key tracks" } }); };
 export const stopListening = () => { if (send("stop_listening")) set({ ears: { busy: true, text: "Taking the Ears off" } }); };
 
-/** Fix it: Muse gets the problem in plain words and makes the change in Live, with Undo. */
-export function fixIt(p: { name: string; short: string; findings: Finding[] }) {
-  const [a, b] = p.findings[0].bars;
-  askMuse(`Fix this: ${p.name}, bars ${a}${b !== a ? ` to ${b}` : ""}. ${p.short}`);
+/** Fix it: Muse gets the problem in plain words and makes the change in Live, with Undo. The change is on
+    the track for the whole song, not just the bars that were checked, so the request doesn't name bars. */
+export function fixIt(p: { name: string; short: string; where: string }) {
+  askMuse(`Fix this for the whole song: ${p.name} (${p.where}). ${p.short}`);
 }
 export const clearHistory = () => { if (!send("clear_history")) set({ ask: { ...state.ask, log: [] } }); };
 export const openAsk = () => { if (!send("open_ask")) window.open("../window/index.html?ask=1", "aria-window"); };

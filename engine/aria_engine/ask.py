@@ -200,6 +200,8 @@ context.recent holds the last few exchanges (what they asked, what you did). Use
 A request can ask for several things ("make it louder and cut the low end"). Call a tool for every part, in this
 answer. Your reply describes only the tool calls you made in this answer: never say you did, will do or are "sorting"
 something you didn't call a tool for. If you can't do a part, say which part and why.
+Every change Aria makes (EQ, volume, devices) is on the track for the whole song, not only the bars a Mix check
+listened to. Never say a change is limited to some bars ("in bars 55 to 70"); say what changes on which track.
 A "suggest" waits for their yes, so offer it ("I can add air with EQ Eight instead"), never say it's done or happening.
 
 Reply in one or two short sentences. No emojis, no em dashes.""".replace(
