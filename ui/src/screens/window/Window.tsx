@@ -11,8 +11,8 @@ import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
 import { AnalyzerIcon, BuriedIcon, ChatIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
-import { barGroups, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
-import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, jumpTo, lastDock, notice, openChat, setAskOpen, setTheme, setWindowMode,
+import { bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
+import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, lastDock, notice, openChat, setAskOpen, setTheme, setWindowMode,
          soundName, useAria, useViewport, type Kind, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +31,8 @@ export function AriaWindow() {
   const [open, setOpen] = useState(0);
   const [width, height] = useViewport();
   const narrow = width < NARROW_PX, compact = narrow && height < COMPACT_PX;
+  // Docked and compact windows float over Live: glass that shows Live through it
+  useEffect(() => { document.documentElement.classList.toggle("see-through", narrow); }, [narrow]);
 
   // A new result opens Mix check with the first problem ("fix first") open.
   useEffect(() => { if (result) { setView("mixcheck"); setOpen(0); } }, [result]);
@@ -42,7 +44,7 @@ export function AriaWindow() {
 
   return (
     <div className={cn("cp-stage", narrow && "is-flush")} style={narrow ? undefined : { height: "100vh", minHeight: 0 }}>
-      <div className="cp-glass cp-window" style={{ height: narrow ? "100vh" : "100%", borderRadius: narrow ? 0 : undefined, gridTemplateColumns: narrow ? "60px minmax(0, 1fr)" : undefined }}>
+      <div className="cp-glass cp-window" style={{ height: narrow ? "100vh" : "100%", gridTemplateColumns: narrow ? "60px minmax(0, 1fr)" : undefined }}>
         <Rail view={view} setView={setView} narrow={narrow} />
         <main className="cp-main overflow-y-auto" style={narrow ? { padding: 14 } : undefined}>
           <header className={cn("cp-spread", narrow && "flex-wrap")}>
@@ -206,50 +208,40 @@ function Home({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
       {tool("Groove match", <GrooveIcon style={{ width: 20, height: 20 }} />, <span className="cp-tag cp-tag-idle">Coming soon</span>, soon("Groove match"))}
       {tool("Reference", <ReferenceIcon style={{ width: 20, height: 20 }} />, <span className="cp-tag cp-tag-idle">Coming soon</span>, soon("Reference"))}
 
-      <WhereItHappens r={result} narrow={narrow} />
+      <WhereItHappens r={result} narrow={narrow} onPick={onOpen} />
     </div>
   );
 }
 
-/** The checked bars, the ones with a problem marked. Before a check: what will appear, greyed out. */
-function WhereItHappens({ r, narrow }: { r: Result | null; narrow: boolean }) {
-  const { session } = useAria();
+/** Where in the mix each problem is, low to high. Before a check: the same bands, greyed out. */
+function WhereItHappens({ r, narrow, onPick }: { r: Result | null; narrow: boolean; onPick?: (p: Problem) => void }) {
   const list = r ? problemsOf(r) : [];
-  if (!r) {
-    const marks = session?.markers ?? [];
-    return (
-      <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 12 }}>
-        <div className="cp-spread"><span className="cp-cap">Where it happens</span><span className="cp-tag cp-tag-idle">No check yet</span></div>
-        {marks.length > 1 && (
-          <div className="cp-where is-empty">
-            {marks.slice(0, 8).map((m, i, all) => (
-              <button key={i} style={n(all[i + 1] ? all[i + 1].bar - m.bar : 8)} onClick={() => jumpTo(m.bar)} title={`Jump to ${m.name}`}>
-                {m.name}<small>bar {m.bar}</small>
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="cp-empty" style={{ flexDirection: narrow ? "column" : "row", alignItems: narrow ? "flex-start" : "center", justifyContent: "space-between", padding: "18px 20px", gap: 12 }}>
-          <div style={{ display: "grid", gap: 4 }}>
-            <b style={{ fontSize: 15 }}>Your first Mix check fills this in</b>
-            <span className="cp-meta">Each problem on the bars where it happens{marks.length > 1 ? ", next to your markers" : ""}. Tap one to hear it in Live.</span>
-          </div>
-          <button className="cp-btn" onClick={checkMix}>Check mix</button>
-        </div>
-      </section>
-    );
-  }
-  const groups = barGroups(r, undefined, 4).map((g) => ({ ...g, found: list.filter((p) => p.findings.some((f) => f.bars[0] <= g.to && f.bars[1] >= g.from)) }));
+  const bands = bandsWith(list);
+  const range = (b: { lo: number; hi: number }) => `${hz(b.lo)} to ${hz(b.hi)}`;
   return (
     <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 12 }}>
-      <div className="cp-spread"><span className="cp-cap">Where it happens</span><span className="cp-meta">Tap to hear it in Live</span></div>
-      <div className="cp-where">
-        {groups.map((g) => (
-          <button key={g.from} className={g.found.length ? "is-hot" : ""} style={n(g.to - g.from + 1)} onClick={() => jumpTo(g.from)} title={g.found.map((p) => p.name).join(", ") || "Clear"}>
-            Bars {g.from} to {g.to}<small>{g.found.length ? g.found.map((p) => statusWord(p)).join(", ") : "Clear"}</small>
+      <div className="cp-spread">
+        <span className="cp-cap">Where it is in the mix</span>
+        {r ? <span className="cp-meta">Low to high. Tap one to see it</span> : <span className="cp-tag cp-tag-idle">No check yet</span>}
+      </div>
+      <div className={cn("cp-where", !r && "is-empty")}>
+        {bands.map((b) => (
+          <button key={b.name} className={b.found.length ? "is-hot" : ""} style={n(1)} title={range(b)}
+                  onClick={() => (b.found[0] && onPick ? onPick(b.found[0]) : undefined)}>
+            {narrow ? b.short ?? b.name : b.name}
+            <small>{!r ? (narrow ? "" : range(b)) : b.found.length ? b.found.map((p) => statusWord(p)).join(", ") : "Clear"}</small>
           </button>
         ))}
       </div>
+      {!r && (
+        <div className="cp-empty" style={{ flexDirection: narrow ? "column" : "row", alignItems: narrow ? "flex-start" : "center", justifyContent: "space-between", padding: "18px 20px", gap: 12 }}>
+          <div style={{ display: "grid", gap: 4 }}>
+            <b style={{ fontSize: 15 }}>Your first Mix check fills this in</b>
+            <span className="cp-meta">Each problem lights up where it sits, from the sub bass to the air.</span>
+          </div>
+          <button className="cp-btn" onClick={checkMix}>Check mix</button>
+        </div>
+      )}
     </section>
   );
 }
@@ -372,7 +364,7 @@ function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen
         )}
       </AnimatePresence>
 
-      <WhereItHappens r={r} narrow={narrow} />
+      <WhereItHappens r={r} narrow={narrow} onPick={(p) => setOpen(list.indexOf(p))} />
     </div>
   );
 }
@@ -450,13 +442,13 @@ function Compact() {
   const { result, progress, error } = useAria();
   const list = result ? problemsOf(result) : [];
   return (
-    <div className="cp-stage is-tight" style={{ height: "100vh", minHeight: 0 }}>
-      <section className="cp-tile cp-card h-full" style={{ gap: 10 }}>
+    <div className="cp-stage is-flush">
+      <section className="cp-tile cp-compact h-full" style={{ gap: 10 }}>
         <div className="cp-spread">
           <div className="cp-mark"><Mark size={22} /><b>Mix check</b></div>
           <div className="cp-row" style={{ gap: 2 }}>
             <button className="cp-btn cp-btn-primary cp-btn-sm" disabled={!!progress} onClick={checkMix}>{progress ? "Checking" : result ? "Check again" : "Check mix"}</button>
-            <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={closeChat}>Show all</button>
+            <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={closeChat} title="Close Ask Muse and show the whole window again">Back to window</button>
             <button className="cp-icon-btn" style={{ width: 28, height: 28, borderRadius: 10 }} aria-label="Close" onClick={closeWindow}><CloseIcon style={{ width: 14, height: 14 }} /></button>
           </div>
         </div>
@@ -473,7 +465,7 @@ function Compact() {
                         className={cn("flex h-[38px] shrink-0 items-center gap-2.5 text-left text-ink", i > 0 && "border-t border-hairline")}>
                   <span className="flex-1 truncate text-[13px] font-semibold">{p.name}</span>
                   <span className="cp-tag cp-tag-hot">{statusWord(p)}</span>
-                  <span className="cp-meta w-[86px] text-right" style={{ fontFamily: "var(--font-mono)" }}>{barsOf(p)}</span>
+                  <span className="cp-meta whitespace-nowrap text-right" style={{ fontFamily: "var(--font-mono)" }}>{barsOf(p)}</span>
                 </button>
               ))}
             </div>

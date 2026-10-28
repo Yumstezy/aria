@@ -30,17 +30,32 @@
 }
 
 html, body, #root { height: 100%; margin: 0; }
+/* Fade out before a window move and back in after, so a stretched frame never shows (lib/aria.ts moveThen) */
+#root { transition: opacity 160ms ease-out; }
+html.moving #root { opacity: 0; transition: opacity 90ms ease-in; }
 body { font-family: var(--font-sans); color: var(--ink); background: var(--ground); -webkit-font-smoothing: antialiased; }
 
-/* Windows are never see-through: every page paints the ground and the two orbs (cp-stage), then glass.
-   A page fills its window, so the stage drops its outer padding when docked or in the strip. */
+/* A page fills its window, so the stage drops its outer padding when docked or in the strip. */
 .cp-stage.is-flush { padding: 0; min-height: 100vh; height: 100vh; }
+
+/* Glass over Live (Ian, Oct 27): docked windows and the popped-out chat float over Live with no title bar,
+   and Max draws nothing behind them, so Live shows through a tint of the ground. The page can't blur what's
+   behind its window, so it's tinted glass, not frosted. The full window keeps the ground and the orbs. */
+html.see-through, html.see-through body, .see-through .cp-stage { background: transparent; }
+.see-through .cp-stage::before, .see-through .cp-stage::after { display: none; }
+.see-through .cp-window, .see-through .cp-ask-pop.is-static, .see-through .cp-compact {
+  background: color-mix(in srgb, var(--ground) 86%, transparent);
+  border: 1px solid var(--glass-edge); border-radius: 22px; box-shadow: var(--shadow-tile), var(--shadow-rim);
+}
 
 /* On the blue hero: the waves' part colours bright enough to read on blue */
 .cp-hero {
   --ink: var(--on-tile); --ink-muted: var(--on-tile-muted); --ink-faint: var(--on-tile-muted); --hairline: color-mix(in srgb, var(--on-tile) 14%, transparent);
   --hot: var(--hot-glow); --part-vocals: var(--on-tile); --part-other: var(--good-glow); --part-bass: var(--hot-glow); --part-drums: var(--on-tile-muted); --part-mix: var(--on-tile);
 }
+
+/* The strip's frequency row: seven bands in a small card, so the labels sit a little smaller */
+.cp-strip .cp-secrow span { font-size: 9px; padding: 0 1px; letter-spacing: -0.01em; }
 
 /* Section rows you can tap to hear that part in Live */
 .cp-secrow button { flex: var(--n) 1 0; min-width: 0; height: 24px; border: 0; padding: 0 2px; border-radius: 6px; background: var(--well); color: var(--ink-faint);

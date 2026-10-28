@@ -22,9 +22,9 @@ const ENGINE = { host: "127.0.0.1", port: 8765 };
 const REPO = path.resolve(__dirname, "..");
 const ENGINE_DIR = path.join(REPO, "engine");
 // The React builds (ui/dist, see ui/vite.config.ts): one self-contained HTML file per screen.
-// Light (Sky) by default; Dark (Night) when the producer picks it in the window's rail. Saved in window.json.
+// Dark (Night) by default; Light (Sky) when the producer picks it in the window's rail (Ian, Oct 27). Saved in window.json.
 const pageUrl = (screen) => "file://" + encodeURI(path.join(REPO, "ui", "dist", screen, "index.html")) +
-  "?theme=" + (loadWindowPrefs().theme === "night" ? "night" : "sky");
+  "?theme=" + (loadWindowPrefs().theme === "sky" ? "sky" : "night");
 const LOG_DIR = path.join(os.homedir(), "Library", "Logs", "Aria");
 // Ask Muse history, kept across Live sessions. Local to this Mac, never sent anywhere.
 const HISTORY_FILE = path.join(os.homedir(), "Library", "Application Support", "Aria", "ask-history.json");
@@ -194,7 +194,7 @@ function stopEngine() {
 
 // ---------- Aria's Remote Script (device/remote): adds plugins, which Max for Live can't ----------
 
-const REMOTE = { host: "127.0.0.1", port: 8766 };
+const REMOTE = { host: "127.0.0.1", port: Number(process.env.ARIA_REMOTE_PORT) || 8766 };   // tests use another port
 const REMOTE_TIMEOUT_MS = 8000;
 const REMOTE_OFF = "Aria can't add plugins until its helper is on: in Live, Settings > Link, Tempo & MIDI > Control Surface, pick Aria.";
 let installedPlugins = null;   // names from Live's browser, read once per session
@@ -357,12 +357,14 @@ function loadWindowPrefs() {
 }
 
 // Docked windows float over Live with no title bar, so their glass can show Live through it.
+// The page is sized first, then the window, so Live never shows the old page stretched to the new size.
+// (The page also fades out before a move it asks for, and back in once it has its new size.)
 function sizeWindow(target, ui, { x, y, w, h }, docked) {
+  Max.outlet(target, "script", "sendbox", ui, "presentation_rect", 0, 0, Math.round(w), Math.round(h));
   Max.outlet(target, "window", "size", Math.round(x), Math.round(y), Math.round(x + w), Math.round(y + h));
   Max.outlet(target, "window", "flags", docked ? "float" : "nofloat");
   Max.outlet(target, "window", "flags", docked ? "notitle" : "title");
   Max.outlet(target, "window", "exec");
-  Max.outlet(target, "script", "sendbox", ui, "presentation_rect", 0, 0, Math.round(w), Math.round(h));
 }
 
 const FALLBACK_SCREEN = { x: 0, y: 25, w: 1440, h: 875 };
@@ -430,7 +432,8 @@ function openChatWindow(fromPage) {
   const screen = fromPage || prefs.screen || FALLBACK_SCREEN;
   // The side it's docked on, or the side it was last docked on
   const side = prefs.mode === "left" || prefs.mode === "right" ? prefs.mode : prefs.side === "left" ? "left" : "right";
-  savePrefs({ ...prefs, mode: side, side, screen });
+  // Remember the layout it came from (full or docked), so closing the chat goes back to it
+  savePrefs({ ...prefs, mode: side, side, screen, before: chatOpen ? prefs.before : prefs.mode });
   if (!windowLoaded) { windowLoaded = true; Max.outlet("window", "url", pageUrl("window")); }
   if (!chatLoaded) { chatLoaded = true; Max.outlet("chat", "url", pageUrl("window") + "&view=chat"); }
   chatOpen = true;
@@ -442,10 +445,16 @@ function openChatWindow(fromPage) {
 }
 
 // Back from the stack: close the chat, the main window takes its full docked height again.
-Max.addHandler("close_chat", () => {
+// Back from the pop-out: close the chat and put the window back the way it was before (full or
+// docked). "back" (the chat's Back button) also reopens the window if it was closed.
+Max.addHandler("close_chat", (s) => {
+  const back = !!(s && decode(s).back);
   chatOpen = false;
   Max.outlet("chat", "wclose");
-  if (mainOpen) placeWindow(loadWindowPrefs());
+  const prefs = loadWindowPrefs();
+  if (prefs.before) { prefs.mode = prefs.before; delete prefs.before; savePrefs(prefs); }
+  if (mainOpen) { placeWindow(prefs); Max.outlet("window", "front"); }
+  else if (back) showWindow(pageUrl("window"));
 });
 
 // Closes only the main window. A popped-out chat stays, and grows into the space.

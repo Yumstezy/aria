@@ -98,13 +98,13 @@ let state: State = {
   progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0,
 };
 
-// Light (Sky) unless the producer picked Dark. Inside Live the bridge saves the choice and puts it in
+// Dark (Night) unless the producer picked Light. Inside Live the bridge saves the choice and puts it in
 // the page's URL; in a browser it's kept in localStorage.
 function initialTheme(): Theme {
-  if (typeof location === "undefined") return "sky";
+  if (typeof location === "undefined") return "night";
   const q = new URLSearchParams(location.search).get("theme");
   if (q === "night" || q === "sky") return q;
-  try { return localStorage.getItem("aria.theme") === "night" ? "night" : "sky"; } catch { return "sky"; }
+  try { return localStorage.getItem("aria.theme") === "sky" ? "sky" : "night"; } catch { return "night"; }
 }
 function applyTheme(theme: Theme) { document.documentElement.setAttribute("data-theme", theme); }
 if (typeof document !== "undefined") applyTheme(state.theme);
@@ -132,7 +132,34 @@ export function send(name: string, payload?: unknown) {
   return true;
 }
 
-export function notice(text: string | null) { set({ notice: text }); }
+let noticeTimer: ReturnType<typeof setTimeout> | undefined;
+/** A short note in the header ("Reference is coming soon."). It clears itself after a few seconds. */
+export function notice(text: string | null) {
+  clearTimeout(noticeTimer);
+  set({ notice: text });
+  if (text) noticeTimer = setTimeout(() => set({ notice: null }), 4000);
+}
+
+// Moving or resizing a window: Live's web view shows the old frame stretched until the page catches up.
+// So the page fades out first, the move happens, and it fades back in once it has its new size.
+const FADE_MS = 110, SETTLE_MS = 180, GIVE_UP_MS = 900;
+let settle: ReturnType<typeof setTimeout> | undefined;
+function moveThen(fn: () => void) {
+  if (!inMax || location.pathname.includes("/strip/")) { fn(); return; }
+  const root = document.documentElement;
+  root.classList.add("moving");
+  const done = () => root.classList.remove("moving");
+  setTimeout(() => {
+    fn();
+    clearTimeout(settle);
+    settle = setTimeout(done, GIVE_UP_MS);   // in case the size didn't change
+  }, FADE_MS);
+}
+if (typeof window !== "undefined") window.addEventListener("resize", () => {
+  if (!document.documentElement.classList.contains("moving")) return;
+  clearTimeout(settle);
+  settle = setTimeout(() => document.documentElement.classList.remove("moving"), SETTLE_MS);
+});
 
 function on<T>(name: string, fn: (data: T) => void) {
   window.max!.bindInlet(name, (encoded) => {
@@ -164,7 +191,7 @@ export function connect() {
     on<Exchange[]>("ask_log", (log) => set({ ask: { ...state.ask, log } }));
     on<{ theme: Theme }>("theme", (t) => { applyTheme(t.theme); set({ theme: t.theme }); });
     on<Session>("session", (x) => set({ session: x }));
-    on("focus_ask", () => set({ askFocus: state.askFocus + 1 }));
+    on("focus_ask", () => { document.documentElement.classList.remove("moving"); set({ askFocus: state.askFocus + 1 }); });
     send("ready");   // bridge.js replies with the engine state and the latest result
   } else {
     checkEngine();
@@ -241,16 +268,18 @@ export type WindowMode = "left" | "right" | "full";
 /** Left or right: a tall panel docked to that edge, floating over Live. Full: the big window. */
 export function setWindowMode(mode: WindowMode) {
   try { localStorage.setItem("aria.dock", mode); } catch { /* storage may be off; the bridge remembers too */ }
-  send("window_mode", { mode, screen: screenRect() });
+  moveThen(() => send("window_mode", { mode, screen: screenRect() }));
 }
 export function lastDock(): "left" | "right" {
   try { return localStorage.getItem("aria.dock") === "left" ? "left" : "right"; } catch { return "right"; }
 }
 
 /** Ask Muse in its own window, stacked under a shrunk main window on the docked edge. */
-export const openChat = () => { if (!send("open_chat", { screen: screenRect() })) window.open("?view=chat", "aria-chat", "width=460,height=620"); };
+export const openChat = () => { if (!inMax) window.open("?view=chat", "aria-chat", "width=460,height=620"); else moveThen(() => send("open_chat", { screen: screenRect() })); };
 /** Close the popped-out chat; the main window takes its full docked height again. */
-export const closeChat = () => { if (!send("close_chat")) window.close(); };
+export const closeChat = () => { if (!inMax) window.close(); else moveThen(() => send("close_chat")); };
+/** The chat's Back button: close it and bring the window back as it was before the pop-out. */
+export const backToWindow = () => { if (!inMax) window.close(); else moveThen(() => send("close_chat", { back: true })); };
 export const closeWindow = () => { if (!send("close_window")) window.close(); };
 
 /** The window's size, kept up to date (docked, stacked and full layouts depend on it). */

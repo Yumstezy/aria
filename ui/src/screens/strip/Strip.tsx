@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { Mark } from "@/components/brand";
 import { MicIcon } from "@/components/icons";
 import { checkMix, fixIt, jumpTo, openChat, openWindow, useAria, type Result } from "@/lib/aria";
-import { barGroups, barsOf, problemsOf, statusWord } from "@/lib/problems";
+import { bandsWith, problemsOf, statusWord } from "@/lib/problems";
 
 const STEP: Record<string, string> = { record: "Listening to 16 bars", analyze: "Splitting and asking Muse" };
 
@@ -60,13 +60,14 @@ function Card() {
 function AfterCheck({ r }: { r: Result }) {
   const list = problemsOf(r);
   const p = list[0];
-  const groups = barGroups(r, p);
+  // Where in the mix, low to high: the fix-first problem filled, the others outlined
   const row = (
-    <div className="cp-secrow" aria-label="The bars Aria checked">
-      {groups.map((g) => (
-        <button key={g.from} className={g.hot ? "is-hot" : ""} style={{ "--n": g.to - g.from + 1 } as CSSProperties}
-                onClick={() => jumpTo(g.from)} title={`Hear bars ${g.from} to ${g.to} in Live`}>{g.from}</button>
-      ))}
+    <div className="cp-secrow" aria-label="Where in the mix">
+      {bandsWith(list).map((b) => {
+        const first = !!p && b.found.includes(p);
+        return <span key={b.name} className={first ? "is-hot" : b.found.length ? "is-watch" : ""} style={{ "--n": 1 } as CSSProperties}
+                     title={b.found.length ? `${b.name}: ${b.found.map((x) => x.name).join(", ")}` : b.name}>{b.short ?? b.name}</span>;
+      })}
     </div>
   );
   if (!p) {
@@ -84,7 +85,7 @@ function AfterCheck({ r }: { r: Result }) {
       <div className="cp-spread"><span className="cp-cap">Fix first</span><span className="cp-tag cp-tag-hot">{statusWord(p)}</span></div>
       <div className="flex min-w-0 items-baseline gap-1.5">
         <b className="truncate" style={{ fontSize: 14, lineHeight: "18px" }}>{p.name}</b>
-        <span className="cp-meta shrink-0" style={{ fontSize: 11 }}>{barsOf(p)}</span>
+        <span className="cp-meta shrink-0" style={{ fontSize: 11 }}>{p.where}</span>
       </div>
       {row}
       <div className="cp-row cp-push" style={{ gap: 8 }}>

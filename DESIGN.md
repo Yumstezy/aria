@@ -31,7 +31,7 @@ Frosted glass over soft blue. Show the problem as a picture first, say it in pla
 
 ## Color
 
-Two themes: **Sky**, the light default, and **Night**, the optional dark mode. The producer switches with the Light / Dark control at the bottom of the side rail. The choice is saved and applies to the window and the strip. Set `data-theme="sky|night"` on `.cp-stage`.
+Two themes: **Night**, the dark default (Ian, Oct 27), and **Sky**, the optional light mode. The producer switches with the Light / Dark control at the bottom of the side rail. The choice is saved and applies to the window and the strip. Set `data-theme="sky|night"` on `.cp-stage`.
 
 | Token | Sky | Night | Use |
 |---|---|---|---|
@@ -71,7 +71,7 @@ Two themes: **Sky**, the light default, and **Night**, the optional dark mode. T
 
 ## Layout
 
-- **Device strip:** 400 x 169 on the master channel (`cp-strip is-mini`). Left: the Aria mark, Check mix, Ask and Open window. Right: one card with the next step, or the one fix with a section row and a Fix it button.
+- **Device strip:** 400 x 169 on the master channel (`cp-strip is-mini`). Left: the Aria mark, Check mix, Ask and Open window. Right: one card with the next step, or the one fix with a row of frequency bands (Sub to Air, the problem's bands filled) and a Fix it button.
 - **Window:** a 184px side rail plus a 12 column bento. The rail holds Home, Mix check, Live analyzer, Groove match and Reference, with Ask Muse pinned at the bottom.
 - **Ask Muse** is a pop-up over the current screen, never a page.
 
@@ -79,7 +79,7 @@ Two themes: **Sky**, the light default, and **Night**, the optional dark mode. T
 
 - Never a blank card. Say what will appear and the next step, and show the result's layout greyed out (`cp-empty`, `cp-tag-idle`, `cp-vs i.is-empty`, `cp-where.is-empty`).
 - Setup steps use `cp-check`: done gets a green check, the next step is bold with a blue ring.
-- Windows and the strip paint their own ground and orbs. Never transparent over Live.
+- The full window and the strip paint their own ground and orbs. Docked windows and the popped-out chat are tinted glass over Live (86% of the ground), by Ian's call on Oct 27.
 - Ask Muse is a 400px pop-up over the current screen (`cp-ask-pop`). Each request gets one reply. A change that was asked for is done right away, with the done pill (`cp-did`) and Undo. Muse's own proposals use one `cp-suggest` card with Do it and Not now.
 
 ## Components

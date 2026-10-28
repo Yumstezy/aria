@@ -71,3 +71,14 @@ export function barsOf(p: Problem): string {
   const lo = Math.min(...p.findings.map((f) => f.bars[0])), hi = Math.max(...p.findings.map((f) => f.bars[1]));
   return lo === hi ? `bar ${lo}` : `bars ${lo} to ${hi}`;
 }
+
+/** Where in the mix, low to high. Bands a problem's frequencies fall in are filled. */
+export const BANDS = [
+  { name: "Sub", lo: 20, hi: 60 }, { name: "Bass", lo: 60, hi: 150 }, { name: "Low mids", short: "Lo mid", lo: 150, hi: 400 },
+  { name: "Mids", short: "Mid", lo: 400, hi: 1000 }, { name: "Upper mids", short: "Hi mid", lo: 1000, hi: 4000 },
+  { name: "Highs", short: "High", lo: 4000, hi: 10000 }, { name: "Air", lo: 10000, hi: 20000 },
+] as { name: string; short?: string; lo: number; hi: number }[];
+
+export function bandsWith(list: Problem[]) {
+  return BANDS.map((b) => ({ ...b, found: list.filter((p) => p.findings.some((f) => f.hz_range[0] < b.hi && f.hz_range[1] > b.lo)) }));
+}

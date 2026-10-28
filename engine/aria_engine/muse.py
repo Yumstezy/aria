@@ -54,6 +54,8 @@ Rules:
   - bass_click: in words. Check the bass sample's start, add a few milliseconds of fade-in on the bass notes, or soften the attack. "fix" is null.
 - If there are no findings, say nothing stuck out in these bars, and that Key tracks mode (Aria Ear on the main tracks) can show which sounds clash.
 - Short sentences. No emojis, no exclamation marks, no em dashes.
+- Call sounds by everyday names: "vocals" is the vocal, "other" is the synths and keys, "the rest" is everything else.
+  Never write "other" or "the rest" as if it were a name.
 - For each note also write "short": what a listener notices, at most 10 words, no numbers. Example: "Words get lost under the drums".
 
 Answer with JSON only:

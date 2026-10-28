@@ -100,7 +100,8 @@ docs/          build steps, contracts, screens
 - Use `design/ds/tokens.css` and `design/ds/components/bundle.css` as they are. Class names start with `cp-`, an internal code name. Keep it.
 - Charts come from `window.CoProducer` in `design/ds/components/bundle.js` (spectrum, sectionMap, energy, stereo, timing, arrangement, analyzer). Feed them the engine's JSON.
 - Talk to Max with `window.max.outlet(...)` and `window.max.bindInlet(...)`. Guard for `window.max` being missing. In a normal browser, the UI calls the engine directly with a real wav path, so we develop fast without Live and still see only real results.
-- Light (Sky) is the default theme. Dark (Night) is an option the producer picks with the Light / Dark switch at the bottom of the side rail. The bridge saves the choice in `window.json` and applies it to the window and the strip. Set `data-theme` on the root.
+- Dark (Night) is the default theme (Ian, Oct 27, after trying both). Light (Sky) is an option the producer picks with the Light / Dark switch at the bottom of the side rail. The bridge saves the choice in `window.json` and applies it to the window and the strip. Set `data-theme` on the root.
+- Docked windows and the popped-out chat are see-through glass over Live (Ian, Oct 27). The full window and the strip paint the ground and orbs.
 - Mix check opens in Simple view: a plain verdict first, then the numbers. Detailed view is one tap away.
 - Ask Muse is a pop-up over the current screen, never a separate page.
 - The product name on screen is Aria. The logo isn't chosen yet, so keep the placeholder bars icon.

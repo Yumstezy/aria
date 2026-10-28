@@ -3,8 +3,8 @@
 // or its own small window when popped out. Both show the same history, which the bridge saves on this Mac.
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { answerSuggestion, askMuse, clearHistory, closeChat, hz, setAskOpen, undoLast, useAria, type Exchange, type Finding, type Suggestion } from "@/lib/aria";
-import { CheckIcon, CloseIcon, MicIcon, SendIcon, UndoIcon } from "@/components/icons";
+import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, setAskOpen, undoLast, useAria, type Exchange, type Finding, type Suggestion } from "@/lib/aria";
+import { BackIcon, CheckIcon, CloseIcon, MicIcon, SendIcon, UndoIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 // Starting points built from what Aria found, so the first ask is one tap
@@ -167,10 +167,11 @@ function ClearButton() {
   );
 }
 
-function Head({ onClose }: { onClose: () => void }) {
+function Head({ onClose, onBack }: { onClose: () => void; onBack?: () => void }) {
   const { ask, result } = useAria();
   return (
     <div className="cp-ask-head">
+      {onBack && <button className="cp-icon-btn" style={{ width: 28, height: 28, borderRadius: 10 }} title="Back to the window" aria-label="Back to the window" onClick={onBack}><BackIcon style={{ width: 14, height: 14 }} /></button>}
       <b>Ask Muse</b><span className="cp-ask-ctx">{result ? "about Mix check" : "about your set"}</span>
       {ask.log.length > 0 && <ClearButton />}
       <button className="cp-icon-btn cp-ask-x" style={ask.log.length ? { marginLeft: 0 } : undefined} aria-label="Close" onClick={onClose}><CloseIcon /></button>
@@ -180,10 +181,11 @@ function Head({ onClose }: { onClose: () => void }) {
 
 /** Ask Muse popped out into its own small window that floats over Live. It paints its own ground. */
 export function ChatWindow() {
+  useEffect(() => { document.documentElement.classList.add("see-through"); }, []);
   return (
-    <div className="cp-stage is-tight" style={{ height: "100vh", minHeight: 0 }}>
-      <section className="cp-ask-pop is-static cp-chat" style={{ height: "calc(100vh - 32px)", boxSizing: "border-box" }} aria-label="Ask Muse">
-        <Head onClose={closeChat} />
+    <div className="cp-stage is-flush">
+      <section className="cp-ask-pop is-static cp-chat" style={{ height: "100vh", boxSizing: "border-box" }} aria-label="Ask Muse">
+        <Head onClose={closeChat} onBack={backToWindow} />
         <AskThread className="flex-1" />
         <AskInput autoFocus />
       </section>
