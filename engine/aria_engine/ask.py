@@ -544,7 +544,7 @@ def check_action(name, args, tracks=(), plugins=()):
             bar = int(args["bar"])
             return {"bar": bar} if 1 <= bar <= 9999 else None
         if name in ("track_mute", "track_solo"):
-            track = _track(args.get("track"), tracks, main_ok=name == "track_mute")
+            track = match_track(args.get("track"), tracks)   # Main has no mute or solo in Live
             return {"track": track, "on": bool(args.get("on"))} if track and isinstance(args.get("on"), bool) else None
         if name == "set_tempo":
             bpm = float(args["bpm"])

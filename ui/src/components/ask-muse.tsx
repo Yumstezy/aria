@@ -3,7 +3,7 @@
 // or its own small window when popped out. Both show the same history, which the bridge saves on this Mac.
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, setAskOpen, soundName, toggleVoice, undoLast, useAria, type Exchange, type Finding, type Guide, type GuideBand, type Suggestion } from "@/lib/aria";
+import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, setAskOpen, soundName, toggleVoice, undoLast, useAria, useAriaSel, type Finding, type Guide, type GuideBand, type Suggestion } from "@/lib/aria";
 import { EqCurve } from "@/components/eq-curve";
 import { BackIcon, CheckIcon, CloseIcon, MicIcon, SendIcon, UndoIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
@@ -50,23 +50,12 @@ function describeSuggestion(s: Suggestion) {
   return s.type;
 }
 
-const changed = (type: string) => type !== "jump_to" && type !== "check_mix" && type !== "undo";
-
-/** Where the newest change Aria made is, so only that one offers Undo */
-function lastChange(log: Exchange[]): string | null {
-  for (let i = log.length - 1; i >= 0; i--) {
-    const x = log[i];
-    for (let k = x.suggestions.length - 1; k >= 0; k--) if (x.suggestions[k].result?.ok) return `${i}s${k}`;
-    for (let k = x.done.length - 1; k >= 0; k--) if (x.done[k].ok && changed(x.done[k].type)) return `${i}d${k}`;
-  }
-  return null;
-}
-
-/** The pill for a change: a check, what changed, and Undo on the newest one */
-function Did({ ok, text, undo }: { ok: boolean; text: string; undo?: boolean }) {
+/** The pill for a change: a check, what changed, and Undo on the one Undo will undo next (the bridge says which).
+    An undone change loses its check; one still running shows no check yet. */
+function Did({ ok, text, undo, undone, waiting }: { ok: boolean; text: string; undo?: boolean; undone?: boolean; waiting?: boolean }) {
   return (
-    <div className={cn("cp-did", !ok && "is-bad")} role="status">
-      {ok && <CheckIcon />}<span className="py-0.5 leading-4">{text}</span>
+    <div className={cn("cp-did", !ok && "is-bad")} role="status" style={undone || waiting ? { color: "var(--ink-faint)" } : undefined}>
+      {ok && !undone && !waiting && <CheckIcon />}<span className="py-0.5 leading-4" style={undone ? { textDecoration: "line-through" } : undefined}>{text}</span>
       {undo && <button className="cp-btn cp-btn-sm" style={{ height: 22, padding: "0 8px", marginLeft: 4 }} onClick={undoLast}><UndoIcon style={{ width: 11, height: 11 }} />Undo</button>}
     </div>
   );
@@ -107,10 +96,21 @@ function GuideCard({ g }: { g: Guide }) {
 
 /** The conversation: one reply per request, at most one card per suggestion, never two the same. */
 export function AskThread({ className }: { className?: string }) {
-  const { ask, result } = useAria();
+  const ask = useAriaSel((s) => s.ask), result = useAriaSel((s) => s.result), undoNext = useAriaSel((s) => s.undoNext);
   const scroller = useRef<HTMLDivElement>(null);
-  useEffect(() => { scroller.current?.scrollTo({ top: 1e6, behavior: "smooth" }); }, [ask.log, ask.pending]);
-  const undoAt = lastChange(ask.log);
+  const seen = useRef(-1);
+  // Scroll only when something new arrives, and only if they were already near the bottom (not while reading back).
+  // The first time, jump straight there.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const grew = ask.log.length > seen.current || ask.pending;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+    if (seen.current < 0) el.scrollTo({ top: 1e6 });
+    else if (grew && near) el.scrollTo({ top: 1e6, behavior: "smooth" });
+    seen.current = ask.log.length;
+  }, [ask.log.length, ask.pending]);
+  const undoAt = undoNext ? `${undoNext.i}${undoNext.kind}${undoNext.k}` : null;
 
   return (
     <div ref={scroller} className={cn("cp-msgs min-h-0 overflow-y-auto", className)}>
@@ -125,15 +125,14 @@ export function AskThread({ className }: { className?: string }) {
 
       {ask.log.map((x, i) => {
         const seen = new Set<string>();
-        // Older history kept a yes's outcome as a note, not on the suggestion: show it as the pill
-        const notes = [...x.notes];
+        const notes = x.notes;
         return (
           <div key={i} className="cp-msgs">
             <div className="cp-bubble is-user">{x.request}</div>
             {x.reply ? <div className="cp-bubble is-bot"><span>{x.reply}</span></div>
               : x.error ? <Did ok={false} text={x.error} /> : null}
             {(x.guides ?? []).map((g, k) => <GuideCard key={"g" + k} g={g} />)}
-            {x.done.map((d, k) => <Did key={k} ok={d.ok} text={d.text} undo={undoAt === `${i}d${k}`} />)}
+            {x.done.map((d, k) => <Did key={k} ok={d.ok} text={d.text} undo={undoAt === `${i}d${k}`} undone={d.undone} />)}
             {/* Calls Aria skipped, so a reply never looks done when it wasn't */}
             {x.reply && (x.problems ?? []).map((p, k) => <Did key={"p" + k} ok={false} text={p} />)}
             {x.suggestions.map((s, k) => {
@@ -141,8 +140,8 @@ export function AskThread({ className }: { className?: string }) {
               if (seen.has(what)) return null;
               seen.add(what);
               if (s.answered === "yes") {
-                const text = s.result?.text ?? notes.shift() ?? `Doing it: ${what}`;
-                return <Did key={"s" + k} ok={s.result?.ok ?? true} text={text} undo={undoAt === `${i}s${k}`} />;
+                return s.result ? <Did key={"s" + k} ok={s.result.ok} text={s.result.text} undo={undoAt === `${i}s${k}`} undone={s.result.undone} />
+                  : <Did key={"s" + k} ok text={`Doing it: ${what}`} waiting />;
               }
               if (s.answered === "no") return <span key={"s" + k} className="cp-meta">Skipped: {what}</span>;
               return (
@@ -233,8 +232,14 @@ export function ChatWindow() {
 
 /** The pop-up over the current screen, anchored bottom left by the rail's Ask Muse button. */
 export function AskMuse({ narrow }: { narrow?: boolean }) {
-  const { ask } = useAria();
-  if (!ask.open) return null;
+  const open = useAriaSel((s) => s.ask.open);
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setAskOpen(false); };
+    document.addEventListener("keydown", esc);
+    return () => document.removeEventListener("keydown", esc);
+  }, [open]);
+  if (!open) return null;
   return (
     <section className="cp-ask-pop" role="dialog" aria-label="Ask Muse"
              style={narrow ? { position: "fixed", left: 12, right: 12, bottom: 12, width: "auto", maxHeight: "calc(100vh - 80px)" }

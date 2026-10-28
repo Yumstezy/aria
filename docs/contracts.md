@@ -262,7 +262,7 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
 
 - UI to device:
   - `ask {text}`: one request. The bridge adds context and calls `POST /muse/ask`.
-  - `answer {exchange, index, yes}`: the producer answered a suggestion. Yes runs it.
+  - `answer {exchange, index, yes, at}`: the producer answered a suggestion. Yes runs it. `at` (the exchange's time) finds it even after the history has shifted.
   - `undo`: undo the last change Aria made.
   - `clear_history`
   - `open_ask`: open the window with the Ask pop-up open.
@@ -277,12 +277,19 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
 - Device to UI:
   - `ask_pending {request | null}`
   - `theme {theme}`: apply this theme now.
+  - `undo_next {i, kind: "d" | "s", k} | null`: the change Undo will undo next (exchange index, a done item or an accepted suggestion, its index). Only that pill offers Undo; an undone change has `undone: true`. Null after a reload or when the top step isn't a pill (Home's Mark bar).
+  - `layout {mode, side}`: where the bridge placed the window. `placed {}`: a window was just placed, so a page that slid out comes back even when its size didn't change.
+  - `notice {text}`: a short note for the header (marker trouble, Live not ready), never a failed check.
   - `focus_ask {}`: put the cursor in Ask Muse's input (the mapped key was pressed).
   - `session {tempo, signature, markers: [{bar, name}], chain: {on_main, after}}`: about the set, sent on `ready`, after a check and after every ask. Home uses it for the header and the Get started steps.
   - `ask_log [exchange]`: the whole history, sent on `ready` and on every change. The bridge owns it and saves it in `~/Library/Application Support/Aria/ask-history.json` (last 100).
   - An exchange is `{request, reply, done: [{type, args, ok, text}], suggestions: [{type, args, why, answered?, result?: {ok, text}}], guides: [guide], problems: [text], error, notes: [text], at}`.
 
-`set_section {name, first_bar, last_bar}` (Step 6, Oct 28): sections are Live's markers. The engine turns it into `add_marker` actions: the name at `first_bar`, and, unless a marker already sits at `last_bar + 1`, one there with the name of the section that was playing there ("After <name>" when nothing was marked), so the rest of the song keeps its names. Each is its own Undo.
+`set_section {name, first_bar, last_bar}` (Step 6, Oct 28): sections are Live's markers. The engine turns it into marker actions: the name at `first_bar`; a `delete_marker` for each marker inside the new section; and, unless a marker already sits at `last_bar + 1`, one there with the name of the section that was playing there ("After <name>" when nothing was marked), so the rest of the song keeps its names. Each is its own Undo.
+
+More tools (Oct 28): `delete_marker {bar}`; `track_mute {track, on}` and `track_solo {track, on}` (not Main); `set_tempo {bpm}` (20 to 999); `sidechain {track, from_track, amount: light | medium | heavy}`, which the engine turns into `track_device` Compressor (S/C On, Threshold -18 / -24 / -30 dB, Ratio 4, Attack 1 ms, Release 150 ms) then `route_sidechain {track, from_track}` (live.js sets the Compressor's `input_routing_type`; Undo of the Compressor puts the routing back). Each runs right away with Undo.
+
+How the bridge applies them (Oct 28 review): every change to Live (an answer's actions, Do it, Undo, markers, jumps, Ears, Check mix) runs through one queue, one at a time. `jump` replies `jump_done` when finished. A marker added, deleted or undone while Live plays: Live stops briefly, the marker is placed exactly, and the song carries on from where it was. Muse's `check_mix` is queued after the answer's changes.
 
 Actions Muse may call: `jump_to`, `add_marker`, `eq_band`, `track_volume`, `track_eq`, `track_device`, `check_mix`, `undo`, and `suggest` for any of the first six. Plus `plugin_guide`, which shows rather than changes.
 

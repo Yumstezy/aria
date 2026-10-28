@@ -3,6 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// Before anything paints: the saved theme (dark unless the producer picked light) and, for docked windows and the
+// popped-out chat, the glass, so there's no light flash and no late switch to glass
+(function () {
+  var q = new URLSearchParams(location.search), root = document.documentElement;
+  root.setAttribute("data-theme", q.get("theme") === "sky" ? "sky" : "night");
+  if (q.get("view") === "chat" || (window.innerWidth < 760 && !/strip/.test(location.pathname))) root.classList.add("see-through");
+})();
+</script>
 <title>Aria strip</title>
 </head>
 <body>

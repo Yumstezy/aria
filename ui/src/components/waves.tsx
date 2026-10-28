@@ -2,7 +2,7 @@
 // numbered zone and a matching chip underneath. With two or more parts playing, each part gets its own
 // line (the ones a problem is about stand out); with one, the whole mix is the line. Curves are smoothed
 // for display only; the engine's numbers stay as measured.
-import { useRef, useState, type PointerEvent } from "react";
+import { useMemo, useRef, useState, type PointerEvent } from "react";
 import { motion } from "motion/react";
 import { describe, partColor, partNames, silentParts, soundName, type Finding, type Spectra } from "@/lib/aria";
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
@@ -64,15 +64,18 @@ export function Waves({ spectra, findings, split, onZone }: {
     setHover({ i, left: e.clientX, top: e.clientY });
   };
 
-  // Waves with their label positions, labels nudged so none overlap
-  const waves = names.map((n) => {
+  // Waves with their label positions, labels nudged so none overlap. Worked out once per result,
+  // not on every pointer move.
+  const waves = useMemo(() => { const out = names.map((n) => {
     const values = smoothValues(n === "mix" ? spectra.mix : spectra.parts[n]!);
     const line = path(spectra.hz.map((h, i) => [X(h), Y(values[i])]));
     const peak = values.indexOf(Math.max(...values));
     return { n, line, quiet: showParts && involved.size > 0 && !involved.has(n),
-             label: { x: Math.min(W - 50, Math.max(50, X(spectra.hz[peak]))), y: Y(values[peak]) - 6, w: soundName(n).length * 6.2 } };
+             label: { x: 0, y: Y(values[peak]) - 6, w: soundName(n).length * 6.2, at: X(spectra.hz[peak]) } };
   });
-  [...waves].sort((a, b) => b.label.y - a.label.y).forEach((wv, i, all) => {
+  // Labels stay inside the picture by their own width, so long track names don't clip
+  out.forEach((wv) => { wv.label.x = Math.min(W - wv.label.w / 2 - 4, Math.max(wv.label.w / 2 + 4, wv.label.at)); });
+  [...out].sort((a, b) => b.label.y - a.label.y).forEach((wv, i, all) => {
     all.slice(0, i).forEach((p) => {
       if (Math.abs(p.label.x - wv.label.x) < (wv.label.w + p.label.w) / 2 + 4 && Math.abs(p.label.y - wv.label.y) < 13) {
         wv.label.y = Math.min(wv.label.y, p.label.y - 13);
@@ -80,6 +83,9 @@ export function Waves({ spectra, findings, split, onZone }: {
     });
     wv.label.y = Math.max(PAD_T - 2, wv.label.y);
   });
+  return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spectra, findings, split]);
 
   return (
     <div className="flex flex-col gap-2.5">

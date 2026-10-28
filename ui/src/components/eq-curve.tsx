@@ -1,6 +1,7 @@
 // How an EQ should look: the summed response of its bands, drawn like an EQ plugin's display,
 // with each band as a numbered point. The bands are real: from the producer's preset, or Muse's
 // stated starting point. Each band is a standard biquad (RBJ cookbook), so shapes look as they sound.
+import { memo } from "react";
 import { hz, type GuideBand } from "@/lib/aria";
 
 const W = 360, H = 132, PAD_B = 16, LO = 20, HI = 20000, FS = 96000, STEPS = 180;
@@ -30,7 +31,7 @@ function db(c: number[], f: number) {
 const freqs = Array.from({ length: STEPS }, (_, i) => LO * (HI / LO) ** (i / (STEPS - 1)));
 const total = (coefs: number[][], f: number) => coefs.reduce((s, c) => s + db(c, f), 0);
 
-export function EqCurve({ bands }: { bands: GuideBand[] }) {
+export const EqCurve = memo(function EqCurve({ bands }: { bands: GuideBand[] }) {
   const coefs = bands.map((b) => biquad(b));
   const moving = bands.some((b) => b.dynamic_db);
   const moved = bands.map((b) => biquad(b, b.gain_db + (b.dynamic_db || 0)));
@@ -63,4 +64,4 @@ export function EqCurve({ bands }: { bands: GuideBand[] }) {
       <text x={W - 4} y={11} textAnchor="end" fill="var(--ink-faint)" style={{ fontSize: 9, fontWeight: 600 }}>±{range} dB</text>
     </svg>
   );
-}
+});

@@ -7,9 +7,11 @@ let ctx: AudioContext | null = null;
 let stream: MediaStream | null = null;
 let node: ScriptProcessorNode | null = null;
 let chunks: Float32Array[] = [];
+const TIMEOUT_MS = 20000;   // never stuck "hearing"
 
 /** Start listening. Throws a plain reason when the microphone isn't allowed. */
 export async function startRecording() {
+  if (stream) return;   // already recording: never open the mic twice
   if (!navigator.mediaDevices?.getUserMedia) throw new Error("This view can't reach the microphone.");
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
@@ -48,12 +50,15 @@ export async function stopRecording(): Promise<Blob> {
 /** The words in a recording, by Muse Voice Transcribe through the engine. */
 export async function transcribe(wav: Blob): Promise<string> {
   let res: Response;
+  const stop = new AbortController(), timer = setTimeout(() => stop.abort(), TIMEOUT_MS);
   try {
-    res = await fetch(ENGINE + "/voice/transcribe", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav });
+    res = await fetch(ENGINE + "/voice/transcribe", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav, signal: stop.signal });
   } catch {
-    throw new Error("The Aria engine isn't running.");
+    throw new Error(stop.signal.aborted ? "Muse took too long to hear that. Try again." : "The Aria engine isn't running.");
+  } finally {
+    clearTimeout(timer);
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || `Muse couldn't hear that (HTTP ${res.status}).`);
-  return body.text;
+  return typeof body.text === "string" ? body.text : "";
 }

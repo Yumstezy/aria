@@ -1,7 +1,7 @@
 // The Aria window: the side rail and the bento (design/screens/11 and 12), Home and Mix check
 // (Simple and Detailed). Picture first, a short line second, numbers when asked for (DESIGN.md).
 // Before the first check every card shows its layout greyed out and says what comes next.
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Mark } from "@/components/brand";
 import { Waves } from "@/components/waves";
@@ -13,7 +13,7 @@ import { AnalyzerIcon, BackIcon, BuriedIcon, ChatIcon, CheckIcon, ClickIcon, Clo
          ReferenceIcon, RingIcon, SunIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode, stopListening,
-         soundName, useAria, useViewport, type Kind, type Result } from "@/lib/aria";
+         soundName, useAria, useAriaSel, useViewport, type Kind, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
 type View = "home" | "mixcheck";
@@ -35,7 +35,10 @@ export function AriaWindow() {
   useEffect(() => { document.documentElement.classList.toggle("see-through", narrow); }, [narrow]);
 
   // A new result opens Mix check with the first problem ("fix first") open.
-  useEffect(() => { if (result) { setView("mixcheck"); setOpen(0); } }, [result]);
+  // A new result opens Mix check with Fix first open. The same result sent again (a page loading) changes nothing.
+  const resultPath = result?.recording.path;
+  useEffect(() => { if (resultPath) { setView("mixcheck"); setOpen(0); } }, [resultPath]);
+  const openMixCheck = useCallback(() => setView("mixcheck"), []);
 
   if (width < TAB_PX) return <MinTab />;
   if (compact) return <Compact />;
@@ -81,7 +84,7 @@ export function AriaWindow() {
           )}
 
           <KeyTracks />
-          {view === "home" ? <Home narrow={narrow} onOpen={() => setView("mixcheck")} />
+          {view === "home" ? <Home narrow={narrow} onOpen={openMixCheck} />
             : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />
             : <Simple r={result} open={open} setOpen={setOpen} narrow={narrow} />}
@@ -141,8 +144,8 @@ function LayoutMenu({ mode, chatOut }: { mode: "full" | "left" | "right"; chatOu
   );
 }
 
-function Rail({ view, setView, narrow }: { view: View; setView: (v: View) => void; narrow: boolean }) {
-  const { theme, ask } = useAria();
+const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView: (v: View) => void; narrow: boolean }) {
+  const theme = useAriaSel((s) => s.theme), ask = { open: useAriaSel((s) => s.ask.open) };
   const item = (id: View | null, label: string, icon: ReactNode) => (
     <a key={label} href="#" title={label} aria-current={id === view ? "page" : undefined} style={narrow ? { justifyContent: "center", padding: 0 } : undefined}
        onClick={(e: MouseEvent) => { e.preventDefault(); if (id) setView(id); else notice(`${label} is coming soon.`); }}>
@@ -177,12 +180,13 @@ function Rail({ view, setView, narrow }: { view: View; setView: (v: View) => voi
       </div>
     </aside>
   );
-}
+});
 
 // ---------- Home ----------
 
-function Home({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
-  const { engine, result, session, ask } = useAria();
+const Home = memo(function Home({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
+  const engine = useAriaSel((s) => s.engine), result = useAriaSel((s) => s.result), session = useAriaSel((s) => s.session);
+  const ask = { log: { length: useAriaSel((s) => s.ask.log.length) } };
   const list = result ? problemsOf(result) : [];
   const steps: [string, boolean][] = [
     ["Aria engine is running", engine.state === "up"],
@@ -248,7 +252,7 @@ function Home({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
       <WhereItHappens r={result} narrow={narrow} onPick={onOpen} />
     </div>
   );
-}
+});
 
 /** Where in the mix each problem is, low to high. Before a check: the same bands, greyed out. */
 function WhereItHappens({ r, narrow, onPick }: { r: Result | null; narrow: boolean; onPick?: (p: Problem) => void }) {
@@ -285,8 +289,8 @@ function WhereItHappens({ r, narrow, onPick }: { r: Result | null; narrow: boole
 
 /** "Name my tracks": with it on, Check mix puts an Aria Ear on each key track (by name) and names the tracks
     that clash. Set it before checking, so a song isn't checked twice. Off takes the Ears off. */
-function KeyTracks() {
-  const { session, ears } = useAria();
+const KeyTracks = memo(function KeyTracks() {
+  const session = useAriaSel((s) => s.session), ears = useAriaSel((s) => s.ears);
   const on = session?.ears ?? [];
   const wanted = !!session?.keyTracks || on.length > 0;
   return (
@@ -301,7 +305,7 @@ function KeyTracks() {
         : !wanted && <span className="cp-meta">Check mix then says which of your tracks clash, like Kick and Bass. Aria adds a small Ear to each key track.</span>}
     </div>
   );
-}
+});
 
 // ---------- Mix check ----------
 
@@ -317,7 +321,7 @@ const KINDS: { kind: Kind; name: string; line: string; icon: ReactNode }[] = [
 const iconFor = (p: Problem) => KINDS.find((x) => x.kind === (p.name === "Mud" ? "buildup" : p.findings[0].kind))!.icon;
 
 /** Before the first check: the Simple view's layout greyed out, saying what will appear and how to start. */
-function EmptyCheck({ narrow }: { narrow: boolean }) {
+const EmptyCheck = memo(function EmptyCheck({ narrow }: { narrow: boolean }) {
   return (
     <div className="cp-bento">
       <section className={cn("cp-tile cp-hero", span(narrow, 7))} style={{ minHeight: narrow ? 0 : 228, gap: 10 }}>
@@ -341,7 +345,7 @@ function EmptyCheck({ narrow }: { narrow: boolean }) {
       <WhereItHappens r={null} narrow={narrow} />
     </div>
   );
-}
+});
 
 const EASE = [0.32, 0.72, 0, 1] as const;
 
@@ -358,7 +362,7 @@ function Rise({ i, className, children }: { i: number; className?: string; child
 const amountText = (p: Problem) => (p.amount.unit.startsWith("%") ? `${p.amount.value}${p.amount.unit}` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`);
 const fixWithMuse = (p: Problem) => { fixIt(p); setAskOpen(true); };
 
-function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen: (i: number) => void; narrow: boolean }) {
+const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen: (i: number) => void; narrow: boolean }) {
   const list = problemsOf(r);
   const first = list[0], selected = list[open];
   const tileSpan = list.length >= 3 ? 4 : list.length === 2 ? 6 : 12;
@@ -425,7 +429,7 @@ function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen
       <WhereItHappens r={r} narrow={narrow} onPick={(p) => setOpen(list.indexOf(p))} />
     </div>
   );
-}
+});
 
 function ProblemDetail({ p }: { p: Problem }) {
   return (
@@ -461,7 +465,7 @@ function Stat({ label, value, unit, why }: { label: string; value: number | null
   );
 }
 
-function Detailed({ r, narrow }: { r: Result; narrow: boolean }) {
+const Detailed = memo(function Detailed({ r, narrow }: { r: Result; narrow: boolean }) {
   const m = r.measured, why = m.unmeasured;
   const f1 = (x: number | null | undefined) => (x === null || x === undefined ? null : Number(x.toFixed(1)));
   return (
@@ -494,7 +498,7 @@ function Detailed({ r, narrow }: { r: Result; narrow: boolean }) {
       </section>
     </div>
   );
-}
+});
 
 /** Minimized: a small tab on the docked edge. Tap it to bring the window back as it was. */
 function MinTab() {

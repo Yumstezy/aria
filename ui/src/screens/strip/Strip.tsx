@@ -20,7 +20,7 @@ function Card() {
         <div className="cp-spread"><span className="cp-cap">Mix check</span><span className="cp-tag cp-tag-idle">Checking</span></div>
         <b style={{ fontSize: 13, lineHeight: "17px" }}>{STEP[progress.step] ?? "Getting ready"}</b>
         <div className="h-2 overflow-hidden rounded-full bg-well">
-          <i className="block h-full rounded-full bg-action transition-[width] duration-200 ease-linear" style={{ width: `${(share ?? 0.08) * 100}%` }} />
+          <i className="block h-full rounded-full bg-action transition-[width] duration-[250ms] ease-linear" style={{ width: `${(share ?? 0.08) * 100}%` }} />
         </div>
         <span className="cp-meta cp-push" style={{ fontSize: 11, lineHeight: "15px" }}>{progress.step === "record" ? `Keep playing. ${progress.detail ?? ""}` : "This takes a few seconds."}</span>
       </section>

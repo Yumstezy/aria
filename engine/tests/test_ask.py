@@ -267,7 +267,8 @@ def test_sidechain_is_a_compressor_then_its_routing():
 
 def test_mute_solo_tempo_and_delete_marker_are_checked():
     assert ask.check_action("track_mute", {"track": "kick", "on": True}, ["Kick"]) == {"track": "Kick", "on": True}
-    assert ask.check_action("track_solo", {"track": "Main", "on": True}, ["Kick"]) is None     # Main can't be soloed
+    assert ask.check_action("track_solo", {"track": "Main", "on": True}, ["Kick"]) is None     # Main has no solo or mute
+    assert ask.check_action("track_mute", {"track": "Main", "on": True}, ["Kick"]) is None
     assert ask.check_action("set_tempo", {"bpm": 140}) == {"bpm": 140.0}
     assert ask.check_action("set_tempo", {"bpm": 4000}) is None
     assert ask.check_action("delete_marker", {"bar": 81}) == {"bar": 81}

@@ -91,8 +91,7 @@ function trackList() {
   return ids(song.get("tracks")).map(function (id, i) {
     const t = new LiveAPI("id " + id);
     return { name: String(one(t, "name")), index: i, group: one(t, "is_foldable") === 1,
-             devices: ids(t.get("devices")).map(function (d) { return String(one(new LiveAPI("id " + d), "name")); }),
-             plugins: pluginsOn(t) };
+             devices: ids(t.get("devices")).map(function (d) { return String(one(new LiveAPI("id " + d), "name")); }) };
   });
 }
 
@@ -147,19 +146,22 @@ function play() {
 // (a locator jump moves the start marker), adding a temporary one if there is none.
 let pendingStart = null;
 
+// Replies jump_done when it's finished, so the next change never overlaps the temporary marker steps
 function jump(bar) {
-  if (!ensureSong()) return;
+  if (!ensureSong()) { send("jump_done", { ok: false, text: "Live isn't ready yet." }); return; }
   const beats = (bar - 1) * beatsPerBar();
+  const done = function () { send("jump_done", { ok: true, text: "Moved the playhead to bar " + bar + "." }); };
   song.set("current_song_time", beats);
-  if (one(song, "is_playing") === 1) return;
+  if (one(song, "is_playing") === 1) { done(); return; }
   if (String(song.info).indexOf("property start_time") >= 0) {
     song.set("start_time", beats);
     post("jump: start_time " + beats + "\n");
+    done();
     return;
   }
   const existing = cueAt(beats);
-  if (existing) { existing.call("jump"); post("jump: existing marker\n"); return; }
-  pendingStart = { beats: beats };
+  if (existing) { existing.call("jump"); post("jump: existing marker\n"); done(); return; }
+  pendingStart = { beats: beats, bar: bar };
   const t = new LiveAPI(function (args) {
     if (!pendingStart || args[0] !== "current_song_time" || Math.abs(args[1] - beats) >= 0.01) return;
     t.property = "";
@@ -187,7 +189,9 @@ function start_cue_jump() {
 function start_cue_remove() {
   if (pendingStart && cueAt(pendingStart.beats)) song.call("set_or_delete_cue");
   post("jump: temporary marker\n");
+  const bar = pendingStart ? pendingStart.bar : 0;
   pendingStart = null;
+  send("jump_done", { ok: true, text: "Moved the playhead to bar " + bar + "." });
 }
 
 function cueAt(beats) {
@@ -206,8 +210,9 @@ function nameMarker(cue) {
   if (!m.restoring) undoStack.push(m.isNew ? { kind: "marker_new", beats: m.beats, bar: m.bar, name: m.name }
                                            : { kind: "marker_rename", id: Number(cue.id), bar: m.bar, name: before });
   cue.set("name", m.name);
-  // Live adds a marker only at the playhead. If the song was stopped, put the playhead back where it was.
-  if (m.isNew && m.from !== null && one(song, "is_playing") !== 1) song.set("current_song_time", m.from);
+  // Put the playhead back where it was, and carry on playing if it was
+  if (m.isNew && m.from !== null) song.set("current_song_time", m.from);
+  if (m.wasPlaying) song.call("continue_playing");
   if (m.restoring) send("undo_done", { ok: true, text: "Put the marker \"" + m.name + "\" back at bar " + m.bar + "." });
   else send("marker_done", { bar: m.bar, name: m.name, ok: true });
 }
@@ -218,12 +223,16 @@ function marker(bar) {
   const name = Array.prototype.slice.call(arguments, 1).join(" ") || "Aria";
   if (!ensureSong()) { send("marker_done", { ok: false, text: "Live isn't ready yet." }); return; }
   const beats = (bar - 1) * beatsPerBar();
-  pendingMarker = { bar: bar, beats: beats, name: name, isNew: false, from: one(song, "current_song_time"), restoring: !!markerRestoring };
+  pendingMarker = { bar: bar, beats: beats, name: name, isNew: false, from: one(song, "current_song_time"), restoring: !!markerRestoring,
+                    wasPlaying: false, before: ids(song.get("cue_points")) };
   markerRestoring = false;
 
   const existing = cueAt(beats);
   if (existing) { nameMarker(existing); return; }
   pendingMarker.isNew = true;
+  // Live adds a marker only at the playhead. While playing, the playhead moves on before the press lands,
+  // so stop, place it exactly, and carry on from where the song was (nameMarker).
+  if (one(song, "is_playing") === 1) { pendingMarker.wasPlaying = true; song.call("stop_playing"); }
 
   // Step 1: move the playhead, wait until Live reports it arrived.
   // Step 2: press set_or_delete_cue, wait until Live reports the new marker.
@@ -247,7 +256,8 @@ function press_cue() {
   if (pendingRemoval) {
     const r = pendingRemoval;
     pendingRemoval = null;
-    if (r.from !== null && one(song, "is_playing") !== 1) song.set("current_song_time", r.from);
+    if (r.from !== null) song.set("current_song_time", r.from);
+    if (r.wasPlaying) song.call("continue_playing");
     if (r.deleting) {
       undoStack.push({ kind: "marker_deleted", bar: r.bar, name: r.name });
       send("marker_deleted", { ok: true, text: "Deleted the marker \"" + r.name + "\" at bar " + r.bar + "." });
@@ -260,21 +270,28 @@ function delete_marker(bar) {
   if (!ensureSong()) { send("marker_deleted", { ok: false, text: "Live isn't ready yet." }); return; }
   const beats = (bar - 1) * beatsPerBar(), cue = cueAt(beats);
   if (!cue) { send("marker_deleted", { ok: false, text: "There's no marker at bar " + bar + "." }); return; }
-  pendingRemoval = { beats: beats, bar: bar, name: String(one(cue, "name")), deleting: true, from: one(song, "current_song_time") };
+  pendingRemoval = { beats: beats, bar: bar, name: String(one(cue, "name")), deleting: true, from: one(song, "current_song_time"),
+                     wasPlaying: one(song, "is_playing") === 1 };
+  if (pendingRemoval.wasPlaying) song.call("stop_playing");
   timeObserver = new LiveAPI(onTime, "live_set");
   timeObserver.property = "current_song_time";
   song.set("current_song_time", beats);
 }
 
+// The marker Live just made: the cue that wasn't there before (or, failing that, the one at the bar)
+function newCue(m) {
+  const fresh = ids(song.get("cue_points")).filter(function (id) { return m.before.indexOf(id) < 0; });
+  return fresh.length ? new LiveAPI("id " + fresh[0]) : cueAt(m.beats);
+}
 function onCues(args) {
   if (!pendingMarker || args[0] !== "cue_points") return;
-  if (!cueAt(pendingMarker.beats)) return;
+  if (!newCue(pendingMarker)) return;
   cueObserver.property = "";
   outlet(0, "defer", "name_cue");
 }
 
 function name_cue() {
-  const cue = pendingMarker && cueAt(pendingMarker.beats);
+  const cue = pendingMarker && newCue(pendingMarker);
   if (cue) nameMarker(cue);
   else send("live_error", { text: "The marker disappeared before Aria could name it." });
 }
@@ -646,7 +663,8 @@ function undo() {
     send("undo_done", { ok: true, text: "Tempo back to " + u.value + " BPM." });
   } else if (u.kind === "marker_new") {
     // set_or_delete_cue toggles: move there, wait for Live to arrive, then press it to remove
-    pendingRemoval = { beats: u.beats, bar: u.bar, name: u.name, from: one(song, "current_song_time") };
+    pendingRemoval = { beats: u.beats, bar: u.bar, name: u.name, from: one(song, "current_song_time"), wasPlaying: one(song, "is_playing") === 1 };
+    if (pendingRemoval.wasPlaying) song.call("stop_playing");
     timeObserver = new LiveAPI(onTime, "live_set");
     timeObserver.property = "current_song_time";
     song.set("current_song_time", u.beats);
@@ -756,6 +774,6 @@ function route_sidechain(trackIndex, fromText) {
   }
   // Undo of the Compressor step puts the routing back too
   const last = undoStack[undoStack.length - 1];
-  if (last && last.kind === "device") last.routing = { id: Number(comp.id), before: before };
+  if (last && last.kind === "device" && last.track === trackIndex && last.name === "Compressor") last.routing = { id: Number(comp.id), before: before };
   send("route_done", { ok: true, text: "The Compressor now listens to \"" + from + "\"." });
 }

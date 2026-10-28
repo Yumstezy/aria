@@ -72,6 +72,8 @@ html.see-through, html.see-through body, .see-through .cp-stage { background: tr
 .cp-ask-pop .cp-did, .cp-chat .cp-did { align-self: flex-start; height: auto; min-height: 26px; padding: 3px 4px 3px 10px; background: var(--well); color: var(--good); }
 .cp-did.is-bad { color: var(--hot); padding-right: 10px; }
 
+@keyframes tickfade { from { opacity: 0; } to { opacity: 1; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

@@ -261,31 +261,54 @@ async function addEars() {
 }
 
 // "Name my tracks" on: Ears go on now, and Check mix puts them back if they're missing (saved in window.json).
-Max.addHandler("listen_tracks", async () => {
+Max.addHandler("listen_tracks", () => serial(listenTracks));
+async function listenTracks() {
   savePrefs({ ...loadWindowPrefs(), keyTracks: true });
   let text = null;
   try { await addEars(); } catch (e) { text = e instanceof UserError ? e.message : `Something went wrong: ${e.message}`; }
   toUI("ears", { busy: false, text });
   pushSession();
-});
+}
 
-Max.addHandler("stop_listening", async () => {
+Max.addHandler("stop_listening", () => serial(async () => {
   savePrefs({ ...loadWindowPrefs(), keyTracks: false });
   let text;
   try { text = (await askLive("remove_ears", "ears_removed")).text; } catch (e) { text = e.message; }
   toUI("ears", { busy: false, text });
   pushSession();
-});
+}));
+
+// ---------- One at a time ----------
+// Everything that changes Live (asks, Do it, Undo, markers, jumps, Ears, Check mix) runs through one queue,
+// so two changes never share live.js's reply slots or its pending steps.
+let liveQueue = Promise.resolve();
+function serial(fn) {
+  const run = liveQueue.then(fn, fn);
+  liveQueue = run.catch(() => {});
+  return run;
+}
+
+// Undo, as the producer sees it: which pill each live.js undo step belongs to, newest last.
+// The UI shows Undo on the top one only; an undone change is marked, never offered again.
+let changeStack = [];   // [{ i: exchange's at, kind: "d" | "s", k }]
+const UNDOABLE = (type) => !["jump_to", "check_mix", "undo", "route_sidechain"].includes(type);
+function sendUndoNext() {
+  const top = changeStack[changeStack.length - 1];
+  const i = top ? askLog.findIndex((x) => x.at === top.at) : -1;
+  toUI("undo_next", top && i >= 0 ? { i, kind: top.kind, k: top.k } : null);
+}
 
 // ---------- live.js ----------
 
+// Reading the whole set takes longer on big projects than one change does
+const LIVE_SLOW = { live_state: 8000, ears_removed: 8000 };
 function askLive(command, reply, ...args) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       if (reply === "live_state") stateWaiters.splice(stateWaiters.indexOf(done) >>> 0, 1);
       else delete waiters[reply];
       reject(new UserError("Live didn't answer. Try removing and adding Aria again."));
-    }, LIVE_TIMEOUT_MS);
+    }, LIVE_SLOW[reply] || LIVE_TIMEOUT_MS);
     const done = (payload) => { clearTimeout(timer); resolve(payload); };
     // Several parts of the bridge ask for the state at once (the window's session line, Ask Muse's
     // context): one reply answers them all. Other replies have one asker at a time.
@@ -307,12 +330,13 @@ Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete wai
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
 Max.addHandler("device_done", (s) => { const w = waiters.device_done; delete waiters.device_done; if (w) w(decode(s)); });
-for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done"]) {
+for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done"]) {
   Max.addHandler(reply, (s) => { const w = waiters[reply]; delete waiters[reply]; if (w) w(decode(s)); });
 }
 Max.addHandler("ears_removed", (s) => { const w = waiters.ears_removed; delete waiters.ears_removed; if (w) w(decode(s)); });
 Max.addHandler("volume_done", (s) => { const w = waiters.volume_done; delete waiters.volume_done; if (w) w(decode(s)); });
-Max.addHandler("live_error", (s) => toUI("error", decode(s)));
+// Not a failed check: a note in the header, so Check mix's own result stays on screen
+Max.addHandler("live_error", (s) => toUI("notice", decode(s)));
 Max.addHandler("live_playing", (on) => {
   if (waiters.live_playing) waiters.live_playing(on === 1);
   if (on === 0 && recording) recording.stopped = true;
@@ -347,6 +371,7 @@ async function checkMix() {
         toUI("ears", { busy: false, text: e instanceof UserError ? e.message : e.message });   // check without them
       }
       pushSession();
+      live = await askLive("state", "live_state");   // the song moved on while the Ears loaded
     }
 
     Max.post(`check_mix: tempo ${live.tempo}, beat ${live.song_beat}, chain ${JSON.stringify(live.chain)}`);
@@ -413,9 +438,17 @@ Max.addHandler("ready", async () => {
   toUI("engine", engineState);
   if (lastResult) toUI("mix_result", lastResult);
   toUI("ask_log", askLog);
+  sendUndoNext();
   pushSession();
   try { await ensureEngine(); } catch (e) { setEngine("error", e.message); }
 });
+
+// Where the window is, as the bridge placed it: the UI's Layout menu, Minimize and the tab follow this
+function layoutNow() {
+  const p = loadWindowPrefs();
+  const side = p.mode === "left" || p.mode === "right" ? p.mode : p.side === "right" ? "right" : "left";
+  return { mode: p.mode === "left" || p.mode === "right" ? p.mode : "full", side };
+}
 
 // What the window shows about the set: tempo, time signature, where Aria sits, and the markers
 async function pushSession() {
@@ -423,7 +456,7 @@ async function pushSession() {
     const live = await askLive("state", "live_state");
     toUI("session", { tempo: live.tempo, signature: live.signature, markers: live.markers,
                       chain: { on_main: live.chain.on_main, after: live.chain.after }, ears: earsOn(live.tracks),
-                      keyTracks: !!loadWindowPrefs().keyTracks });
+                      keyTracks: !!loadWindowPrefs().keyTracks, layout: layoutNow() });
   } catch (e) { /* Live didn't answer; the window says what it doesn't know */ }
 }
 
@@ -432,7 +465,7 @@ Max.addHandler("set_theme", (s) => {
   savePrefs({ ...loadWindowPrefs(), theme });
   toUI("theme", { theme });
 });
-Max.addHandler("check_mix", () => checkMix());
+Max.addHandler("check_mix", () => serial(checkMix));
 // ---------- the window ----------
 
 function loadWindowPrefs() {
@@ -448,6 +481,7 @@ function sizeWindow(target, ui, { x, y, w, h }, docked) {
   Max.outlet(target, "window", "flags", docked ? "float" : "nofloat");
   Max.outlet(target, "window", "flags", docked ? "notitle" : "title");
   Max.outlet(target, "window", "exec");
+  setTimeout(() => toUI("placed", {}), 250);
 }
 
 const FALLBACK_SCREEN = { x: 0, y: 25, w: 1440, h: 875 };
@@ -483,6 +517,7 @@ function placeChatAlone(prefs) {
 }
 
 function savePrefs(prefs) {
+  setTimeout(() => toUI("layout", layoutNow()), 0);   // every page follows where the window really is
   try {
     fs.mkdirSync(path.dirname(WINDOW_FILE), { recursive: true });
     fs.writeFileSync(WINDOW_FILE, JSON.stringify(prefs));
@@ -559,10 +594,12 @@ Max.addHandler("close_window", () => {
 });
 
 Max.addHandler("window_mode", (s) => {
-  const prefs = decode(s);
+  // Keep the rest of the saved choices (theme, Name my tracks): only the layout changes here
+  const prefs = { ...loadWindowPrefs(), ...decode(s) };
   if (prefs.mode === "left" || prefs.mode === "right") prefs.side = prefs.mode;
-  else prefs.side = loadWindowPrefs().side;
+  delete prefs.before;
   savePrefs(prefs);
+  toUI("layout", layoutNow());
   if (chatOpen && prefs.mode !== "full") { placeStack(prefs.mode, prefs.screen || FALLBACK_SCREEN); return; }
   if (chatOpen) { chatOpen = false; Max.outlet("chat", "wclose"); }
   placeWindow(prefs);
@@ -586,16 +623,17 @@ Max.addHandler("restore", () => {
   Max.outlet("window", "front");
 });
 
-Max.addHandler("jump_to", (s) => toLive("jump", decode(s).bar));
-Max.addHandler("add_marker", async (s) => {
+Max.addHandler("jump_to", (s) => serial(() => askLive("jump", "jump_done", decode(s).bar).catch(() => {})));
+Max.addHandler("add_marker", (s) => serial(async () => {
   const { bar, name } = decode(s);
   try {
     const done = await askLive("marker", "marker_done", bar, name);
+    if (done.ok !== false) { changeStack.push({ at: null, kind: "d", k: 0 }); sendUndoNext(); }   // Undo can take it back, but no pill shows it
     toUI("marker_done", done);
   } catch (e) {
-    toUI("error", { text: e.message });
+    toUI("notice", { text: e.message });
   }
-});
+}));
 // ---------- Ask Muse ----------
 
 // One action from Muse's menu, applied in Live. Returns { ok, text } for the UI.
@@ -625,8 +663,7 @@ async function apply(action, tracks = []) {
     case "set_tempo":
       return await askLive("tempo", "tempo_done", a.bpm);
     case "jump_to":
-      toLive("jump", a.bar);
-      return { ok: true, text: `Moved the playhead to bar ${a.bar}.` };
+      return await askLive("jump", "jump_done", a.bar);   // waits, so the next step never overlaps it
     case "add_marker": {
       const m = await askLive("marker", "marker_done", a.bar, a.name);
       if (m.ok === false) return m;
@@ -637,8 +674,9 @@ async function apply(action, tracks = []) {
     case "undo":
       return await askLive("undo", "undo_done");
     case "check_mix":
-      checkMix();
-      return { ok: true, text: "Started a Mix check." };
+      if (busy) return { ok: false, text: "A Mix check is already running." };
+      serial(checkMix);   // queued: it starts once this answer's changes are done
+      return { ok: true, text: "Mix check is next." };
     default:
       return { ok: false, text: `Aria can't do "${action.type}" yet.` };
   }
@@ -683,10 +721,15 @@ async function listDevices(trackName) {
 }
 
 let asking = false;
-Max.addHandler("ask", async (s) => {
-  if (asking) return;
+Max.addHandler("ask", (s) => {
+  let text;
+  try { text = decode(s).text; } catch (e) { return; }
+  if (asking || !text) return;
   asking = true;
-  const { text } = decode(s);
+  return serial(() => runAsk(text));
+});
+
+async function runAsk(text) {
   toUI("ask_pending", { request: text });
   if (/^\/devices\b/i.test(text)) {
     try {
@@ -707,27 +750,50 @@ Max.addHandler("ask", async (s) => {
     if (res.status !== 200 || !res.json) throw new UserError(`Muse couldn't answer (HTTP ${res.status}).`);
     const done = [];
     for (const action of res.json.actions) {
+      // A sidechain's routing only follows its own Compressor
+      if (action.type === "route_sidechain" && done.length && !done[done.length - 1].ok) continue;
       try { done.push({ ...action, ...(await apply(action, context.tracks)) }); }
       catch (e) { done.push({ ...action, ok: false, text: e.message }); }
     }
     const reply = res.json.reply, suggestions = res.json.suggestions;
     // guides: how a third-party plugin should look (Aria draws it; the producer sets it)
-    askLog.push({ request: text, reply, done, suggestions, guides: res.json.guides || [],
-                  problems: res.json.problems || [], error: res.json.error, notes: [], at: Date.now() });
+    const at = Date.now();
+    // Everything failed in Live: the reply would say it was done
+    askLog.push({ request: text, reply: done.length && done.every((d) => !d.ok) ? null : reply, done, suggestions, guides: res.json.guides || [],
+                  problems: res.json.problems || [], error: res.json.error, notes: [], at });
+    noteChanges(at, done);
   } catch (e) {
     askLog.push({ request: text, reply: null, done: [], suggestions: [], problems: [], notes: [], at: Date.now(),
                   error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
   } finally {
+    logChanged();                                   // the answer first, then pending clears: no blink
     toUI("ask_pending", { request: null });
-    logChanged();
     asking = false;
   }
-});
+}
+
+// Each change that went through, in order, onto the Undo stack (an Undo from Muse pops one)
+function noteChanges(at, done) {
+  done.forEach((d, k) => {
+    if (!d.ok) return;
+    if (d.type === "undo") undoneTop();
+    else if (UNDOABLE(d.type)) changeStack.push({ at, kind: "d", k });
+  });
+  sendUndoNext();
+}
+function undoneTop() {
+  const top = changeStack.pop();
+  const x = top && askLog.find((e) => e.at === top.at);
+  if (x && top.kind === "d" && x.done[top.k]) x.done[top.k].undone = true;
+  if (x && top.kind === "s" && x.suggestions[top.k] && x.suggestions[top.k].result) x.suggestions[top.k].result.undone = true;
+}
 
 // The producer answered one of Muse's suggestions. Yes runs it (the engine already checked it).
-Max.addHandler("answer", async (s) => {
-  const { exchange, index, yes } = decode(s);
-  const sg = askLog[exchange] && askLog[exchange].suggestions[index];
+Max.addHandler("answer", (s) => serial(async () => {
+  const { exchange, index, yes, at } = decode(s);
+  // By the exchange's time when given: positions shift once the history is full
+  const x = at ? askLog.find((e) => e.at === at) : askLog[exchange];
+  const sg = x && x.suggestions[index];
   if (!sg || sg.answered) return;
   sg.answered = yes ? "yes" : "no";
   logChanged();
@@ -735,16 +801,23 @@ Max.addHandler("answer", async (s) => {
   let out;
   try { out = await apply(sg, (await askContext()).tracks); } catch (e) { out = { ok: false, text: e.message }; }
   sg.result = { ok: !!out.ok, text: out.text };   // the card becomes the done pill, with Undo
+  if (out.ok && UNDOABLE(sg.type)) changeStack.push({ at: x.at, kind: "s", k: index });
   logChanged();
-});
+  sendUndoNext();
+}));
 
-Max.addHandler("undo", async () => {
+Max.addHandler("undo", () => serial(async () => {
   let out;
   try { out = await askLive("undo", "undo_done"); } catch (e) { out = { ok: false, text: e.message }; }
-  addNote(out.text);
-});
+  const top = changeStack[changeStack.length - 1];
+  if (out.ok) undoneTop();
+  // The note goes on the exchange whose change was undone
+  const i = top ? askLog.findIndex((x) => x.at === top.at) : -1;
+  addNote(out.text, i >= 0 ? i : askLog.length - 1);
+  sendUndoNext();
+}));
 
-Max.addHandler("clear_history", () => { askLog = []; logChanged(); });
+Max.addHandler("clear_history", () => { askLog = []; changeStack = []; logChanged(); sendUndoNext(); });
 
 // The strip's Ask opens the window with Ask Muse open.
 Max.addHandler("open_ask", () => showWindow(pageUrl("window") + "&ask=1"));

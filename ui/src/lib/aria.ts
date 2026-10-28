@@ -50,8 +50,8 @@ export type EngineState = "starting" | "up" | "down" | "error";
 export interface Setting { param: string; value?: number; option?: string; change?: number }
 export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "track_volume" | "track_eq" | "track_device" | "track_plugin" | "check_mix" | "undo"
   | "delete_marker" | "track_mute" | "track_solo" | "set_tempo" | "route_sidechain"; args: Record<string, number | string> & { settings?: Setting[] } }
-export interface Done extends Action { ok: boolean; text: string }
-export interface Suggestion { type: Action["type"]; args: Action["args"]; why: string; answered?: "yes" | "no"; result?: { ok: boolean; text: string } }
+export interface Done extends Action { ok: boolean; text: string; undone?: boolean }
+export interface Suggestion { type: Action["type"]; args: Action["args"]; why: string; answered?: "yes" | "no"; result?: { ok: boolean; text: string; undone?: boolean } }
 /** One band of a plugin guide, in Aria's shapes and units. dynamic_db: how far a dynamic band moves with the music. */
 export interface GuideBand { band: number; shape: string; freq_hz: number; gain_db: number; q: number; dynamic_db?: number }
 /** How a third-party plugin should look: Aria draws it, the producer sets it (Aria can't turn third-party plugins). */
@@ -91,13 +91,18 @@ interface State {
   askFocus: number;
   /** Adding or removing Aria Ears on the key tracks: what's happening, in words */
   ears: { busy: boolean; text: string | null };
-  /** Talking to Muse: listening to the mic, turning it into words, or why it couldn't */
-  voice: { state: "idle" | "listening" | "hearing"; error: string | null };
+  /** Talking to Muse: opening the mic, listening, turning it into words, or why it couldn't */
+  voice: { state: "idle" | "starting" | "listening" | "hearing"; error: string | null };
+  /** The change Undo will undo next, from the bridge: { exchange, done | suggestion, index }. None after a reload. */
+  undoNext: { i: number; kind: "d" | "s"; k: number } | null;
+  /** Where the window is, as the bridge placed it */
+  layout: { mode: "full" | "left" | "right"; side: "left" | "right" } | null;
 }
 
 export type Theme = "sky" | "night";
 /** About the set, from Live: shown in headers and the Get started steps */
-export interface Session { tempo: number; signature: [number, number]; markers: { bar: number; name: string }[]; chain: { on_main: boolean; after: string[] }; ears?: string[]; keyTracks?: boolean }
+export interface Session { tempo: number; signature: [number, number]; markers: { bar: number; name: string }[]; chain: { on_main: boolean; after: string[] }; ears?: string[]; keyTracks?: boolean;
+  layout?: { mode: "full" | "left" | "right"; side: "left" | "right" } }
 
 declare global {
   interface Window {
@@ -110,7 +115,7 @@ export const inMax = typeof window !== "undefined" && !!window.max?.outlet;
 let state: State = {
   ask: { open: typeof location !== "undefined" && new URLSearchParams(location.search).get("ask") === "1", pending: null, log: [] },
   engine: { state: "starting", text: "Starting Aria" },
-  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null },
+  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null }, undoNext: null, layout: null,
 };
 
 // Dark (Night) unless the producer picked Light. Inside Live the bridge saves the choice and puts it in
@@ -136,6 +141,10 @@ function set(patch: Partial<State>) {
   listeners.forEach((l) => l());
 }
 export const useAriaSnapshot = () => state;
+/** One slice of the state: the component re-renders only when that slice changes (not on every progress tick). */
+export function useAriaSel<T>(pick: (s: State) => T): T {
+  return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => pick(state));
+}
 export function useAria() {
   return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => state);
 }
@@ -212,20 +221,35 @@ async function checkEngine() {
 /** Start listening. Call once per screen. */
 export function connect() {
   if (inMax) {
-    on<{ state: EngineState; text: string }>("engine", (e) => set({ engine: e, ...(e.state === "error" ? { error: e.text } : {}) }));
+    on<{ state: EngineState; text: string }>("engine", (e) => set({ engine: e, ...(e.state === "error" ? { error: e.text }
+      : e.state === "up" && state.engine.state === "error" && state.error === state.engine.text ? { error: null } : {}) }));
     on<Progress>("progress", (p) => set({ progress: p, error: null }));
     on<Result>("mix_result", (r) => set({ result: r, progress: null, error: null }));
     on<{ text: string }>("error", (e) => set({ error: e?.text || "Something went wrong.", progress: null }));
     on<{ bar: number; name: string }>("marker_done", (m) => set({ marker: m }));
-    on<{ request: string | null }>("ask_pending", (p) => set({ ask: { ...state.ask, pending: p.request } }));
+    on<{ request: string | null }>("ask_pending", (p) => {
+      // The answer already arrived in ask_log: keep the thread as it is (no flicker)
+      if (p.request === null && !state.ask.pending) return;
+      set({ ask: { ...state.ask, pending: p.request } });
+      if (p.request === null) askQueued();
+    });
     // The bridge owns the history (saved on this Mac) and sends all of it on every change.
-    on<Exchange[]>("ask_log", (log) => set({ ask: { ...state.ask, log } }));
+    on<Exchange[]>("ask_log", (log) => {
+      // The answer to what's pending is in: clear pending in the same update, so the thread never blinks
+      const answered = state.ask.pending !== null && log.length > 0 && log[log.length - 1].request === state.ask.pending;
+      set({ ask: { ...state.ask, log, ...(answered ? { pending: null } : {}) } });
+      if (answered) askQueued();
+    });
+    on<{ i: number; kind: "d" | "s"; k: number } | null>("undo_next", (u) => set({ undoNext: u ?? null }));
+    on<{ text: string }>("notice", (n) => notice(n.text));
+    on("placed", () => arrive());
+    on<{ mode: "full" | "left" | "right"; side: "left" | "right" }>("layout", (l) => set({ layout: l }));
     on<{ theme: Theme }>("theme", (t) => { applyTheme(t.theme); set({ theme: t.theme }); });
     on<Session>("session", (x) => set({ session: x }));
     on<{ busy: boolean; text: string }>("ears", (e) => set({ ears: e }));
     // The mapped key: hold to talk, let go to send. Only the popped-out chat listens, so it records once.
     if (new URLSearchParams(location.search).get("view") === "chat") on<{ down: boolean }>("voice_key", (k) => voiceKey(k.down));
-    on("focus_ask", () => { arrive(); set({ askFocus: state.askFocus + 1 }); });
+    if (new URLSearchParams(location.search).get("view") === "chat") on("focus_ask", () => { arrive(); set({ askFocus: state.askFocus + 1 }); });
     send("ready");   // bridge.js replies with the engine state and the latest result
   } else {
     checkEngine();
@@ -255,9 +279,13 @@ export async function checkMix() {
 
 export const setAskOpen = (open: boolean) => set({ ask: { ...state.ask, open } });
 
+let queued: string | null = null;
+function askQueued() { const q = queued; queued = null; if (q) askMuse(q); }
+
 export async function askMuse(text: string) {
   text = text.trim();
-  if (!text || state.ask.pending) return;
+  if (!text) return;
+  if (state.ask.pending) { queued = text; notice("Muse will do that next."); return; }   // never drop a request
   if (send("ask", { text })) { set({ ask: { ...state.ask, pending: text } }); return; }
   // Development in a normal browser: ask the engine directly. Nothing is applied without Live.
   set({ ask: { ...state.ask, pending: text } });
@@ -276,7 +304,7 @@ export async function askMuse(text: string) {
 }
 
 export function answerSuggestion(exchange: number, index: number, yes: boolean) {
-  if (send("answer", { exchange, index, yes })) return;
+  if (send("answer", { exchange, index, yes, at: state.ask.log[exchange]?.at })) return;
   const log = state.ask.log.map((x, i) => i !== exchange ? x : { ...x, suggestions: x.suggestions.map((sg, k) => k !== index ? sg : { ...sg, answered: (yes ? "yes" : "no") as "yes" | "no" }) });
   set({ ask: { ...state.ask, log } });
 }
@@ -294,20 +322,27 @@ function voiceError(text: string) {
 }
 
 /** The mic button: first press starts listening, the next sends what was said to Muse. */
+let releasedWhileStarting = false;
+
 export async function toggleVoice() {
-  const v = state.voice;
-  if (v.state === "hearing") return;
-  if (v.state === "idle") {
+  const v = state.voice.state;
+  if (v === "hearing" || v === "starting") return;
+  if (v === "idle") {
+    // "starting" at once, so a second press or a key release while the mic opens is handled, not lost
+    releasedWhileStarting = false;
+    set({ voice: { state: "starting", error: null } });
     try { await startRecording(); } catch (e) { voiceError((e as Error).message); return; }
     voiceSince = Date.now();
     set({ voice: { state: "listening", error: null } });
+    if (releasedWhileStarting) toggleVoice();   // the key came up before the mic was ready: send what was said
     return;
   }
   set({ voice: { state: "hearing", error: null } });
   try {
-    const words = await transcribe(await stopRecording());
+    const words = (await transcribe(await stopRecording())).trim();
     set({ voice: { state: "idle", error: null } });
-    askMuse(words);
+    if (words) askMuse(words);
+    else voiceError("Muse didn't hear any words. Try again a little closer to the mic.");
   } catch (e) { voiceError((e as Error).message); }
 }
 
@@ -315,6 +350,7 @@ export async function toggleVoice() {
 function voiceKey(down: boolean) {
   const v = state.voice.state;
   if (down) { if (v === "idle" || v === "listening") toggleVoice(); }
+  else if (v === "starting") releasedWhileStarting = true;
   else if (v === "listening" && Date.now() - voiceSince > 400) toggleVoice();
 }
 
@@ -344,6 +380,8 @@ export function setWindowMode(mode: WindowMode) {
   moveThen(() => send("window_mode", { mode, screen: screenRect() }));
 }
 export function lastDock(): "left" | "right" {
+  const side = state.layout?.side ?? state.session?.layout?.side;
+  if (side) return side;
   try { return localStorage.getItem("aria.dock") === "right" ? "right" : "left"; } catch { return "left"; }
 }
 
