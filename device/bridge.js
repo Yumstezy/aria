@@ -319,7 +319,7 @@ Max.addHandler("check_mix", () => checkMix());
 // ---------- the window ----------
 
 function loadWindowPrefs() {
-  try { return JSON.parse(fs.readFileSync(WINDOW_FILE, "utf8")); } catch (e) { return { mode: "full", screen: null }; }
+  try { return JSON.parse(fs.readFileSync(WINDOW_FILE, "utf8")); } catch (e) { return { mode: "left", side: "left", screen: null }; }   // docked left by default (Ian, Oct 27)
 }
 
 // Docked windows float over Live with no title bar, so their glass can show Live through it.
@@ -344,7 +344,8 @@ const dockHeight = (sc) => sc.h - (dockTop(sc) - sc.y) - 8;
 // Size and place the window for a mode. Docking needs the screen size, which only the page knows.
 function placeWindow({ mode, screen }) {
   if (mode === "side") mode = "right";   // the first version had one side
-  const docked = (mode === "left" || mode === "right") && screen;
+  const docked = mode === "left" || mode === "right";
+  screen = screen || FALLBACK_SCREEN;
   if (!docked) { sizeWindow("window", "aria-window-ui", { x: 120, y: 90, ...FULL }, false); return; }
   sizeWindow("window", "aria-window-ui", { x: dockX(mode, screen), y: dockTop(screen), w: SIDE_W, h: dockHeight(screen) }, true);
 }
@@ -360,7 +361,7 @@ function placeStack(side, sc) {
 // The chat alone (the main window was closed): it takes the full docked height on its side.
 function placeChatAlone(prefs) {
   const sc = prefs.screen || FALLBACK_SCREEN;
-  const side = prefs.side === "left" ? "left" : "right";
+  const side = prefs.side === "right" ? "right" : "left";
   sizeWindow("chat", "aria-chat-ui", { x: dockX(side, sc), y: dockTop(sc), w: SIDE_W, h: dockHeight(sc) }, true);
 }
 
@@ -387,7 +388,12 @@ function showWindow(url) {
   Max.outlet("window", "front");
 }
 
-Max.addHandler("open_window", () => showWindow(pageUrl("window")));
+// The strip sends the screen size, so the window can dock on its very first open
+Max.addHandler("open_window", (s) => {
+  const screen = s && decode(s).screen;
+  if (screen) savePrefs({ ...loadWindowPrefs(), screen });
+  showWindow(pageUrl("window"));
+});
 Max.addHandler("open_chat", (s) => openChatWindow(s && decode(s).screen));
 
 // The mapped key (the strip's "Ask key" in Live's Key Map): pressing it opens Ask Muse, ready to type.
@@ -398,7 +404,7 @@ function openChatWindow(fromPage) {
   const prefs = loadWindowPrefs();
   const screen = fromPage || prefs.screen || FALLBACK_SCREEN;
   // The side it's docked on, or the side it was last docked on
-  const side = prefs.mode === "left" || prefs.mode === "right" ? prefs.mode : prefs.side === "left" ? "left" : "right";
+  const side = prefs.mode === "left" || prefs.mode === "right" ? prefs.mode : prefs.side === "right" ? "right" : "left";
   // Remember the layout it came from (full or docked), so closing the chat goes back to it
   savePrefs({ ...prefs, mode: side, side, screen, before: chatOpen ? prefs.before : prefs.mode });
   if (!windowLoaded) { windowLoaded = true; Max.outlet("window", "url", pageUrl("window")); }
@@ -444,7 +450,7 @@ Max.addHandler("window_mode", (s) => {
 const TAB = { w: 44, h: 132 };
 Max.addHandler("minimize", () => {
   const prefs = loadWindowPrefs(), sc = prefs.screen || FALLBACK_SCREEN;
-  const side = prefs.mode === "left" || prefs.side === "left" ? "left" : "right";
+  const side = prefs.mode === "right" || (prefs.mode !== "left" && prefs.side === "right") ? "right" : "left";
   minimized = { chat: chatOpen };
   if (chatOpen) { chatOpen = false; Max.outlet("chat", "wclose"); }
   const x = side === "left" ? sc.x : sc.x + sc.w - TAB.w;

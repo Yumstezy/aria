@@ -293,7 +293,7 @@ export function setWindowMode(mode: WindowMode) {
   moveThen(() => send("window_mode", { mode, screen: screenRect() }));
 }
 export function lastDock(): "left" | "right" {
-  try { return localStorage.getItem("aria.dock") === "left" ? "left" : "right"; } catch { return "right"; }
+  try { return localStorage.getItem("aria.dock") === "right" ? "right" : "left"; } catch { return "left"; }
 }
 
 /** Docked: shrink to a small tab on the edge, and back. */
@@ -316,7 +316,7 @@ export function useViewport() {
     () => `${window.innerWidth}x${window.innerHeight}`,
   ).split("x").map(Number) as [number, number];
 }
-export const openWindow = () => { if (!send("open_window")) window.open("../window/index.html", "aria-window"); };
+export const openWindow = () => { if (!send("open_window", { screen: screenRect() })) window.open("../window/index.html", "aria-window"); };
 export const addMarker = (bar: number) => send("add_marker", { bar, name: "Aria check" });
 
 /** For previews and tests: show a result without the device (window.Aria.showResult in the console). */

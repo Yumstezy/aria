@@ -256,6 +256,7 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
   - `open_ask`: open the window with the Ask pop-up open.
   - `window_mode {mode: "full" | "left" | "right", screen: {x, y, w, h}}`: size and place the window. Left and right dock to that screen edge and float over Live. Saved in `~/Library/Application Support/Aria/window.json`.
   - `open_chat {screen}`: pop Ask Muse out. The main window shrinks to what to fix, with the chat stacked under it on the docked edge.
+  - `open_window {screen}`: open the window in the saved layout (docked left by default). The screen size lets it dock on the first open.
   - `close_chat {back?}`: close the chat and put the main window back in the layout it had before the pop-out (full or docked). With `back: true` (the chat's Back button) it also reopens the main window if it was closed.
   - `close_window`: close the main window only. A popped-out chat stays and takes the full docked height.
   - `ask_key <0|1>` (from the device's "Ask key" live.text, not the page): the mapped key. A press opens Ask Muse and sends `focus_ask`; a release does nothing until voice.
