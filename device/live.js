@@ -656,3 +656,17 @@ function devices(trackIndex) {
   });
   send("devices_end", { track: String(one(track, "name")), count: devs.length });
 }
+
+// ---------- Aria Ears: "Stop listening" takes every Ear off the key tracks ----------
+
+function remove_ears() {
+  if (!ensureSong()) { send("ears_removed", { text: "Live isn't ready yet." }); return; }
+  const removed = [];
+  ids(song.get("tracks")).forEach(function (id) {
+    const t = new LiveAPI("id " + id), devs = ids(t.get("devices"));
+    for (let i = devs.length - 1; i >= 0; i--) {
+      if (String(one(new LiveAPI("id " + devs[i]), "name")) === "Aria Ear") { t.call("delete_device", i); removed.push(String(one(t, "name"))); }
+    }
+  });
+  send("ears_removed", { text: removed.length ? "Took the Ears off " + removed.join(", ") + "." : "No Ears to take off." });
+}

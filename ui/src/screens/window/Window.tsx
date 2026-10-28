@@ -12,7 +12,7 @@ import { MiniWaves } from "@/components/mini-waves";
 import { AnalyzerIcon, BackIcon, BuriedIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, LayoutIcon, MinimizeIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
-import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, lastDock, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode,
+import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, lastDock, listenTracks, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode, stopListening,
          soundName, useAria, useViewport, type Kind, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +80,7 @@ export function AriaWindow() {
             </div>
           )}
 
+          {view === "mixcheck" && <KeyTracks />}
           {view === "home" ? <Home narrow={narrow} onOpen={() => setView("mixcheck")} />
             : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />
@@ -279,6 +280,29 @@ function WhereItHappens({ r, narrow, onPick }: { r: Result | null; narrow: boole
         </div>
       )}
     </section>
+  );
+}
+
+/** Key tracks mode: with an Aria Ear on each key track, Check mix names the tracks that clash.
+    Aria adds them by track name and takes them off again; Check mix works without them too. */
+function KeyTracks() {
+  const { session, ears } = useAria();
+  const on = session?.ears ?? [];
+  return (
+    <div className="cp-row flex-wrap" style={{ gap: 8 }}>
+      {on.length ? (
+        <>
+          <span className="cp-tag cp-tag-good">Listening to {on.join(", ")}</span>
+          <button className="cp-btn cp-btn-ghost cp-btn-sm" disabled={ears.busy} onClick={stopListening}>Stop listening</button>
+        </>
+      ) : (
+        <>
+          <button className="cp-btn cp-btn-sm" disabled={ears.busy} onClick={listenTracks}>Listen to my key tracks</button>
+          {!ears.text && <span className="cp-meta">Names the tracks that clash. Aria adds a small Ear to Kick, Bass, Leads and Vocals.</span>}
+        </>
+      )}
+      {ears.text && <span className="cp-meta">{ears.text}</span>}
+    </div>
   );
 }
 

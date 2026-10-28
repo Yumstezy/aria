@@ -1,6 +1,8 @@
-"""Aria's helper inside Live. ON HOLD (Oct 27, Ian): Aria no longer adds or turns third-party plugins; it shows
-how they should look instead (engine/aria_engine/guides.py). The bridge doesn't call this script, and install.sh
-no longer installs it. Kept for later: it works in Live 12.4 (it found 277 plugins on Ian's Mac).
+"""Aria's helper inside Live. Used for one thing (Oct 27, Ian): "Listen to my key tracks" puts an Aria Ear on
+each key track, which only the browser can do (Live's API inserts only Live's own devices). Loading third-party
+plugins is on hold: Aria shows how they should look instead (engine/aria_engine/guides.py).
+
+  {"cmd": "load_ear", "track": 3}  -> {"ok": true, "name": "Aria Ear", "index": 2}
 
 
 Max for Live can't reach Live's browser, so it can't add a third-party plugin. A Remote Script can:
@@ -123,6 +125,12 @@ class Aria(ControlSurface):
             self._reply(c, {"ok": True, "plugins": names})
         elif cmd == "tree":
             self._reply(c, {"ok": True, "tree": self._tree(self.application().browser.plugins, int(msg.get("depth", 3)))})
+        elif cmd == "load_ear":
+            ear = self._user_item("Aria Ear")
+            if not ear:
+                self._reply(c, {"ok": False, "missing": True, "text": "Aria Ear isn't in the User Library. Run install.sh again."})
+            else:
+                self._load(c, int(msg.get("track", -1)), "Aria Ear", ear)
         elif cmd == "load":
             self._load(c, int(msg.get("track", -1)), str(msg.get("name", "")))
         else:
@@ -151,6 +159,31 @@ class Aria(ControlSurface):
             self._plugins = found
             self.log_message("Aria: found %d plugins" % len(found))
         return self._plugins
+
+    def _user_item(self, name):
+        """A device in the User Library's Presets folder by name ("Aria Ear" finds "Aria Ear.amxd"), or None."""
+        want = key(name)
+        try:
+            presets = [c for c in self.application().browser.user_library.children if key(c.name) == "presets"]
+        except Exception:
+            return None
+
+        def walk(item, depth):
+            for child in item.children:
+                base = child.name[:-5] if child.name.lower().endswith(".amxd") else child.name
+                if child.is_loadable and key(base) == want:
+                    return child
+                if depth < 5 and not child.is_loadable:
+                    hit = walk(child, depth + 1)
+                    if hit:
+                        return hit
+            return None
+
+        for p in presets:
+            hit = walk(p, 1)
+            if hit:
+                return hit
+        return None
 
     def _aria_preset(self, plugin):
         """The producer's "<plugin> (Aria)" rack or preset in the User Library's Presets folder, or None.
@@ -214,7 +247,7 @@ class Aria(ControlSurface):
         tracks = list(song.tracks)
         return tracks[index] if index < len(tracks) else None
 
-    def _load(self, c, index, name):
+    def _load(self, c, index, name, item=None):
         if self._loading:
             self._reply(c, {"ok": False, "text": "Aria is still adding a plugin."})
             return
@@ -222,12 +255,12 @@ class Aria(ControlSurface):
         if track is None:
             self._reply(c, {"ok": False, "text": "No track %d." % index})
             return
-        hit = self._find(name)
+        hit = (name, "", item) if item is not None else self._find(name)
         if not hit:
             self._reply(c, {"ok": False, "missing": True, "text": "%s isn't in Live's plugin list." % name})
             return
         # A preset the producer saved as "<plugin> (Aria)" has its knobs picked with Configure, so Aria can set them
-        preset = self._aria_preset(hit[0])
+        preset = None if item is not None else self._aria_preset(hit[0])
         if preset:
             hit = (hit[0], hit[1], preset)
         song = self.song()

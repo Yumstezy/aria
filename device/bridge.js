@@ -12,6 +12,7 @@
 
 const fs = require("fs");
 const http = require("http");
+const net = require("net");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
@@ -196,6 +197,68 @@ function stopEngine() {
 
 ["SIGTERM", "SIGINT", "exit"].forEach((sig) => process.on(sig, () => { stopEngine(); if (sig !== "exit") process.exit(0); }));
 
+// ---------- Aria's helper in Live (device/remote): puts Aria Ears on key tracks ----------
+// Live's API inserts only Live's own devices, so a Max for Live device like Aria Ear needs the browser.
+
+const REMOTE = { host: "127.0.0.1", port: Number(process.env.ARIA_REMOTE_PORT) || 8766 };   // tests use another port
+const REMOTE_TIMEOUT_MS = 8000;
+const REMOTE_OFF = "To add Ears for you, Aria's helper has to be on: in Live, Settings > Link, Tempo & MIDI > Control Surface, pick Aria.";
+
+function remote(cmd) {
+  return new Promise((resolve, reject) => {
+    const sock = net.createConnection(REMOTE);
+    let buf = "";
+    const fail = (text) => { sock.destroy(); reject(new UserError(text)); };
+    sock.setTimeout(REMOTE_TIMEOUT_MS, () => fail("Live took too long to add the Ear."));
+    sock.on("error", () => fail(REMOTE_OFF));
+    sock.on("connect", () => sock.write(JSON.stringify(cmd) + "\n"));
+    sock.on("data", (d) => {
+      buf += d;
+      const nl = buf.indexOf("\n");
+      if (nl < 0) return;
+      sock.end();
+      try { resolve(JSON.parse(buf.slice(0, nl))); } catch (e) { reject(new UserError("Aria's helper in Live sent something odd.")); }
+    });
+  });
+}
+
+// Key tracks by name: the parts whose clashes matter most. Up to six, in the set's order.
+const KEY_TRACK = /kick|bass|sub|808|lead|synth|vocal|vox|voice|pad|chord|keys|drum|perc|snare|clap|pluck|arp/i;
+const MAX_EARS = 6;
+const EAR = "Aria Ear";
+const earsOn = (tracks) => tracks.filter((t) => (t.devices || []).includes(EAR)).map((t) => t.name);
+
+Max.addHandler("listen_tracks", async () => {
+  let text;
+  try {
+    const live = await askLive("state", "live_state");
+    const have = earsOn(live.tracks);
+    const pick = live.tracks.filter((t) => KEY_TRACK.test(t.name) && !have.includes(t.name)).slice(0, Math.max(0, MAX_EARS - have.length));
+    if (have.length + pick.length < 2) {
+      throw new UserError("Aria didn't find key tracks by name (Kick, Bass, Lead, Vocal and so on). Rename them, or drop Aria Ear on the tracks you want.");
+    }
+    toUI("ears", { busy: true, text: `Adding Ears to ${pick.map((t) => t.name).join(", ")}` });
+    const added = [];
+    for (const t of pick) {
+      const r = await remote({ cmd: "load_ear", track: t.index });
+      if (!r.ok) throw new UserError(r.text);
+      added.push(t.name);
+    }
+    text = `Listening to ${[...have, ...added].join(", ")}. Press Check mix.`;
+  } catch (e) {
+    text = e instanceof UserError ? e.message : `Something went wrong: ${e.message}`;
+  }
+  toUI("ears", { busy: false, text });
+  pushSession();
+});
+
+Max.addHandler("stop_listening", async () => {
+  let text;
+  try { text = (await askLive("remove_ears", "ears_removed")).text; } catch (e) { text = e.message; }
+  toUI("ears", { busy: false, text });
+  pushSession();
+});
+
 // ---------- live.js ----------
 
 function askLive(command, reply, ...args) {
@@ -226,6 +289,7 @@ Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete wai
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
 Max.addHandler("device_done", (s) => { const w = waiters.device_done; delete waiters.device_done; if (w) w(decode(s)); });
+Max.addHandler("ears_removed", (s) => { const w = waiters.ears_removed; delete waiters.ears_removed; if (w) w(decode(s)); });
 Max.addHandler("volume_done", (s) => { const w = waiters.volume_done; delete waiters.volume_done; if (w) w(decode(s)); });
 Max.addHandler("live_error", (s) => toUI("error", decode(s)));
 Max.addHandler("live_playing", (on) => {
@@ -325,7 +389,7 @@ async function pushSession() {
   try {
     const live = await askLive("state", "live_state");
     toUI("session", { tempo: live.tempo, signature: live.signature, markers: live.markers,
-                      chain: { on_main: live.chain.on_main, after: live.chain.after } });
+                      chain: { on_main: live.chain.on_main, after: live.chain.after }, ears: earsOn(live.tracks) });
   } catch (e) { /* Live didn't answer; the window says what it doesn't know */ }
 }
 

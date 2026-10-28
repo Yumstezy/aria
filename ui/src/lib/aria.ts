@@ -87,11 +87,13 @@ interface State {
   session: Session | null;
   /** Goes up each time the mapped key opens Ask Muse, so its input takes focus */
   askFocus: number;
+  /** Adding or removing Aria Ears on the key tracks: what's happening, in words */
+  ears: { busy: boolean; text: string | null };
 }
 
 export type Theme = "sky" | "night";
 /** About the set, from Live: shown in headers and the Get started steps */
-export interface Session { tempo: number; signature: [number, number]; markers: { bar: number; name: string }[]; chain: { on_main: boolean; after: string[] } }
+export interface Session { tempo: number; signature: [number, number]; markers: { bar: number; name: string }[]; chain: { on_main: boolean; after: string[] }; ears?: string[] }
 
 declare global {
   interface Window {
@@ -104,7 +106,7 @@ export const inMax = typeof window !== "undefined" && !!window.max?.outlet;
 let state: State = {
   ask: { open: typeof location !== "undefined" && new URLSearchParams(location.search).get("ask") === "1", pending: null, log: [] },
   engine: { state: "starting", text: "Starting Aria" },
-  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0,
+  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null },
 };
 
 // Dark (Night) unless the producer picked Light. Inside Live the bridge saves the choice and puts it in
@@ -216,6 +218,7 @@ export function connect() {
     on<Exchange[]>("ask_log", (log) => set({ ask: { ...state.ask, log } }));
     on<{ theme: Theme }>("theme", (t) => { applyTheme(t.theme); set({ theme: t.theme }); });
     on<Session>("session", (x) => set({ session: x }));
+    on<{ busy: boolean; text: string }>("ears", (e) => set({ ears: e }));
     on("focus_ask", () => { arrive(); set({ askFocus: state.askFocus + 1 }); });
     send("ready");   // bridge.js replies with the engine state and the latest result
   } else {
@@ -273,6 +276,10 @@ export function answerSuggestion(exchange: number, index: number, yes: boolean) 
 }
 
 export const undoLast = () => send("undo");
+
+/** Key tracks mode: Aria puts an Ear on each key track (by name), or takes them all off. */
+export const listenTracks = () => { if (send("listen_tracks")) set({ ears: { busy: true, text: "Finding your key tracks" } }); };
+export const stopListening = () => { if (send("stop_listening")) set({ ears: { busy: true, text: "Taking the Ears off" } }); };
 
 /** Fix it: Muse gets the problem in plain words and makes the change in Live, with Undo. */
 export function fixIt(p: { name: string; short: string; findings: Finding[] }) {
