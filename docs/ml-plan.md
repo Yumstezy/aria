@@ -37,12 +37,13 @@ Files:
 
 ## Labels
 
-- Average the overall ratings per mix.
-  - 4.0 and above is "good".
-  - 2.5 and below is "needs work".
-  - Leave the middle out of the first binary model.
-- Measure how well raters agree (for example Krippendorff's alpha). If raters disagree a lot, the model can't do better than they do, and we say so.
-- The per-aspect labels (too little, about right, too much) become one small classifier each, if there's enough data.
+**Decided Oct 28 (Ian):** one genre, and mixes that already come rated, so no rating round is needed. Three tiers: **good, mid and bad**. The model learns what separates them: what makes a good mix better than a mid one, and a mid one better than a bad one.
+
+- Each mix's existing rating becomes its tier. Write the mapping down (for example a score out of 10: 8 and up good, 5 to 7 mid, under 5 bad) and keep it fixed.
+- Keep where each rating came from in the manifest. The rules below still hold: real mixes, real ratings, and permission to train on them.
+- Treat the tiers as ordered (bad < mid < good): an ordinal model, or two yes/no steps (bad vs better, mid vs good).
+- What it outputs is what's wrong, not only a tier: the measurements that pull a mix down a tier, with how far they are from the good mixes ("low mids 3 dB heavier than good mixes in this genre"). See "Features" and "How it plugs into Aria".
+- **Later, the reference track (build step 8):** a different view, for producers going for one particular sound. The model says how the mix compares with good mixes in the genre; the reference says how it compares with the one track they want to sound like.
 
 ## Features
 
