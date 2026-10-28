@@ -80,6 +80,12 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {
             "bar": {"type": "integer", "minimum": 1}, "name": {"type": "string", "maxLength": MAX_NAME}}, "required": ["bar", "name"]}}},
     {"type": "function", "function": {
+        "name": "set_section", "description": "Make bars first_bar to last_bar a named section of the song (sections are the markers in "
+                                               "Live): a marker with that name at first_bar, and one after last_bar so the rest keeps its name.",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string", "maxLength": MAX_NAME}, "first_bar": {"type": "integer", "minimum": 1},
+            "last_bar": {"type": "integer", "minimum": 1}}, "required": ["name", "first_bar", "last_bar"]}}},
+    {"type": "function", "function": {
         "name": "eq_band", "description": "Set one band on Live's EQ Eight at the end of the Main track (Aria adds one if needed). Changes the whole mix.",
         "parameters": {"type": "object", "properties": EQ_PROPS, "required": ["freq_hz"]}}},
     {"type": "function", "function": {
@@ -133,7 +139,8 @@ would help, use "suggest" for it instead, and it waits for their yes.
 
 You get JSON context: the latest Mix check findings (what sticks out, where, by how much), the bars it covered,
 the playhead bar, the tempo, the markers already in the producer's Live set (name and bar), and their tracks (name). When they name a
-part of the song, like "the drop", use a marker with that name; if there isn't one, say so. Use only numbers from the context or from the producer's words. Never invent a number.
+part of the song, like "the drop", use a marker with that name; if there isn't one, say so. "Make bars 97 to 112 the drop"
+(a stretch of bars becomes a section): use set_section, not add_marker. Use only numbers from the context or from the producer's words. Never invent a number.
 If they ask for a fix from the findings, use the finding's frequency.
 EQ uses Live's own EQ Eight, which every producer has. Pick the shape from their words:
 - "cut the low end", "high-pass", "remove the lows below X": shape low_cut at X. "hard", "steep" or "brick wall": steep true.
@@ -319,6 +326,26 @@ def _setting(st):
     return {"param": param, k: round(v, 2)}
 
 
+def section_markers(args, markers):
+    """set_section as markers: the name at first_bar and, unless a marker already sits right after last_bar,
+    one there with the name of the section that was playing there, so the rest of the song keeps its name."""
+    try:
+        name, first, last = str(args["name"]).strip(), int(args["first_bar"]), int(args["last_bar"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not name or len(name) > MAX_NAME or not 1 <= first <= last <= 9999:
+        return None
+    name = name[0].upper() + name[1:]   # "drop" reads as a section name: "Drop"
+    out = [{"bar": first, "name": name}]
+    after = last + 1
+    bars = {int(m.get("bar", 0)): str(m.get("name", "")) for m in markers if isinstance(m, dict)}
+    if after not in bars:
+        before = [b for b in bars if b <= after and not first <= b <= last]
+        # The section that was playing after the new one, or a plain "After <name>" when nothing was marked
+        out.append({"bar": after, "name": bars[max(before)] if before else f"After {name}"[:MAX_NAME]})
+    return out
+
+
 def why_dropped(name, args, tracks=(), plugins=()):
     """One plain sentence on why a call was dropped, for the producer."""
     if name == "track_plugin" and isinstance(args, dict) and not match_plugin(args.get("plugin"), plugins):
@@ -450,6 +477,14 @@ def interpret(message, context, request):
             else:
                 dropped += 1
                 problems.append(why_dropped(str(args.get("action")), args.get("args"), tracks, plugins))
+            continue
+        if name == "set_section":
+            marks = section_markers(args, context.get("markers") or [])
+            if marks:
+                actions += [{"type": "add_marker", "args": m} for m in marks]
+            else:
+                dropped += 1
+                problems.append("Aria needs a name and bars in order (first bar, then last) to make a section.")
             continue
         cleaned = check_action(name, args, tracks, plugins)
         if cleaned is None:

@@ -234,3 +234,21 @@ def test_track_plugin_needs_a_plugin_muse_was_shown():
     assert set_now["then_set"] is False                                  # knobs already given: nothing to come back for
     assert ask.check_action("track_plugin", {"track": "SYNTH TEST", "plugin": "Serum"}, ["SYNTH TEST"], INSTALLED) is None
     assert "plugin list" in ask.why_dropped("track_plugin", {"track": "SYNTH TEST", "plugin": "Serum"}, ["SYNTH TEST"], INSTALLED)
+
+
+def test_a_section_gets_a_marker_at_each_end_and_the_rest_keeps_its_name():
+    marks = [{"bar": 1, "name": "Intro"}, {"bar": 81, "name": "Outro"}]
+    assert ask.section_markers({"name": "Drop", "first_bar": 97, "last_bar": 112}, marks) == \
+        [{"bar": 97, "name": "Drop"}, {"bar": 113, "name": "Outro"}]
+    assert ask.section_markers({"name": "Intro", "first_bar": 1, "last_bar": 16}, [{"bar": 17, "name": "Verse"}]) == \
+        [{"bar": 1, "name": "Intro"}]                      # bar 17 is already marked
+    assert ask.section_markers({"name": "Build", "first_bar": 9, "last_bar": 16}, []) == \
+        [{"bar": 9, "name": "Build"}, {"bar": 17, "name": "After Build"}]
+    assert ask.section_markers({"name": "Drop", "first_bar": 20, "last_bar": 10}, []) is None
+
+
+def test_set_section_becomes_marker_actions():
+    section = SimpleNamespace(function=SimpleNamespace(name="set_section", arguments=json.dumps({"name": "drop", "first_bar": 97, "last_bar": 112})))
+    out = ask.interpret(msg("Making bars 97 to 112 the drop.", section), {"markers": [{"bar": 81, "name": "Outro"}]}, "make bars 97 to 112 the drop")
+    assert out["actions"] == [{"type": "add_marker", "args": {"bar": 97, "name": "Drop"}},
+                              {"type": "add_marker", "args": {"bar": 113, "name": "Outro"}}]
