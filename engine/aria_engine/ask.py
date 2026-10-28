@@ -10,6 +10,8 @@ import re
 
 from openai import OpenAI, OpenAIError
 
+from aria_engine import guides
+
 TIMEOUT_SEC = 20
 MAX_TOKENS = 1200
 MAX_NAME = 32
@@ -98,18 +100,19 @@ TOOLS = [
                          "items": SETTING_ITEM}},
             "required": ["track", "device"]}}},
     {"type": "function", "function": {
-        "name": "track_plugin",
-        "description": "Put a third-party plugin the producer named on a track (or Main), or adjust the one already there, and set its knobs. "
-                       "Aria loads it from Live's plugin list if it isn't on the track yet.",
+        "name": "plugin_guide",
+        "description": "Show the producer how a third-party plugin they named should look: Aria draws the EQ curve and lists the bands, "
+                       "and they set it themselves. Aria can't add or turn third-party plugins.",
         "parameters": {"type": "object", "properties": {
-            "track": {"type": "string", "description": "Exact track name from context.tracks, or Main for the whole mix."},
-            "plugin": {"type": "string", "description": "The plugin's name exactly as in context.plugins or context.tracks[].plugins."},
-            "settings": {"type": "array", "maxItems": MAX_SETTINGS,
-                         "description": "Knobs to set, by the names in that track's plugins[].knobs only. Empty when the plugin isn't on the track yet.",
-                         "items": SETTING_ITEM},
-            "then_set": {"type": "boolean", "description": "True when they also asked for a change on this plugin and it isn't on the track yet: "
-                                                          "once it's loaded, Aria asks you again with its knob names."}},
-            "required": ["track", "plugin"]}}},
+            "plugin": {"type": "string", "description": "The plugin they named, like FabFilter Pro-Q 4 (the exact name from context.plugin_presets when it's there)."},
+            "track": {"type": "string", "description": "The track it's for, from context.tracks, if they said."},
+            "preset": {"type": "string", "description": "One of their presets from context.plugin_presets that fits. Aria reads its real bands."},
+            "bands": {"type": "array", "maxItems": 8, "description": "Your own bands, only when no preset fits (standard starting points).",
+                      "items": {"type": "object", "properties": {
+                          "shape": {"type": "string", "enum": SHAPES}, "freq_hz": {"type": "number", "minimum": 20, "maximum": 20000},
+                          "gain_db": {"type": "number", "minimum": -12, "maximum": 12}, "q": {"type": "number", "minimum": 0.1, "maximum": 12}},
+                          "required": ["shape", "freq_hz"]}}},
+            "required": ["plugin"]}}},
     {"type": "function", "function": {
         "name": "check_mix", "description": "Run a new Mix check: Aria records 16 bars of Main and analyzes them.",
         "parameters": {"type": "object", "properties": {}}}},
@@ -119,7 +122,7 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "suggest", "description": "Offer a change the producer did NOT ask for. It is shown with Do it / Not now and only runs if they say yes.",
         "parameters": {"type": "object", "properties": {
-            "action": {"type": "string", "enum": ["jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device", "track_plugin"]},
+            "action": {"type": "string", "enum": ["jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device"]},
             "args": {"type": "object"},
             "why": {"type": "string", "maxLength": MAX_WHY}}, "required": ["action", "args", "why"]}}},
 ]
@@ -177,24 +180,17 @@ change moves a knob from where it is now, so use it only when context.tracks sho
 If the device isn't there yet, Aria adds a fresh one with Live's own defaults (a fresh Compressor's Threshold is
 0 dB, which does nothing). So for "compress it and raise the threshold by 2 dB", start from the everyday starting
 point and apply their move to it, as values (Threshold -16 dB, Ratio 3, Attack 10 ms, Release 100 ms), and say so.
-Third-party plugins (FabFilter Pro-Q, Valhalla, Ozone, Serum and others): use them only when the producer names one.
-context.plugins lists the installed plugins their words name. context.tracks[].plugins lists the plugins already on
-each track, with the knob names Live shows for each.
-- To add one or set it, use track_plugin with the plugin's exact name from those lists. If they name it without a
-  version and several versions are listed ("pro q": Pro-Q 2, 3 and 4), use the newest. Aria adds it if it isn't on
-  the track. Set knobs only by names in that track's plugins[].knobs, in the units Live shows.
-- If the plugin isn't on the track yet, you can't know its knob names: add it with no settings. If they also asked
-  for a change on it ("pro q 4 and cut the lows at 400 Hz"), set then_set true: once it's loaded Aria asks you again.
-- context.follow_up means Aria just added those plugins for this same request. Now set their knobs for what they
-  asked, with track_plugin and the knob names in context.tracks[].plugins. If the knobs you need aren't listed,
-  say in one sentence that Live isn't showing that plugin's knobs yet (the fix: in Live press Configure on it, move
-  the knobs, and save it as a preset named "<plugin> (Aria)"), and suggest the same move with Live's stock tools
-  (track_eq or track_device) in a "suggest". Call nothing else.
-- If the plugin they name isn't in context.plugins or on the track, or context.plugin_helper is "off", say so in one
-  short sentence (helper off: "Turn on Aria in Live's Settings, Link Tempo and MIDI, Control Surface"), and offer
-  the same job with Live's stock tools in a "suggest" (Pro-Q is EQ Eight, Pro-C is Compressor, Pro-L is Limiter,
-  Valhalla is Reverb or Hybrid Reverb). If they named a move, the suggest carries it (track_eq low_cut at 400 Hz, or
-  track_device with their settings); with no move named, track_device with no settings.
+Third-party plugins (FabFilter Pro-Q, Valhalla, Ozone, Serum and others): Aria can't add or turn them. When the
+producer names one, show them how it should look with plugin_guide, and they set it themselves:
+- context.plugin_presets lists their own presets for the plugins they named (name, folder, what it's for, and
+  "curve": its biggest moves). Pick by the curve, not only the name: "air on my vocals" needs a vocal preset whose
+  curve lifts the top (a high shelf or a boost above 8000 Hz). If one fits, pass it as preset; Aria draws its real
+  bands. If several versions of a plugin are listed, use the newest.
+- If none fits, pass your own bands instead: standard starting points (air: high_shelf +2 dB at 10000 Hz;
+  clarity: bell +2 dB at 3000 Hz; mud: bell -3 dB at 300 Hz), and say they're a starting point.
+- Your reply says what to do in one or two short sentences ("Here's how it should look in Pro-Q 4. Set band 1
+  to a high shelf at 10 kHz and raise it about 2 dB."). Don't say Aria added or changed the plugin.
+- You may also offer the same move with Live's stock tools in a "suggest", so Aria can do it for them.
 Don't make up a setting they didn't ask for.
 If you can't do what they ask with these tools, say so plainly and don't call a tool.
 
@@ -334,6 +330,36 @@ def why_dropped(name, args, tracks=(), plugins=()):
     return f"Muse asked for {name.replace('_', ' ')} with values outside Aria's limits, so Aria skipped it."
 
 
+def check_guide(args, tracks=()):
+    """A plugin guide, with its bands read from the producer's preset, or None if there's nothing to draw."""
+    plugin = str(args.get("plugin") or "").strip()[:60]
+    if not plugin:
+        return None
+    known = match_plugin(plugin, guides.plugin_names())
+    entry = guides.find(known, args["preset"]) if known and args.get("preset") else None
+    if entry:
+        bands, source = guides.preset_bands(entry), "preset"
+    else:
+        raw = args.get("bands") or []
+        if not isinstance(raw, list) or len(raw) > 8:
+            return None
+        bands, source = [], "aria"
+        for i, b in enumerate(raw):
+            shape = b.get("shape") if isinstance(b, dict) else None
+            if shape not in SHAPES:
+                return None
+            f, g = float(b["freq_hz"]), 0.0 if shape in NO_GAIN else float(b.get("gain_db") or 0)
+            q = float(b.get("q") or (CUT_Q if shape in ("low_cut", "high_cut") else DEFAULT_Q))
+            if not (20 <= f <= 20000 and -12 <= g <= 12 and 0.1 <= q <= 12):
+                return None
+            bands.append({"band": i + 1, "shape": shape, "freq_hz": round(f), "gain_db": round(g, 1), "q": round(q, 2), "dynamic_db": 0.0})
+    if not bands:
+        return None
+    track = match_track(args.get("track"), tracks) if args.get("track") else None
+    return {"plugin": known or plugin, "track": track, "preset": entry["name"] if entry else None,
+            "about": guides.about(entry) if entry else "", "source": source, "bands": bands}
+
+
 def check_action(name, args, tracks=(), plugins=()):
     """Return the cleaned args if this call is on the menu and in range, else None.
     Track tools must name a track that exists in the set; track_plugin, a plugin Muse was shown."""
@@ -396,7 +422,7 @@ def check_action(name, args, tracks=(), plugins=()):
 
 def interpret(message, context, request):
     """Turn Muse's reply into {reply, actions, suggestions, dropped, problems}. Exposed for tests."""
-    actions, suggestions, dropped, problems = [], [], 0, []
+    actions, suggestions, dropped, problems, shown = [], [], 0, [], []
     tracks = [t["name"] if isinstance(t, dict) else str(t) for t in context.get("tracks") or []]
     plugins = plugin_names(context)
     for call in getattr(message, "tool_calls", None) or []:
@@ -406,10 +432,18 @@ def interpret(message, context, request):
         except json.JSONDecodeError:
             dropped += 1
             continue
+        if name == "plugin_guide":
+            g = check_guide(args, tracks)
+            if g:
+                shown.append(g)
+            else:
+                dropped += 1
+                problems.append(f'Aria has nothing to draw for {args.get("plugin") or "that plugin"} yet.')
+            continue
         if name == "suggest":
             inner = check_action(args.get("action"), args.get("args"), tracks, plugins)
             why = str(args.get("why", "")).strip()[:MAX_WHY]
-            if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device", "track_plugin") and why:
+            if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device") and why:
                 suggestions.append({"type": args["action"], "args": inner, "why": why})
             else:
                 dropped += 1
@@ -426,27 +460,38 @@ def interpret(message, context, request):
     if reply:
         reply = re.sub(r"\s*[\u2014\u2013]\s*", ", ", reply)   # no em or en dashes in anything the producer reads
     if reply:
-        allowed = _allowed(context, request, actions + [{"args": s["args"]} for s in suggestions])
+        allowed = _allowed(context, request, actions + [{"args": s["args"]} for s in suggestions] + [{"args": g} for g in shown])
         if any(round(n, 2) not in allowed for n in _numbers(reply)):
             reply = None   # cited a number we don't have; the actions themselves still stand
-    if problems and not actions:
+    if problems and not actions and not shown:
         reply = None   # it would say it was done, and nothing was
-    return {"reply": reply, "actions": actions, "suggestions": suggestions, "dropped": dropped, "problems": problems}
+    return {"reply": reply, "actions": actions, "suggestions": suggestions, "guides": shown, "dropped": dropped, "problems": problems}
 
 
 # Everyday names for the split parts, so Muse never says "other"
 PART_NAMES = {"vocals": "vocal", "other": "synths and keys", "drums": "drums and loops", "bass": "bass", "the rest": "the rest of the mix"}
 
 
+def newest(names):
+    """Of several versions of one plugin (Pro-Q 2, 3 and 4), keep the newest."""
+    best = {}
+    for n in names:
+        m = re.match(r"(.*?)(\d+)?$", n.strip())
+        family, version = m.group(1).strip(), int(m.group(2) or 0)
+        if family not in best or version > best[family][1]:
+            best[family] = (n, version)
+    return [n for n, _ in best.values()]
+
+
 def friendly(context, request=""):
     """Context for Muse with everyday part names. Numbers are untouched.
-    Of the installed plugins, Muse sees only the ones the request names; None means Aria's helper in Live is off."""
+    For each third-party plugin the request names, Muse sees the producer's presets that fit (plugin guides)."""
     out = dict(context)
-    if context.get("plugins") is None:
-        out["plugins"] = None
-        out["plugin_helper"] = "off"
-    else:
-        out["plugins"] = mentioned_plugins(request, context["plugins"])
+    out.pop("plugins", None)
+    out["tracks"] = [{k: v for k, v in t.items() if k != "plugins"} if isinstance(t, dict) else t for t in context.get("tracks") or []]
+    named = newest(mentioned_plugins(request, guides.plugin_names()))[:2]
+    if named:
+        out["plugin_presets"] = {p: guides.candidates(p, request, 8) for p in named}
     out["recent"] = (context.get("recent") or [])[-RECENT:]
     out["findings"] = [{k: PART_NAMES.get(v, v) if k in ("masked", "by") else v for k, v in f.items()}
                        for f in context.get("findings") or []]
@@ -458,10 +503,10 @@ def ask(request, context, client=None):
     request = (request or "").strip()
     context = friendly(context or {}, request)
     if not request:
-        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "problems": [], "error": "Say what you'd like Muse to do."}
+        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "dropped": 0, "problems": [], "error": "Say what you'd like Muse to do."}
     key = os.environ.get("MODEL_API_KEY", "").strip()
     if client is None and not key:
-        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "problems": [],
+        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "dropped": 0, "problems": [],
                 "error": "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."}
     if client is None:
         client = OpenAI(api_key=key, base_url=os.environ.get("MUSE_BASE_URL", "https://api.meta.ai/v1"),
@@ -473,14 +518,14 @@ def ask(request, context, client=None):
             messages=[{"role": "system", "content": PROMPT},
                       {"role": "user", "content": json.dumps({"context": context, "request": request})}])
     except OpenAIError as e:
-        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "problems": [],
+        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "dropped": 0, "problems": [],
                 "error": f"Muse Spark is unavailable right now ({type(e).__name__})."}
     if not res.choices:
-        return {"reply": None, "actions": [], "suggestions": [], "dropped": 0, "problems": [], "error": "Muse Spark returned an empty reply."}
+        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "dropped": 0, "problems": [], "error": "Muse Spark returned an empty reply."}
     out = interpret(res.choices[0].message, context, request)
-    out["error"] = (None if (out["reply"] or out["actions"] or out["suggestions"])
+    out["error"] = (None if (out["reply"] or out["actions"] or out["suggestions"] or out["guides"])
                     else " ".join(out["problems"]) or "Muse Spark didn't answer that one.")
     # Local engine log only (~/Library/Logs/Aria/engine.log): what was asked and what Muse did
-    print(f"ask: {request!r} -> actions={out['actions']} suggestions={len(out['suggestions'])} "
+    print(f"ask: {request!r} -> actions={out['actions']} suggestions={len(out['suggestions'])} guides={[(g['plugin'], g['preset']) for g in out['guides']]} "
           f"dropped={out['dropped']} problems={out['problems']} reply={out['reply']!r} error={out['error']!r}", flush=True)
     return out

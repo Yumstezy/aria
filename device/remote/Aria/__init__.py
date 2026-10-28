@@ -1,4 +1,7 @@
-"""Aria's helper inside Live.
+"""Aria's helper inside Live. ON HOLD (Oct 27, Ian): Aria no longer adds or turns third-party plugins; it shows
+how they should look instead (engine/aria_engine/guides.py). The bridge doesn't call this script, and install.sh
+no longer installs it. Kept for later: it works in Live 12.4 (it found 277 plugins on Ian's Mac).
+
 
 Max for Live can't reach Live's browser, so it can't add a third-party plugin. A Remote Script can:
 browser.load_item() puts a plugin on the selected track, the same as a double-click. The bridge

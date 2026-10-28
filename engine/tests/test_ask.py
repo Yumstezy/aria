@@ -174,11 +174,56 @@ def test_plugin_names_match_how_producers_say_them():
     assert ask.mentioned_plugins("add pro q to muddy loops", INSTALLED) == ["FabFilter Pro-Q 4", "FabFilter Pro-Q 3"]
 
 
-def test_friendly_shows_only_named_plugins_and_says_when_the_helper_is_off():
-    assert ask.friendly({"plugins": INSTALLED}, "add ozone eq to main")["plugins"] == ["Ozone 12 Equalizer"]
-    assert ask.friendly({"plugins": INSTALLED}, "make the vocal brighter")["plugins"] == []
-    off = ask.friendly({"plugins": None}, "add pro q 4")
-    assert off["plugins"] is None and off["plugin_helper"] == "off"
+FFP = """[Preset]
+Signature=FQ4p
+Description="Test preset.\\n"
+
+[Parameters]
+Band 1 Used=1
+Band 1 Enabled=1
+Band 1 Frequency=13.287712
+Band 1 Gain=2.5
+Band 1 Q=0.5
+Band 1 Shape=3
+Band 2 Used=0
+Band 2 Enabled=1
+Band 2 Frequency=8
+Band 2 Gain=-3
+Band 2 Q=0.5
+Band 2 Shape=0
+"""
+
+
+def catalog_with(tmp_path, monkeypatch):
+    path = tmp_path / "Air Test.ffp"
+    path.write_text(FFP)
+    entries = [{"source": "fabfilter", "plugin": f"FabFilter Pro-Q {v}", "name": "Air Test", "format": "text", "category": "Vocals",
+                "words": ["air", "test"], "path": str(path)} for v in (3, 4)]
+    monkeypatch.setattr(ask.guides, "catalog", lambda: entries)
+
+
+def test_named_plugin_brings_its_presets_newest_version_only(tmp_path, monkeypatch):
+    catalog_with(tmp_path, monkeypatch)
+    ctx = ask.friendly({"plugins": ["x"], "tracks": [{"name": "Vox", "plugins": []}]}, "pro q, add air to my vocals")
+    assert list(ctx["plugin_presets"]) == ["FabFilter Pro-Q 4"] and ctx["plugin_presets"]["FabFilter Pro-Q 4"][0]["name"] == "Air Test"
+    assert "plugins" not in ctx and ctx["tracks"] == [{"name": "Vox"}]
+    assert "plugin_presets" not in ask.friendly({}, "add some reverb")
+
+
+def test_guide_draws_the_presets_real_bands(tmp_path, monkeypatch):
+    catalog_with(tmp_path, monkeypatch)
+    g = ask.check_guide({"plugin": "pro q 4", "preset": "Air Test", "track": "vox"}, ["Vox"])
+    assert g["plugin"] == "FabFilter Pro-Q 4" and g["preset"] == "Air Test" and g["source"] == "preset" and g["track"] == "Vox"
+    assert g["bands"] == [{"band": 1, "shape": "high_shelf", "freq_hz": 10000, "gain_db": 2.5, "q": 1.0, "dynamic_db": 0.0}]   # band 2 is off
+
+
+def test_guide_with_musess_own_bands_is_checked(tmp_path, monkeypatch):
+    catalog_with(tmp_path, monkeypatch)
+    own = ask.check_guide({"plugin": "Pro-Q 4", "bands": [{"shape": "high_shelf", "freq_hz": 10000, "gain_db": 2}]})
+    assert own["source"] == "aria" and own["bands"][0]["q"] == 1.0
+    assert ask.check_guide({"plugin": "Pro-Q 4", "bands": [{"shape": "wobble", "freq_hz": 100}]}) is None
+    assert ask.check_guide({"plugin": "Pro-Q 4", "bands": [{"shape": "bell", "freq_hz": 100, "gain_db": 30}]}) is None
+    assert ask.check_guide({"plugin": "Pro-Q 4"}) is None   # nothing to draw
 
 
 def test_track_plugin_needs_a_plugin_muse_was_shown():

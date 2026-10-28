@@ -30,6 +30,7 @@ export const ClickIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidt
 export const DockLeftIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} {...p}><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16" /></svg>;
 export const DockRightIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} {...p}><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M15 4v16" /></svg>;
 export const BackIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={2.2} {...p}><path d="M15 5l-7 7 7 7" /></svg>;
+export const MinimizeIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={2.2} {...p}><path d="M6 12h12" /></svg>;
 export const SunIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5" /></svg>;
 export const MoonIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} {...p}><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" /></svg>;
 export const ExpandIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={2} {...p}><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>;

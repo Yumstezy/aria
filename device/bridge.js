@@ -12,7 +12,6 @@
 
 const fs = require("fs");
 const http = require("http");
-const net = require("net");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
@@ -50,6 +49,7 @@ let windowLoaded = false;
 let chatLoaded = false;
 let chatOpen = false;
 let mainOpen = false;
+let minimized = null;     // { chat: bool } while the docked window is a tab on its edge
 let lastResult = null;    // so a window opened later shows the latest Check mix
 const waiters = {};       // live.js reply name -> resolve function
 const stateWaiters = [];  // everyone waiting for the next live_state
@@ -191,41 +191,6 @@ function stopEngine() {
 }
 
 ["SIGTERM", "SIGINT", "exit"].forEach((sig) => process.on(sig, () => { stopEngine(); if (sig !== "exit") process.exit(0); }));
-
-// ---------- Aria's Remote Script (device/remote): adds plugins, which Max for Live can't ----------
-
-const REMOTE = { host: "127.0.0.1", port: Number(process.env.ARIA_REMOTE_PORT) || 8766 };   // tests use another port
-const REMOTE_TIMEOUT_MS = 8000;
-const REMOTE_OFF = "Aria can't add plugins until its helper is on: in Live, Settings > Link, Tempo & MIDI > Control Surface, pick Aria.";
-let installedPlugins = null;   // names from Live's browser, read once per session
-
-function remote(cmd) {
-  return new Promise((resolve, reject) => {
-    const sock = net.createConnection(REMOTE);
-    let buf = "";
-    const fail = (text) => { sock.destroy(); reject(new UserError(text)); };
-    sock.setTimeout(REMOTE_TIMEOUT_MS, () => fail("Live took too long to add the plugin."));
-    sock.on("error", () => fail(REMOTE_OFF));
-    sock.on("connect", () => sock.write(JSON.stringify(cmd) + "\n"));
-    sock.on("data", (d) => {
-      buf += d;
-      const nl = buf.indexOf("\n");
-      if (nl < 0) return;
-      sock.end();
-      try { resolve(JSON.parse(buf.slice(0, nl))); } catch (e) { reject(new UserError("Aria's helper in Live sent something odd.")); }
-    });
-  });
-}
-
-async function pluginNames() {
-  if (installedPlugins) return installedPlugins;
-  try {
-    const r = await remote({ cmd: "plugins" });
-    if (r.ok && r.plugins.length) installedPlugins = r.plugins;   // an empty list is asked again next time
-    else if (r.ok) return [];
-  } catch (e) { return null; }   // helper off: Muse is told plugins can't be added
-  return installedPlugins;
-}
 
 // ---------- live.js ----------
 
@@ -413,6 +378,7 @@ function showWindow(url) {
   // The page says "ready" when it loads, and the bridge replays the latest result.
   windowLoaded = true;
   mainOpen = true;
+  minimized = null;
   Max.outlet("window", "url", url);
   const prefs = loadWindowPrefs();
   // The chat is still out: stack again, the window on top
@@ -474,6 +440,25 @@ Max.addHandler("window_mode", (s) => {
   if (chatOpen) { chatOpen = false; Max.outlet("chat", "wclose"); }
   placeWindow(prefs);
 });
+// Minimize: the docked window becomes a small tab on its edge (the chat hides too). The tab brings it back.
+const TAB = { w: 44, h: 132 };
+Max.addHandler("minimize", () => {
+  const prefs = loadWindowPrefs(), sc = prefs.screen || FALLBACK_SCREEN;
+  const side = prefs.mode === "left" || prefs.side === "left" ? "left" : "right";
+  minimized = { chat: chatOpen };
+  if (chatOpen) { chatOpen = false; Max.outlet("chat", "wclose"); }
+  const x = side === "left" ? sc.x : sc.x + sc.w - TAB.w;
+  sizeWindow("window", "aria-window-ui", { x, y: dockTop(sc) + Math.round(dockHeight(sc) / 2 - TAB.h / 2), ...TAB }, true);
+  Max.outlet("window", "front");
+});
+Max.addHandler("restore", () => {
+  const was = minimized;
+  minimized = null;
+  if (was && was.chat) { openChatWindow(null); return; }
+  placeWindow(loadWindowPrefs());
+  Max.outlet("window", "front");
+});
+
 Max.addHandler("jump_to", (s) => toLive("jump", decode(s).bar));
 Max.addHandler("add_marker", async (s) => {
   const { bar, name } = decode(s);
@@ -503,16 +488,6 @@ async function apply(action, tracks = []) {
       return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track), a.shape || "bell", a.steep ? 1 : 0);
     case "track_device":
       return await askLive("device", "device_done", trackIndex(a.track), encodeURIComponent(a.device), encodeURIComponent(JSON.stringify(a.settings || [])));
-    case "track_plugin": {
-      // Use the one on the track, else have the Remote Script load it, then set its knobs like a stock device
-      const idx = trackIndex(a.track), settings = encodeURIComponent(JSON.stringify(a.settings || []));
-      const first = await askLive("device", "device_done", idx, encodeURIComponent(a.plugin), settings, 0);
-      if (!first.missing) return first;
-      const loaded = await remote({ cmd: "load", track: idx, name: a.plugin });
-      if (!loaded.ok) return { ok: false, text: loaded.text };
-      // By the plugin's own name: it may sit inside a saved rack ("Pro-Q 4 (Aria)") with any name
-      return await askLive("device", "device_done", idx, encodeURIComponent(a.plugin), settings, 1);
-    }
     case "jump_to":
       toLive("jump", a.bar);
       return { ok: true, text: `Moved the playhead to bar ${a.bar}.` };
@@ -544,7 +519,6 @@ async function askContext() {
     playhead_bar: live ? Math.floor(live.song_beat / live.beats_per_bar) + 1 : null,
     markers: live ? live.markers : [],
     tracks: live ? live.tracks : [],
-    plugins: await pluginNames(),   // installed third-party plugins; null when Aria's helper in Live is off
     // The last few exchanges, so "it" and "that" make sense. What was done, as Aria reported it.
     recent: askLog.slice(-3).map((x) => ({ asked: x.request, did: x.done.map((d) => d.text), replied: x.reply })),
   };
@@ -600,24 +574,9 @@ Max.addHandler("ask", async (s) => {
       try { done.push({ ...action, ...(await apply(action, context.tracks)) }); }
       catch (e) { done.push({ ...action, ok: false, text: e.message }); }
     }
-    // A plugin just loaded for a request that also wants it set: ask Muse again, now that Live shows its knobs
-    let reply = res.json.reply;
-    let suggestions = res.json.suggestions;
-    const fresh = done.filter((d) => d.type === "track_plugin" && d.ok && d.added && d.args.then_set);
-    if (fresh.length) {
-      const again = await askContext();
-      again.follow_up = { added: fresh.map((d) => ({ track: d.args.track, plugin: d.args.plugin })), did: done.map((d) => d.text) };
-      const res2 = await request("POST", "/muse/ask", { text, context: again }, ANALYZE_TIMEOUT_MS);
-      if (res2.status === 200 && res2.json) {
-        for (const action of res2.json.actions.filter((x) => x.type === "track_plugin")) {
-          try { done.push({ ...action, ...(await apply(action, again.tracks)) }); }
-          catch (e) { done.push({ ...action, ok: false, text: e.message }); }
-        }
-        reply = res2.json.reply || reply;
-        suggestions = [...suggestions, ...(res2.json.suggestions || [])];   // e.g. the stock move when the plugin's knobs are hidden
-      }
-    }
-    askLog.push({ request: text, reply, done, suggestions,
+    const reply = res.json.reply, suggestions = res.json.suggestions;
+    // guides: how a third-party plugin should look (Aria draws it; the producer sets it)
+    askLog.push({ request: text, reply, done, suggestions, guides: res.json.guides || [],
                   problems: res.json.problems || [], error: res.json.error, notes: [], at: Date.now() });
   } catch (e) {
     askLog.push({ request: text, reply: null, done: [], suggestions: [], problems: [], notes: [], at: Date.now(),

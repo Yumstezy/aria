@@ -9,10 +9,10 @@ import { TickGauge } from "@/components/tick-gauge";
 import { CountUp } from "@/components/count-up";
 import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
-import { AnalyzerIcon, BuriedIcon, ChatIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
+import { AnalyzerIcon, BackIcon, BuriedIcon, ChatIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, MinimizeIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
 import { bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
-import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, lastDock, notice, openChat, setAskOpen, setTheme, setWindowMode,
+import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, lastDock, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode,
          soundName, useAria, useViewport, type Kind, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +20,7 @@ type View = "home" | "mixcheck";
 
 // Docked (a narrow panel beside Live) keeps the rail as icons and stacks the bento in one column.
 // Short as well as narrow means Ask Muse is popped out under it: show only what to fix.
-const NARROW_PX = 760, COMPACT_PX = 480;
+const NARROW_PX = 760, COMPACT_PX = 480, TAB_PX = 120;
 const span = (narrow: boolean, n: number) => (narrow ? "span-12" : `span-${n}`);
 const n = (v: number) => ({ "--n": v }) as CSSProperties;
 
@@ -37,6 +37,7 @@ export function AriaWindow() {
   // A new result opens Mix check with the first problem ("fix first") open.
   useEffect(() => { if (result) { setView("mixcheck"); setOpen(0); } }, [result]);
 
+  if (width < TAB_PX) return <MinTab />;
   if (compact) return <Compact />;
 
   const status = progress ? `${progress.text}${progress.detail ? ` · ${progress.detail}` : ""}` : error ?? note;
@@ -96,6 +97,7 @@ function WindowControls() {
   );
   return (
     <div className="cp-row" style={{ gap: 0 }}>
+      {icon("Minimize to a tab on the edge", minimize, <MinimizeIcon style={{ width: 15, height: 15 }} />)}
       {icon("Move to the other side", () => setWindowMode(lastDock() === "left" ? "right" : "left"), <SwapIcon style={{ width: 15, height: 15 }} />)}
       {icon("Pop out Ask Muse", openChat, <ChatIcon style={{ width: 15, height: 15 }} />)}
       {icon("Full window", () => setWindowMode("full"), <ExpandIcon style={{ width: 15, height: 15 }} />)}
@@ -438,6 +440,24 @@ function Detailed({ r, narrow }: { r: Result; narrow: boolean }) {
   );
 }
 
+/** Minimized: a small tab on the docked edge. Tap it to bring the window back as it was. */
+function MinTab() {
+  const { result, progress } = useAria();
+  const n = result ? problemsOf(result).length : 0;
+  const left = lastDock() === "left";
+  return (
+    <button onClick={restore} title="Bring Aria back" aria-label="Bring Aria back"
+            className="flex h-screen w-full flex-col items-center justify-center gap-2.5"
+            style={{ background: "color-mix(in srgb, var(--ground) 86%, transparent)", border: "1px solid var(--glass-edge)", color: "var(--ink)",
+                     borderRadius: left ? "0 16px 16px 0" : "16px 0 0 16px", boxShadow: "var(--shadow-tile)", cursor: "pointer" }}>
+      <Mark size={22} />
+      {progress ? <span className="cp-meta" style={{ fontSize: 10 }}>…</span>
+        : result ? <span className={n ? "cp-tag cp-tag-hot" : "cp-tag cp-tag-good"} style={{ padding: "0 6px" }}>{n}</span> : null}
+      <BackIcon style={{ width: 14, height: 14, transform: left ? "rotate(180deg)" : undefined, color: "var(--ink-muted)" }} />
+    </button>
+  );
+}
+
 /** While Ask Muse is popped out: the main window shrinks to what needs fixing. Tap a row to hear it. */
 function Compact() {
   const { result, progress, error } = useAria();
@@ -450,6 +470,7 @@ function Compact() {
           <div className="cp-row" style={{ gap: 2 }}>
             <button className="cp-btn cp-btn-primary cp-btn-sm" disabled={!!progress} onClick={checkMix}>{progress ? "Checking" : result ? "Check again" : "Check mix"}</button>
             <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={closeChat} title="Close Ask Muse and show the whole window again">Back to window</button>
+            <button className="cp-icon-btn" style={{ width: 28, height: 28, borderRadius: 10 }} aria-label="Minimize to a tab on the edge" title="Minimize to a tab on the edge" onClick={minimize}><MinimizeIcon style={{ width: 14, height: 14 }} /></button>
             <button className="cp-icon-btn" style={{ width: 28, height: 28, borderRadius: 10 }} aria-label="Close" onClick={closeWindow}><CloseIcon style={{ width: 14, height: 14 }} /></button>
           </div>
         </div>

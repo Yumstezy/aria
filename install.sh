@@ -29,7 +29,5 @@ if [ ! -f .env ]; then
   echo "Created engine/.env. Put your MODEL_API_KEY in it, then restart with engine/run.sh"
 fi
 
-../device/remote/install.sh
-
 echo "Starting the engine on http://127.0.0.1:8765 (Ctrl+C to stop)"
 exec ./run.sh

@@ -47,15 +47,21 @@ export interface Setting { param: string; value?: number; option?: string; chang
 export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "track_volume" | "track_eq" | "track_device" | "track_plugin" | "check_mix" | "undo"; args: Record<string, number | string> & { settings?: Setting[] } }
 export interface Done extends Action { ok: boolean; text: string }
 export interface Suggestion { type: Action["type"]; args: Action["args"]; why: string; answered?: "yes" | "no"; result?: { ok: boolean; text: string } }
+/** One band of a plugin guide, in Aria's shapes and units. dynamic_db: how far a dynamic band moves with the music. */
+export interface GuideBand { band: number; shape: string; freq_hz: number; gain_db: number; q: number; dynamic_db?: number }
+/** How a third-party plugin should look: Aria draws it, the producer sets it (Aria can't turn third-party plugins). */
+export interface Guide { plugin: string; track: string | null; preset: string | null; about: string; source: "preset" | "aria"; bands: GuideBand[] }
 export interface Exchange {
   request: string; reply: string | null; done: Done[]; suggestions: Suggestion[]; error: string | null; notes: string[];
   problems?: string[];   // calls Aria dropped, and why
+  guides?: Guide[];
   at?: number;
 }
 
 /** The one line that says how an exchange went, so the strip is never blank. */
 export function outcome(x: Exchange): { text: string; bad: boolean } {
   if (x.reply) return { text: x.reply, bad: false };
+  if (x.guides?.length) return { text: `How it should look in ${x.guides[0].plugin}`, bad: false };
   if (x.error) return { text: x.error, bad: true };
   if (x.problems?.length) return { text: x.problems[0], bad: true };
   const failed = x.done.find((d) => !d.ok);
@@ -273,6 +279,10 @@ export function setWindowMode(mode: WindowMode) {
 export function lastDock(): "left" | "right" {
   try { return localStorage.getItem("aria.dock") === "left" ? "left" : "right"; } catch { return "right"; }
 }
+
+/** Docked: shrink to a small tab on the edge, and back. */
+export const minimize = () => { if (inMax) moveThen(() => send("minimize")); };
+export const restore = () => { if (inMax) moveThen(() => send("restore")); };
 
 /** Ask Muse in its own window, stacked under a shrunk main window on the docked edge. */
 export const openChat = () => { if (!inMax) window.open("?view=chat", "aria-chat", "width=460,height=620"); else moveThen(() => send("open_chat", { screen: screenRect() })); };

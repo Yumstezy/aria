@@ -3,7 +3,8 @@
 // or its own small window when popped out. Both show the same history, which the bridge saves on this Mac.
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, setAskOpen, undoLast, useAria, type Exchange, type Finding, type Suggestion } from "@/lib/aria";
+import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, setAskOpen, undoLast, useAria, type Exchange, type Finding, type Guide, type GuideBand, type Suggestion } from "@/lib/aria";
+import { EqCurve } from "@/components/eq-curve";
 import { BackIcon, CheckIcon, CloseIcon, MicIcon, SendIcon, UndoIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
@@ -63,6 +64,39 @@ function Did({ ok, text, undo }: { ok: boolean; text: string; undo?: boolean }) 
   );
 }
 
+const SHAPE_NAME: Record<string, string> = { bell: "Bell", low_cut: "Low cut", high_cut: "High cut", low_shelf: "Low shelf", high_shelf: "High shelf", notch: "Notch" };
+const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)} dB`;
+const MAX_ROWS = 6;
+
+function bandLine(b: GuideBand) {
+  const cut = b.shape === "low_cut" || b.shape === "high_cut" || b.shape === "notch";
+  return `${SHAPE_NAME[b.shape] ?? b.shape} at ${hz(b.freq_hz)}${cut ? "" : `, ${signed(b.gain_db)}`}, Q ${b.q.toFixed(1)}`;
+}
+
+/** How a third-party plugin should look: the curve, then each band to set. The producer sets it in the plugin. */
+function GuideCard({ g }: { g: Guide }) {
+  const name = g.plugin.replace(/^FabFilter /, "");
+  return (
+    <div className="cp-suggest" style={{ gap: 8 }}>
+      <span className="cp-cap">How it should look</span>
+      <span className="cp-tile-title">{name}{g.track ? ` on ${g.track}` : ""}</span>
+      <span className="cp-meta">{g.source === "preset" ? `From your preset “${g.preset}”` : "Aria's starting point"}</span>
+      <EqCurve bands={g.bands} />
+      <ol className="m-0 grid list-none gap-1 p-0">
+        {g.bands.slice(0, MAX_ROWS).map((b) => (
+          <li key={b.band} className="flex items-center gap-2 text-[12px] leading-4">
+            <i className="grid size-[18px] shrink-0 place-items-center rounded-full bg-action text-[10px] font-bold not-italic text-on-action">{b.band}</i>
+            <span>{bandLine(b)}{b.dynamic_db ? <span className="text-ink-faint">, moves {signed(b.dynamic_db)} with the music</span> : null}</span>
+          </li>
+        ))}
+        {g.bands.length > MAX_ROWS && <li className="cp-meta">and {g.bands.length - MAX_ROWS} smaller bands</li>}
+      </ol>
+      {g.about && <span className="cp-meta line-clamp-2">{g.about}</span>}
+      <span className="cp-meta">Set this in {name} yourself. Aria can't turn third-party plugins.</span>
+    </div>
+  );
+}
+
 /** The conversation: one reply per request, at most one card per suggestion, never two the same. */
 export function AskThread({ className }: { className?: string }) {
   const { ask, result } = useAria();
@@ -90,6 +124,7 @@ export function AskThread({ className }: { className?: string }) {
             <div className="cp-bubble is-user">{x.request}</div>
             {x.reply ? <div className="cp-bubble is-bot"><span>{x.reply}</span></div>
               : x.error ? <Did ok={false} text={x.error} /> : null}
+            {(x.guides ?? []).map((g, k) => <GuideCard key={"g" + k} g={g} />)}
             {x.done.map((d, k) => <Did key={k} ok={d.ok} text={d.text} undo={undoAt === `${i}d${k}`} />)}
             {/* Calls Aria skipped, so a reply never looks done when it wasn't */}
             {x.reply && (x.problems ?? []).map((p, k) => <Did key={"p" + k} ok={false} text={p} />)}

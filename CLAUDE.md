@@ -111,6 +111,7 @@ docs/          build steps, contracts, screens
 - Python 3.11, FastAPI, uvicorn, numpy, scipy, soundfile, librosa, pyloudnorm. Add a library only when a step needs it, and note why in the commit.
 - Every endpoint has a test that runs on files from `test-pack/`. `pytest` must pass before a step counts as done.
 - Today's clarity findings (buried, mud, harsh, ringing, clicks) come from measurement rules, version 1. They are not the finished product (Ian, Oct 27): the mix model trained on rated mixes (`docs/ml-plan.md`, `ml/`) is what makes the data accurate. Keep the UI fed by data shapes the model can fill (the band row, the problem cards), and wire `POST /mix/score` in after the Oct 31 checkpoint if the model beats its baselines.
+- Third-party plugins (Oct 27, Ian): Aria changes only Live's own devices. For a plugin the producer names, Muse shows how it should look (`plugin_guide`: the EQ curve and bands from one of the producer's own presets, or a stated starting point) and the producer sets it. The Remote Script in `device/remote/` that loaded plugins is on hold.
 - Analysis returns numbers. Words come from Muse Spark only. If the model is down, the UI shows the measurements and says advice is unavailable.
 - Loudness is LUFS (pyloudnorm). Before and after comparisons are always loudness matched.
 - Read secrets from environment variables (`MODEL_API_KEY`, `MUSE_BASE_URL`, `MUSE_MODEL`). Never commit them. Keep a `.env.example`.
