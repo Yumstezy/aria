@@ -147,24 +147,40 @@ export function notice(text: string | null) {
 }
 
 // Moving or resizing a window: Live's web view shows the old frame stretched until the page catches up.
-// So the page fades out first, the move happens, and it fades back in once it has its new size.
-const FADE_MS = 110, SETTLE_MS = 180, GIVE_UP_MS = 900;
+// So the page slides out (toward the edge it's going to, or a small fade), the window changes, and once its
+// size settles the page slides back in. It's hidden only while the window itself changes.
+type Motion = "fade" | "left" | "right";
+const OUT_MS = 150, IN_MS = 260, SETTLE_MS = 120, GIVE_UP_MS = 900, EASE_OUT = "cubic-bezier(.32,.72,0,1)";
+const away = (m: Motion) => (m === "left" ? "translateX(-56px)" : m === "right" ? "translateX(56px)" : "scale(0.97)");
 let settle: ReturnType<typeof setTimeout> | undefined;
-function moveThen(fn: () => void) {
-  if (!inMax || location.pathname.includes("/strip/")) { fn(); return; }
-  const root = document.documentElement;
-  root.classList.add("moving");
-  const done = () => root.classList.remove("moving");
-  setTimeout(() => {
+let arriving: Motion | null = null;
+
+function moveThen(fn: () => void, motion: Motion = "fade") {
+  const root = document.getElementById("root");
+  if (!inMax || !root || location.pathname.includes("/strip/")) { fn(); return; }
+  arriving = motion;
+  const out = root.animate([{ opacity: 1, transform: "none" }, { opacity: 0, transform: away(motion) }],
+                           { duration: OUT_MS, easing: "cubic-bezier(.4,0,1,1)", fill: "forwards" });
+  out.onfinish = () => {
     fn();
     clearTimeout(settle);
-    settle = setTimeout(done, GIVE_UP_MS);   // in case the size didn't change
-  }, FADE_MS);
+    settle = setTimeout(arrive, GIVE_UP_MS);   // in case the size didn't change
+  };
+}
+
+/** Bring the page back in, from the side it left by. */
+export function arrive() {
+  const root = document.getElementById("root");
+  if (!root) return;
+  root.getAnimations().forEach((a) => a.cancel());
+  const m = arriving;
+  arriving = null;
+  if (m) root.animate([{ opacity: 0, transform: away(m) }, { opacity: 1, transform: "none" }], { duration: IN_MS, easing: EASE_OUT });
 }
 if (typeof window !== "undefined") window.addEventListener("resize", () => {
-  if (!document.documentElement.classList.contains("moving")) return;
+  if (!arriving) return;
   clearTimeout(settle);
-  settle = setTimeout(() => document.documentElement.classList.remove("moving"), SETTLE_MS);
+  settle = setTimeout(arrive, SETTLE_MS);
 });
 
 function on<T>(name: string, fn: (data: T) => void) {
@@ -197,7 +213,7 @@ export function connect() {
     on<Exchange[]>("ask_log", (log) => set({ ask: { ...state.ask, log } }));
     on<{ theme: Theme }>("theme", (t) => { applyTheme(t.theme); set({ theme: t.theme }); });
     on<Session>("session", (x) => set({ session: x }));
-    on("focus_ask", () => { document.documentElement.classList.remove("moving"); set({ askFocus: state.askFocus + 1 }); });
+    on("focus_ask", () => { arrive(); set({ askFocus: state.askFocus + 1 }); });
     send("ready");   // bridge.js replies with the engine state and the latest result
   } else {
     checkEngine();
@@ -281,8 +297,9 @@ export function lastDock(): "left" | "right" {
 }
 
 /** Docked: shrink to a small tab on the edge, and back. */
-export const minimize = () => { if (inMax) moveThen(() => send("minimize")); };
-export const restore = () => { if (inMax) moveThen(() => send("restore")); };
+// Minimize and restore slide toward / from the docked edge
+export const minimize = () => { if (inMax) moveThen(() => send("minimize"), lastDock()); };
+export const restore = () => { if (inMax) moveThen(() => send("restore"), lastDock()); };
 
 /** Ask Muse in its own window, stacked under a shrunk main window on the docked edge. */
 export const openChat = () => { if (!inMax) window.open("?view=chat", "aria-chat", "width=460,height=620"); else moveThen(() => send("open_chat", { screen: screenRect() })); };

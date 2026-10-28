@@ -30,9 +30,7 @@
 }
 
 html, body, #root { height: 100%; margin: 0; }
-/* Fade out before a window move and back in after, so a stretched frame never shows (lib/aria.ts moveThen) */
-#root { transition: opacity 160ms ease-out; }
-html.moving #root { opacity: 0; transition: opacity 90ms ease-in; }
+/* Window moves slide the page out and back in (lib/aria.ts moveThen), so a stretched frame never shows */
 body { font-family: var(--font-sans); color: var(--ink); background: var(--ground); -webkit-font-smoothing: antialiased; }
 
 /* A page fills its window, so the stage drops its outer padding when docked or in the strip. */

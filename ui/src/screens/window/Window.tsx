@@ -1,7 +1,7 @@
 // The Aria window: the side rail and the bento (design/screens/11 and 12), Home and Mix check
 // (Simple and Detailed). Picture first, a short line second, numbers when asked for (DESIGN.md).
 // Before the first check every card shows its layout greyed out and says what comes next.
-import { useEffect, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Mark } from "@/components/brand";
 import { Waves } from "@/components/waves";
@@ -9,8 +9,8 @@ import { TickGauge } from "@/components/tick-gauge";
 import { CountUp } from "@/components/count-up";
 import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
-import { AnalyzerIcon, BackIcon, BuriedIcon, ChatIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, MinimizeIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
-         ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
+import { AnalyzerIcon, BackIcon, BuriedIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, LayoutIcon, MinimizeIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
+         ReferenceIcon, RingIcon, SunIcon } from "@/components/icons";
 import { bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, lastDock, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode,
          soundName, useAria, useViewport, type Kind, type Result } from "@/lib/aria";
@@ -49,12 +49,19 @@ export function AriaWindow() {
         <Rail view={view} setView={setView} narrow={narrow} />
         <main className="cp-main overflow-y-auto" style={narrow ? { padding: 14 } : undefined}>
           <header className={cn("cp-spread", narrow && "flex-wrap")}>
-            <div>
-              <span className="cp-cap">{view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : sessionLine}</span>
-              <h1 className="cp-title" style={{ marginTop: 4 }}>{view === "mixcheck" ? "Mix check" : "Home"}</h1>
+            <div className={cn(narrow && "flex w-full items-start justify-between")}>
+              <div>
+                <span className="cp-cap">{view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : sessionLine}</span>
+                <h1 className="cp-title" style={{ marginTop: 4 }}>{view === "mixcheck" ? "Mix check" : "Home"}</h1>
+              </div>
+              {narrow && (
+                <div className="cp-row" style={{ gap: 2 }}>
+                  <LayoutMenu mode={lastDock()} />
+                  <IconButton label="Close" onClick={closeWindow}><CloseIcon style={{ width: 15, height: 15 }} /></IconButton>
+                </div>
+              )}
             </div>
             <div className="cp-row flex-wrap justify-end">
-              {narrow && <WindowControls />}
               {view === "mixcheck" && result && (
                 <div className="cp-seg" role="group" aria-label="View">
                   <button aria-pressed={!detailed} onClick={() => setDetailed(false)}>Simple</button>
@@ -62,14 +69,7 @@ export function AriaWindow() {
                 </div>
               )}
               <button className="cp-btn cp-btn-primary" disabled={!!progress} onClick={checkMix}>{progress ? "Checking" : result ? "Check again" : "Check mix"}</button>
-              {!narrow && (
-                <div className="cp-row" style={{ gap: 0 }}>
-                  <button className="cp-icon-btn" style={{ width: 32, height: 32, borderRadius: 10, background: "transparent" }} title="Dock on the left of the screen"
-                          aria-label="Dock on the left of the screen" onClick={() => setWindowMode("left")}><DockLeftIcon /></button>
-                  <button className="cp-icon-btn" style={{ width: 32, height: 32, borderRadius: 10, background: "transparent" }} title="Dock on the right of the screen"
-                          aria-label="Dock on the right of the screen" onClick={() => setWindowMode("right")}><DockRightIcon /></button>
-                </div>
-              )}
+              {!narrow && <LayoutMenu mode="full" />}
             </div>
           </header>
           {(status || engine.state !== "up") && (
@@ -90,18 +90,52 @@ export function AriaWindow() {
   );
 }
 
-// Docked windows have no title bar: close, full size, other side and pop out Ask Muse live here.
-function WindowControls() {
-  const icon = (label: string, onClick: () => void, child: ReactNode) => (
-    <button className="cp-icon-btn" style={{ width: 30, height: 30, borderRadius: 10, background: "transparent" }} title={label} aria-label={label} onClick={onClick}>{child}</button>
+function IconButton({ label, onClick, children, pressed }: { label: string; onClick: () => void; children: ReactNode; pressed?: boolean }) {
+  return (
+    <button className="cp-icon-btn" style={{ width: 32, height: 32, borderRadius: 10, background: pressed ? "var(--well)" : "transparent" }}
+            title={label} aria-label={label} aria-expanded={pressed} onClick={onClick}>{children}</button>
+  );
+}
+
+/** Every way to lay out the window, in one place: full, docked left or right, minimized to the edge, and
+    Ask Muse popped out or back. The current layout is ticked. */
+function LayoutMenu({ mode, chatOut }: { mode: "full" | "left" | "right"; chatOut?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", away);
+    return () => { document.removeEventListener("mousedown", away); document.removeEventListener("keydown", away); };
+  }, [open]);
+  const pick = (fn: () => void) => () => { setOpen(false); fn(); };
+  const item = (label: string, icon: ReactNode, fn: () => void, on = false) => (
+    <button key={label} role="menuitemradio" aria-checked={on} onClick={pick(fn)}
+            className="flex h-9 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[13px] font-semibold hover:bg-well"
+            style={{ color: on ? "var(--ink)" : "var(--ink-muted)" }}>
+      <span style={{ width: 16, height: 16, display: "grid", placeItems: "center" }}>{icon}</span>
+      <span className="flex-1">{label}</span>
+      {on && <CheckIcon style={{ width: 14, height: 14, color: "var(--action)" }} />}
+    </button>
   );
   return (
-    <div className="cp-row" style={{ gap: 0 }}>
-      {icon("Minimize to a tab on the edge", minimize, <MinimizeIcon style={{ width: 15, height: 15 }} />)}
-      {icon("Move to the other side", () => setWindowMode(lastDock() === "left" ? "right" : "left"), <SwapIcon style={{ width: 15, height: 15 }} />)}
-      {icon("Pop out Ask Muse", openChat, <ChatIcon style={{ width: 15, height: 15 }} />)}
-      {icon("Full window", () => setWindowMode("full"), <ExpandIcon style={{ width: 15, height: 15 }} />)}
-      {icon("Close", closeWindow, <CloseIcon style={{ width: 15, height: 15 }} />)}
+    <div ref={box} className="relative">
+      <IconButton label="Layout" pressed={open} onClick={() => setOpen(!open)}><LayoutIcon style={{ width: 17, height: 17 }} /></IconButton>
+      {open && (
+        <div role="menu" aria-label="Layout" className="absolute right-0 top-10 z-[950] w-[224px]"
+             style={{ background: "var(--card)", border: "1px solid var(--card-edge)", borderRadius: 16, boxShadow: "var(--shadow-tile)", padding: 6 }}>
+          {item("Full window", <ExpandIcon style={{ width: 15, height: 15 }} />, () => setWindowMode("full"), mode === "full" && !chatOut)}
+          {item("Docked left", <DockLeftIcon style={{ width: 16, height: 16 }} />, () => setWindowMode("left"), mode === "left" && !chatOut)}
+          {item("Docked right", <DockRightIcon style={{ width: 16, height: 16 }} />, () => setWindowMode("right"), mode === "right" && !chatOut)}
+          <div style={{ height: 1, background: "var(--hairline)", margin: "6px 4px" }} />
+          {mode !== "full" && item("Minimize to the edge", <MinimizeIcon style={{ width: 15, height: 15 }} />, minimize)}
+          {chatOut ? item("Back to one window", <BackIcon style={{ width: 14, height: 14 }} />, closeChat)
+                   : item("Pop out Ask Muse", <ChatIcon style={{ width: 15, height: 15 }} />, openChat)}
+        </div>
+      )}
     </div>
   );
 }
@@ -469,9 +503,8 @@ function Compact() {
           <div className="cp-mark"><Mark size={22} /><b>Mix check</b></div>
           <div className="cp-row" style={{ gap: 2 }}>
             <button className="cp-btn cp-btn-primary cp-btn-sm" disabled={!!progress} onClick={checkMix}>{progress ? "Checking" : result ? "Check again" : "Check mix"}</button>
-            <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={closeChat} title="Close Ask Muse and show the whole window again">Back to window</button>
-            <button className="cp-icon-btn" style={{ width: 28, height: 28, borderRadius: 10 }} aria-label="Minimize to a tab on the edge" title="Minimize to a tab on the edge" onClick={minimize}><MinimizeIcon style={{ width: 14, height: 14 }} /></button>
-            <button className="cp-icon-btn" style={{ width: 28, height: 28, borderRadius: 10 }} aria-label="Close" onClick={closeWindow}><CloseIcon style={{ width: 14, height: 14 }} /></button>
+            <LayoutMenu mode={lastDock()} chatOut />
+            <IconButton label="Close" onClick={closeWindow}><CloseIcon style={{ width: 15, height: 15 }} /></IconButton>
           </div>
         </div>
         {error && <p className="cp-meta line-clamp-2" style={{ color: "var(--hot)" }}>{error}</p>}
