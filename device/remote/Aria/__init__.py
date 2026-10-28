@@ -149,6 +149,32 @@ class Aria(ControlSurface):
             self.log_message("Aria: found %d plugins" % len(found))
         return self._plugins
 
+    def _aria_preset(self, plugin):
+        """The producer's "<plugin> (Aria)" preset in the User Library's Presets folder, or None.
+        Read each time, so a preset saved a minute ago is found."""
+        want = key(plugin + " aria")
+        try:
+            presets = [c for c in self.application().browser.user_library.children if key(c.name) == "presets"]
+        except Exception:
+            return None
+
+        def walk(item, depth):
+            for child in item.children:
+                if child.is_loadable and key(child.name.rsplit(".", 1)[0] if child.name.endswith(".adv") else child.name) == want:
+                    return child
+                if depth < 5 and not child.is_loadable:
+                    hit = walk(child, depth + 1)
+                    if hit:
+                        return hit
+            return None
+
+        for p in presets:
+            hit = walk(p, 1)
+            if hit:
+                self.log_message("Aria: using the preset %s" % hit.name)
+                return hit
+        return None
+
     def _tree(self, item, depth):
         """Names and flags under an item, for checking how Live lays out its plugins."""
         out = []
@@ -191,6 +217,10 @@ class Aria(ControlSurface):
         if not hit:
             self._reply(c, {"ok": False, "missing": True, "text": "%s isn't in Live's plugin list." % name})
             return
+        # A preset the producer saved as "<plugin> (Aria)" has its knobs picked with Configure, so Aria can set them
+        preset = self._aria_preset(hit[0])
+        if preset:
+            hit = (hit[0], hit[1], preset)
         song = self.song()
         song.view.selected_track = track
         devices = list(track.devices)

@@ -601,6 +601,7 @@ Max.addHandler("ask", async (s) => {
     }
     // A plugin just loaded for a request that also wants it set: ask Muse again, now that Live shows its knobs
     let reply = res.json.reply;
+    let suggestions = res.json.suggestions;
     const fresh = done.filter((d) => d.type === "track_plugin" && d.ok && d.added && d.args.then_set);
     if (fresh.length) {
       const again = await askContext();
@@ -612,9 +613,10 @@ Max.addHandler("ask", async (s) => {
           catch (e) { done.push({ ...action, ok: false, text: e.message }); }
         }
         reply = res2.json.reply || reply;
+        suggestions = [...suggestions, ...(res2.json.suggestions || [])];   // e.g. the stock move when the plugin's knobs are hidden
       }
     }
-    askLog.push({ request: text, reply, done, suggestions: res.json.suggestions,
+    askLog.push({ request: text, reply, done, suggestions,
                   problems: res.json.problems || [], error: res.json.error, notes: [], at: Date.now() });
   } catch (e) {
     askLog.push({ request: text, reply: null, done: [], suggestions: [], problems: [], notes: [], at: Date.now(),
