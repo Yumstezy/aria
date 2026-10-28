@@ -171,6 +171,7 @@ def test_plugin_names_match_how_producers_say_them():
     assert ask.mentioned_plugins("add pro q 4 and cut the lows", INSTALLED) == ["FabFilter Pro-Q 4"]
     assert ask.mentioned_plugins("put valhalla on the vocal", INSTALLED) == ["ValhallaRoom", "ValhallaVintageVerb"]
     assert ask.mentioned_plugins("add some reverb to the vocal", INSTALLED) == []
+    assert ask.mentioned_plugins("add pro q to muddy loops", INSTALLED) == ["FabFilter Pro-Q 4", "FabFilter Pro-Q 3"]
 
 
 def test_friendly_shows_only_named_plugins_and_says_when_the_helper_is_off():

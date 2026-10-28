@@ -180,7 +180,8 @@ point and apply their move to it, as values (Threshold -16 dB, Ratio 3, Attack 1
 Third-party plugins (FabFilter Pro-Q, Valhalla, Ozone, Serum and others): use them only when the producer names one.
 context.plugins lists the installed plugins their words name. context.tracks[].plugins lists the plugins already on
 each track, with the knob names Live shows for each.
-- To add one or set it, use track_plugin with the plugin's exact name from those lists. Aria adds it if it isn't on
+- To add one or set it, use track_plugin with the plugin's exact name from those lists. If they name it without a
+  version and several versions are listed ("pro q": Pro-Q 2, 3 and 4), use the newest. Aria adds it if it isn't on
   the track. Set knobs only by names in that track's plugins[].knobs, in the units Live shows.
 - If the plugin isn't on the track yet, you can't know its knob names: add it with no settings. If they also asked
   for a change on it ("pro q 4 and cut the lows at 400 Hz"), set then_set true: once it's loaded Aria asks you again.
@@ -283,17 +284,20 @@ def match_plugin(name, names):
 
 
 def mentioned_plugins(request, names, limit=12):
-    """Installed plugins the request names: "pro q 4" finds "FabFilter Pro-Q 4", "valhalla" finds ValhallaRoom."""
+    """Installed plugins the request names: "pro q 4" finds "FabFilter Pro-Q 4", "valhalla" finds ValhallaRoom.
+    Named without a version ("pro q"), every version is shown and Muse picks the newest."""
     text = _key(request)
     words = [_key(w) for w in re.findall(r"[A-Za-z]{5,}", request or "")]
-    out = []
-    for n in names:
-        k = _key(n)
+
+    def keys(n):
         parts = str(n).split()
-        rest = _key(" ".join(parts[1:])) if len(parts) > 1 else ""
-        if (k and k in text) or (len(rest) >= 4 and rest in text) or any(w in k for w in words):
-            out.append(n)
-    return out[:limit]
+        return [_key(n)] + ([_key(" ".join(parts[1:]))] if len(parts) > 1 else [])   # with and without the maker
+
+    exact = [n for n in names if any(len(k) >= 4 and k in text for k in keys(n)) or any(w in _key(n) for w in words)]
+    if exact:
+        return exact[:limit]
+    bare = [n for n in names if any(len(b) >= 4 and b in text for b in (re.sub(r"\d+$", "", k) for k in keys(n)))]
+    return bare[:limit]
 
 
 def _setting(st):
