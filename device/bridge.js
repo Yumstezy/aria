@@ -241,7 +241,8 @@ Max.addHandler("listen_tracks", async () => {
     const added = [];
     for (const t of pick) {
       const r = await remote({ cmd: "load_ear", track: t.index });
-      if (!r.ok) throw new UserError(r.text);
+      // An older helper (Live reads it only at startup) doesn't know load_ear yet
+      if (!r.ok) throw new UserError(/unknown command/i.test(r.text) ? "Aria's helper in Live is out of date. Quit and reopen Live, then try again." : r.text);
       added.push(t.name);
     }
     text = `Listening to ${[...have, ...added].join(", ")}. Press Check mix.`;
