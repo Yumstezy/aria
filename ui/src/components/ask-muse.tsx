@@ -42,6 +42,10 @@ function describeSuggestion(s: Suggestion) {
     return `${s.type === "track_plugin" ? a.plugin : a.device} on ${a.track}${knobs.length ? `: ${knobs.join(", ")}` : ""}`;
   }
   if (s.type === "add_marker") return `Marker "${a.name}" at bar ${a.bar}`;
+  if (s.type === "delete_marker") return `Delete the marker at bar ${a.bar}`;
+  if (s.type === "track_mute") return `${a.on ? "Mute" : "Unmute"} ${a.track}`;
+  if (s.type === "track_solo") return `${a.on ? "Solo" : "Unsolo"} ${a.track}`;
+  if (s.type === "set_tempo") return `Tempo to ${a.bpm} BPM`;
   if (s.type === "jump_to") return `Jump to bar ${a.bar}`;
   return s.type;
 }

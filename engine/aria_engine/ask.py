@@ -123,6 +123,26 @@ TOOLS = [
         "name": "check_mix", "description": "Run a new Mix check: Aria records 16 bars of Main and analyzes them.",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
+        "name": "delete_marker", "description": "Delete the marker (Live locator) at a bar. Use a bar from context.markers.",
+        "parameters": {"type": "object", "properties": {"bar": {"type": "integer", "minimum": 1}}, "required": ["bar"]}}},
+    {"type": "function", "function": {
+        "name": "track_mute", "description": "Mute or unmute a track (exact name from context.tracks).",
+        "parameters": {"type": "object", "properties": {"track": {"type": "string"}, "on": {"type": "boolean"}}, "required": ["track", "on"]}}},
+    {"type": "function", "function": {
+        "name": "track_solo", "description": "Solo or unsolo a track (exact name from context.tracks).",
+        "parameters": {"type": "object", "properties": {"track": {"type": "string"}, "on": {"type": "boolean"}}, "required": ["track", "on"]}}},
+    {"type": "function", "function": {
+        "name": "set_tempo", "description": "Set the song's tempo in BPM.",
+        "parameters": {"type": "object", "properties": {"bpm": {"type": "number", "minimum": 20, "maximum": 999}}, "required": ["bpm"]}}},
+    {"type": "function", "function": {
+        "name": "sidechain", "description": "Duck one track under another (\"sidechain the bass to the kick\"): a Compressor on track, "
+                                             "listening to from_track. Aria uses the Compressor already there or adds one.",
+        "parameters": {"type": "object", "properties": {
+            "track": {"type": "string", "description": "The track that ducks (exact name from context.tracks)."},
+            "from_track": {"type": "string", "description": "The track it listens to, usually the kick (exact name)."},
+            "amount": {"type": "string", "enum": ["light", "medium", "heavy"], "description": "How much it ducks. Default medium."}},
+            "required": ["track", "from_track"]}}},
+    {"type": "function", "function": {
         "name": "undo", "description": "Undo the last change Aria made in Live.",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
@@ -178,7 +198,7 @@ Everyday starting points when they give no numbers (say what you used):
 - compress a vocal: Compressor Threshold -18 dB, Ratio 3, Attack 10 ms, Release 100 ms
 - glue the drums or the mix: Glue Compressor Threshold -15 dB, Ratio 2, Attack 10 ms, Makeup 2 dB
 - reverb, space, spacey: Reverb Decay Time 2500 ms (4000 ms for big or spacey), Predelay 20 ms, Dry/Wet 20%
-- delay or echo: Delay L 16th 3, R 16th 4, Feedback 30%, Dry/Wet 15%
+- delay or echo: the Delay device (not Echo, unless they name the Echo device): L 16th 3, R 16th 4, Feedback 30%, Dry/Wet 15%
 - warmth, saturation, grit: Saturator Drive 4 dB, Type Analog Clip, Dry/Wet 50%
 - wider: Utility Stereo Width 130%. Mono the bass: Utility Bass Mono On, Bass Freq 120 Hz
 - limit Main: Limiter Ceiling -1 dB
@@ -193,6 +213,7 @@ producer names one, show them how it should look with plugin_guide, and they set
   "curve": its biggest moves). Pick by the curve, not only the name: "air on my vocals" needs a vocal preset whose
   curve lifts the top (a high shelf or a boost above 8000 Hz). If one fits, pass it as preset; Aria draws its real
   bands. If several versions of a plugin are listed, use the newest.
+- If they named a move ("cut below 100", "boost 3 kHz"), draw that move with your own bands, not a preset.
 - If none fits, pass your own bands instead: standard starting points (air: high_shelf +2 dB at 10000 Hz;
   clarity: bell +2 dB at 3000 Hz; mud: bell -3 dB at 300 Hz), and say they're a starting point.
 - Your reply says what to do in one or two short sentences ("Here's how it should look in Pro-Q 4. Set band 1
@@ -203,6 +224,11 @@ If you can't do what they ask with these tools, say so plainly and don't call a 
 
 context.recent holds the last few exchanges (what they asked, what you did). Use it for "it", "that" and "again":
 "it" is usually the track from the last request.
+
+"Fix everything", "do what it needs" or "what would you change": don't ask which track. Offer one fix per finding in
+context.findings, each as a "suggest" with a short why, strongest first, at most 3. They say yes to the ones they want,
+so your reply offers them ("Here are three fixes, strongest first"), never "fixing everything".
+Mute, solo, tempo and deleting a marker happen right away with Undo, like any change they ask for.
 
 A request can ask for several things ("make it louder and cut the low end"). Call a tool for every part, in this
 answer. Your reply describes only the tool calls you made in this answer: never say you did, will do or are "sorting"
@@ -326,6 +352,23 @@ def _setting(st):
     return {"param": param, k: round(v, 2)}
 
 
+# How hard a sidechain ducks: standard starting points, said in the reply when used
+DUCK = {"light": -18.0, "medium": -24.0, "heavy": -30.0}
+
+
+def sidechain_steps(args, tracks):
+    """sidechain as two steps: a Compressor on the track (S/C On, a fast attack, a release that breathes),
+    then its sidechain routed from the other track. None if either track isn't in the set."""
+    track, source = match_track(args.get("track"), tracks), match_track(args.get("from_track"), tracks)
+    if not track or not source or track == source:
+        return None
+    threshold = DUCK.get(args.get("amount") or "medium", DUCK["medium"])
+    settings = [{"param": "S/C On", "option": "On"}, {"param": "Threshold", "value": threshold}, {"param": "Ratio", "value": 4.0},
+                {"param": "Attack", "value": 1.0}, {"param": "Release", "value": 150.0}]
+    return [{"type": "track_device", "args": {"track": track, "device": "Compressor", "settings": settings}},
+            {"type": "route_sidechain", "args": {"track": track, "from_track": source}}]
+
+
 def section_markers(args, markers):
     """set_section as markers: the name at first_bar and, unless a marker already sits right after last_bar,
     one there with the name of the section that was playing there, so the rest of the song keeps its name."""
@@ -429,6 +472,7 @@ def check_action(name, args, tracks=(), plugins=()):
             return {"bar": bar} if 1 <= bar <= 9999 else None
         if name == "add_marker":
             bar, label = int(args["bar"]), str(args["name"]).strip()
+            label = label[:1].upper() + label[1:]   # "breakdown" reads as a section name: "Breakdown"
             return {"bar": bar, "name": label} if 1 <= bar <= 9999 and 0 < len(label) <= MAX_NAME else None
         if name == "eq_band":
             shape = args.get("shape") or "bell"
@@ -444,6 +488,15 @@ def check_action(name, args, tracks=(), plugins=()):
             return out if ok else None
         if name in ("check_mix", "undo"):
             return {}
+        if name == "delete_marker":
+            bar = int(args["bar"])
+            return {"bar": bar} if 1 <= bar <= 9999 else None
+        if name in ("track_mute", "track_solo"):
+            track = _track(args.get("track"), tracks, main_ok=name == "track_mute")
+            return {"track": track, "on": bool(args.get("on"))} if track and isinstance(args.get("on"), bool) else None
+        if name == "set_tempo":
+            bpm = float(args["bpm"])
+            return {"bpm": round(bpm, 2)} if 20 <= bpm <= 999 else None
     except (KeyError, TypeError, ValueError):
         return None
     return None
@@ -477,6 +530,17 @@ def interpret(message, context, request):
             else:
                 dropped += 1
                 problems.append(why_dropped(str(args.get("action")), args.get("args"), tracks, plugins))
+            continue
+        if name == "sidechain":
+            steps = sidechain_steps(args, tracks)
+            if steps:
+                actions += steps
+            else:
+                dropped += 1
+                missing = [args.get(k) for k in ("track", "from_track") if not match_track(args.get(k), tracks)]
+                shown = ", ".join(f'"{t}"' for t in tracks[:8]) or "none"
+                problems.append(f'No track called "{missing[0]}" in this set. Tracks: {shown}.' if missing
+                                else "A track can't be sidechained to itself.")
             continue
         if name == "set_section":
             marks = section_markers(args, context.get("markers") or [])

@@ -16,7 +16,8 @@ let playObserver = null;
 let timeObserver = null;
 let cueObserver = null;
 let pendingMarker = null;
-let pendingRemoval = null;   // a marker Undo is removing (set_or_delete_cue toggles it off)
+let pendingRemoval = null;   // a marker being removed (set_or_delete_cue toggles it off): by Undo, or by delete_marker
+let markerRestoring = false; // the next marker() call puts back a deleted marker (Undo), so it isn't an undo step itself
 const undoStack = [];        // every change Aria made, newest last
 
 function one(api, prop) {
@@ -202,10 +203,13 @@ function nameMarker(cue) {
   const m = pendingMarker;
   pendingMarker = null;
   const before = String(one(cue, "name"));
-  undoStack.push(m.isNew ? { kind: "marker_new", beats: m.beats, bar: m.bar, name: m.name }
-                         : { kind: "marker_rename", id: Number(cue.id), bar: m.bar, name: before });
+  if (!m.restoring) undoStack.push(m.isNew ? { kind: "marker_new", beats: m.beats, bar: m.bar, name: m.name }
+                                           : { kind: "marker_rename", id: Number(cue.id), bar: m.bar, name: before });
   cue.set("name", m.name);
-  send("marker_done", { bar: m.bar, name: m.name, ok: true });
+  // Live adds a marker only at the playhead. If the song was stopped, put the playhead back where it was.
+  if (m.isNew && m.from !== null && one(song, "is_playing") !== 1) song.set("current_song_time", m.from);
+  if (m.restoring) send("undo_done", { ok: true, text: "Put the marker \"" + m.name + "\" back at bar " + m.bar + "." });
+  else send("marker_done", { bar: m.bar, name: m.name, ok: true });
 }
 
 // Add a marker named <name> at <bar>, or rename the one already there.
@@ -214,7 +218,8 @@ function marker(bar) {
   const name = Array.prototype.slice.call(arguments, 1).join(" ") || "Aria";
   if (!ensureSong()) { send("marker_done", { ok: false, text: "Live isn't ready yet." }); return; }
   const beats = (bar - 1) * beatsPerBar();
-  pendingMarker = { bar: bar, beats: beats, name: name, isNew: false };
+  pendingMarker = { bar: bar, beats: beats, name: name, isNew: false, from: one(song, "current_song_time"), restoring: !!markerRestoring };
+  markerRestoring = false;
 
   const existing = cueAt(beats);
   if (existing) { nameMarker(existing); return; }
@@ -242,8 +247,23 @@ function press_cue() {
   if (pendingRemoval) {
     const r = pendingRemoval;
     pendingRemoval = null;
-    send("undo_done", { ok: true, text: "Removed the marker \"" + r.name + "\" at bar " + r.bar + "." });
+    if (r.from !== null && one(song, "is_playing") !== 1) song.set("current_song_time", r.from);
+    if (r.deleting) {
+      undoStack.push({ kind: "marker_deleted", bar: r.bar, name: r.name });
+      send("marker_deleted", { ok: true, text: "Deleted the marker \"" + r.name + "\" at bar " + r.bar + "." });
+    } else send("undo_done", { ok: true, text: "Removed the marker \"" + r.name + "\" at bar " + r.bar + "." });
   }
+}
+
+// Delete the marker at a bar: move there, then press set_or_delete_cue (it toggles the marker off)
+function delete_marker(bar) {
+  if (!ensureSong()) { send("marker_deleted", { ok: false, text: "Live isn't ready yet." }); return; }
+  const beats = (bar - 1) * beatsPerBar(), cue = cueAt(beats);
+  if (!cue) { send("marker_deleted", { ok: false, text: "There's no marker at bar " + bar + "." }); return; }
+  pendingRemoval = { beats: beats, bar: bar, name: String(one(cue, "name")), deleting: true, from: one(song, "current_song_time") };
+  timeObserver = new LiveAPI(onTime, "live_set");
+  timeObserver.property = "current_song_time";
+  song.set("current_song_time", beats);
 }
 
 function onCues(args) {
@@ -603,6 +623,7 @@ function undo() {
     send("undo_done", { ok: true, text: u.deviceId ? "Removed the EQ Eight Aria added." : "Put EQ band " + u.band + " back how it was." });
   } else if (u.kind === "device") {
     u.params.forEach(function (p) { new LiveAPI("id " + p.id).set("value", p.value); });
+    if (u.routing && u.routing.before) { try { new LiveAPI("id " + u.routing.id).set("input_routing_type", { identifier: u.routing.before.identifier }); } catch (e) { } }
     if (u.deviceId) {
       const track = trackAt(u.track), at = ids(track.get("devices")).indexOf(u.deviceId);
       if (at >= 0) track.call("delete_device", at);
@@ -614,9 +635,18 @@ function undo() {
   } else if (u.kind === "marker_rename") {
     new LiveAPI("id " + u.id).set("name", u.name);
     send("undo_done", { ok: true, text: "Renamed the marker at bar " + u.bar + " back to \"" + u.name + "\"." });
+  } else if (u.kind === "marker_deleted") {
+    markerRestoring = true;
+    marker(u.bar, u.name);
+  } else if (u.kind === "track_prop") {
+    trackAt(u.track).set(u.prop, u.value);
+    send("undo_done", { ok: true, text: u.text });
+  } else if (u.kind === "tempo") {
+    song.set("tempo", u.value);
+    send("undo_done", { ok: true, text: "Tempo back to " + u.value + " BPM." });
   } else if (u.kind === "marker_new") {
     // set_or_delete_cue toggles: move there, wait for Live to arrive, then press it to remove
-    pendingRemoval = { beats: u.beats, bar: u.bar, name: u.name };
+    pendingRemoval = { beats: u.beats, bar: u.bar, name: u.name, from: one(song, "current_song_time") };
     timeObserver = new LiveAPI(onTime, "live_set");
     timeObserver.property = "current_song_time";
     song.set("current_song_time", u.beats);
@@ -669,4 +699,63 @@ function remove_ears() {
     }
   });
   send("ears_removed", { text: removed.length ? "Took the Ears off " + removed.join(", ") + "." : "No Ears to take off." });
+}
+
+// ---------- Mute, solo and tempo, with Undo ----------
+
+function track_prop(trackIndex, prop, value) {
+  if (!ensureSong()) { send("prop_done", { ok: false, text: "Live isn't ready yet." }); return; }
+  const track = trackAt(trackIndex), name = trackIndex < 0 ? "Main" : "\"" + one(track, "name") + "\"";
+  if (trackIndex < 0 && prop === "solo") { send("prop_done", { ok: false, text: "Main can't be soloed." }); return; }
+  const before = one(track, prop), on = Number(value) === 1;
+  const word = prop === "mute" ? (on ? "Muted" : "Unmuted") : (on ? "Soloed" : "Unsoloed");
+  undoStack.push({ kind: "track_prop", track: trackIndex, prop: prop, value: before, text: "Put " + name + " " + prop + " back." });
+  track.set(prop, on ? 1 : 0);
+  send("prop_done", { ok: true, text: word + " " + name + "." });
+}
+
+function tempo(bpm) {
+  if (!ensureSong()) { send("tempo_done", { ok: false, text: "Live isn't ready yet." }); return; }
+  const before = one(song, "tempo");
+  undoStack.push({ kind: "tempo", value: before });
+  song.set("tempo", Number(bpm));
+  send("tempo_done", { ok: true, text: "Tempo " + Math.round(before * 100) / 100 + " to " + Number(bpm) + " BPM." });
+}
+
+// ---------- Sidechain: the Compressor on a track listens to another track ----------
+// Live 12 exposes a Compressor's sidechain source as input_routing_type, a dictionary property. Dictionary
+// values come back as JSON text, so they're parsed defensively; a failure says what to pick by hand.
+
+function dict(api, prop) {
+  try {
+    const raw = api.get(prop), text = Array.isArray(raw) ? raw.join(" ") : String(raw);
+    const v = JSON.parse(text.slice(text.indexOf("{")));
+    return v[prop] !== undefined ? v[prop] : v;
+  } catch (e) { return null; }
+}
+
+function route_sidechain(trackIndex, fromText) {
+  const from = decodeURIComponent(String(fromText));
+  const comp = findStock(trackAt(trackIndex), "Compressor");
+  if (!comp) { send("route_done", { ok: false, text: "There's no Compressor on that track to sidechain." }); return; }
+  const types = dict(comp, "available_input_routing_types") || [];
+  const want = key(from);
+  const hit = types.filter(function (t) { return key(t.display_name) === want; })[0] ||
+              types.filter(function (t) { return key(t.display_name).indexOf(want) >= 0; })[0];
+  if (!hit) { send("route_done", { ok: false, text: "Live doesn't offer \"" + from + "\" as a sidechain source. Pick it in the Compressor's Sidechain menu." }); return; }
+  const before = dict(comp, "input_routing_type");
+  try { comp.set("input_routing_type", { identifier: hit.identifier }); } catch (e) { }
+  let now = dict(comp, "input_routing_type");
+  if (!now || now.identifier !== hit.identifier) {
+    try { comp.set("input_routing_type", JSON.stringify({ identifier: hit.identifier })); } catch (e) { }
+    now = dict(comp, "input_routing_type");
+  }
+  if (!now || now.identifier !== hit.identifier) {
+    send("route_done", { ok: false, text: "Live didn't let Aria pick the sidechain source. Pick \"" + from + "\" in the Compressor's Sidechain menu." });
+    return;
+  }
+  // Undo of the Compressor step puts the routing back too
+  const last = undoStack[undoStack.length - 1];
+  if (last && last.kind === "device") last.routing = { id: Number(comp.id), before: before };
+  send("route_done", { ok: true, text: "The Compressor now listens to \"" + from + "\"." });
 }

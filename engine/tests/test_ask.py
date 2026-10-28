@@ -252,3 +252,23 @@ def test_set_section_becomes_marker_actions():
     out = ask.interpret(msg("Making bars 97 to 112 the drop.", section), {"markers": [{"bar": 81, "name": "Outro"}]}, "make bars 97 to 112 the drop")
     assert out["actions"] == [{"type": "add_marker", "args": {"bar": 97, "name": "Drop"}},
                               {"type": "add_marker", "args": {"bar": 113, "name": "Outro"}}]
+
+
+def test_sidechain_is_a_compressor_then_its_routing():
+    sc = SimpleNamespace(function=SimpleNamespace(name="sidechain", arguments=json.dumps({"track": "high bass", "from_track": "kick"})))
+    out = ask.interpret(msg("Ducking the bass under the kick.", sc), {"tracks": [{"name": "Kick"}, {"name": "High Bass"}]}, "sidechain the bass to the kick")
+    assert [a["type"] for a in out["actions"]] == ["track_device", "route_sidechain"]
+    assert out["actions"][0]["args"]["device"] == "Compressor" and out["actions"][0]["args"]["track"] == "High Bass"
+    assert {"param": "S/C On", "option": "On"} in out["actions"][0]["args"]["settings"]
+    assert out["actions"][1]["args"] == {"track": "High Bass", "from_track": "Kick"}
+    bad = SimpleNamespace(function=SimpleNamespace(name="sidechain", arguments=json.dumps({"track": "Bass", "from_track": "Snare"})))
+    assert ask.interpret(msg("x", bad), {"tracks": [{"name": "Bass"}]}, "x")["problems"][0].startswith('No track called "Snare"')
+
+
+def test_mute_solo_tempo_and_delete_marker_are_checked():
+    assert ask.check_action("track_mute", {"track": "kick", "on": True}, ["Kick"]) == {"track": "Kick", "on": True}
+    assert ask.check_action("track_solo", {"track": "Main", "on": True}, ["Kick"]) is None     # Main can't be soloed
+    assert ask.check_action("set_tempo", {"bpm": 140}) == {"bpm": 140.0}
+    assert ask.check_action("set_tempo", {"bpm": 4000}) is None
+    assert ask.check_action("delete_marker", {"bar": 81}) == {"bar": 81}
+    assert ask.check_action("add_marker", {"bar": 49, "name": "breakdown"}) == {"bar": 49, "name": "Breakdown"}

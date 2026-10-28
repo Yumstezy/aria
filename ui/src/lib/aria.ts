@@ -48,7 +48,8 @@ export interface Progress { step: string; text: string; detail?: string; done?: 
 export type EngineState = "starting" | "up" | "down" | "error";
 
 export interface Setting { param: string; value?: number; option?: string; change?: number }
-export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "track_volume" | "track_eq" | "track_device" | "track_plugin" | "check_mix" | "undo"; args: Record<string, number | string> & { settings?: Setting[] } }
+export interface Action { type: "jump_to" | "add_marker" | "eq_band" | "track_volume" | "track_eq" | "track_device" | "track_plugin" | "check_mix" | "undo"
+  | "delete_marker" | "track_mute" | "track_solo" | "set_tempo" | "route_sidechain"; args: Record<string, number | string> & { settings?: Setting[] } }
 export interface Done extends Action { ok: boolean; text: string }
 export interface Suggestion { type: Action["type"]; args: Action["args"]; why: string; answered?: "yes" | "no"; result?: { ok: boolean; text: string } }
 /** One band of a plugin guide, in Aria's shapes and units. dynamic_db: how far a dynamic band moves with the music. */

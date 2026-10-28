@@ -307,6 +307,9 @@ Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete wai
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
 Max.addHandler("device_done", (s) => { const w = waiters.device_done; delete waiters.device_done; if (w) w(decode(s)); });
+for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done"]) {
+  Max.addHandler(reply, (s) => { const w = waiters[reply]; delete waiters[reply]; if (w) w(decode(s)); });
+}
 Max.addHandler("ears_removed", (s) => { const w = waiters.ears_removed; delete waiters.ears_removed; if (w) w(decode(s)); });
 Max.addHandler("volume_done", (s) => { const w = waiters.volume_done; delete waiters.volume_done; if (w) w(decode(s)); });
 Max.addHandler("live_error", (s) => toUI("error", decode(s)));
@@ -612,6 +615,15 @@ async function apply(action, tracks = []) {
       return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track), a.shape || "bell", a.steep ? 1 : 0);
     case "track_device":
       return await askLive("device", "device_done", trackIndex(a.track), encodeURIComponent(a.device), encodeURIComponent(JSON.stringify(a.settings || [])));
+    case "route_sidechain":
+      return await askLive("route_sidechain", "route_done", trackIndex(a.track), encodeURIComponent(a.from_track));
+    case "delete_marker":
+      return await askLive("delete_marker", "marker_deleted", a.bar);
+    case "track_mute":
+    case "track_solo":
+      return await askLive("track_prop", "prop_done", trackIndex(a.track), action.type === "track_mute" ? "mute" : "solo", a.on ? 1 : 0);
+    case "set_tempo":
+      return await askLive("tempo", "tempo_done", a.bpm);
     case "jump_to":
       toLive("jump", a.bar);
       return { ok: true, text: `Moved the playhead to bar ${a.bar}.` };
