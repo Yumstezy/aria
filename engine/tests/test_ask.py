@@ -272,3 +272,60 @@ def test_mute_solo_tempo_and_delete_marker_are_checked():
     assert ask.check_action("set_tempo", {"bpm": 4000}) is None
     assert ask.check_action("delete_marker", {"bar": 81}) == {"bar": 81}
     assert ask.check_action("add_marker", {"bar": 49, "name": "breakdown"}) == {"bar": 49, "name": "Breakdown"}
+
+
+# ---------- from the Oct 28 review: replies stay honest, matching doesn't guess, nothing crashes ----------
+
+def test_numbers_inside_names_and_text_are_allowed_but_invented_ones_are_not():
+    ctx = {"tracks": [{"name": "808 Bass"}], "markers": [{"bar": 65, "name": "Drop 2"}],
+           "recent": [{"asked": "cut 450 Hz on the bass", "did": [], "replied": None}]}
+    allowed = ask._allowed(ctx, "", [{"type": "track_eq", "args": {"track": "808 Bass", "shape": "low_cut", "freq_hz": 30}}])
+    assert {808.0, 2.0, 450.0, 48.0} <= allowed and 13.0 not in allowed
+    assert ask._numbers("3,500 Hz in bars 97-112") == [3500.0, 97.0, 112.0]
+
+
+def test_track_matching_does_not_guess():
+    assert ask.match_track("it", ["Kit", "Vocal"]) is None
+    assert ask.match_track("Vocal 2", ["Vocal"]) is None
+    assert ask.match_track("Vocal", ["Vocal", "Vocal"]) is None
+    assert ask.match_track("new vocal", ["NEW VOCAL 2", "Kick"]) == "NEW VOCAL 2"
+    assert ask.match_track("the kick track", ["Kick", "Bass"]) == "Kick"
+    assert ask.check_action("track_volume", {"track": "Main", "change_db": 2}, ["Main Vox", "Kick"]) == {"track": "Main", "change_db": 2.0}
+    assert "Two tracks are called" in ask.why_dropped("track_volume", {"track": "Vocal", "change_db": 2}, ["Vocal", "Vocal"])
+
+
+def test_a_section_takes_the_name_of_what_was_playing_and_clears_markers_inside():
+    assert ask.section_markers({"name": "Drop", "first_bar": 97, "last_bar": 112}, [{"bar": 81, "name": "Build"}, {"bar": 97, "name": "Verse"}]) == \
+        [{"bar": 97, "name": "Drop"}, {"bar": 113, "name": "Verse"}]
+    assert ask.section_markers({"name": "Drop", "first_bar": 85, "last_bar": 100}, [{"bar": 1, "name": "Intro"}, {"bar": 90, "name": "Build"}]) == \
+        [{"bar": 85, "name": "Drop"}, {"delete": 90}, {"bar": 101, "name": "Build"}]
+    assert ask.section_markers({"name": "Drop", "first_bar": 1, "last_bar": 9999}, []) == [{"bar": 1, "name": "Drop"}]
+
+
+def test_a_malformed_call_is_dropped_and_the_good_ones_still_run():
+    bad = SimpleNamespace(function=SimpleNamespace(name="plugin_guide", arguments=json.dumps({"plugin": "Pro-Q 4", "bands": [{"shape": "bell"}]})))
+    worse = SimpleNamespace(function=SimpleNamespace(name="suggest", arguments="[]"))
+    out = ask.interpret(msg("Done.", bad, worse, call("jump_to", bar=17)), {}, "jump to 17")
+    assert out["actions"] == [{"type": "jump_to", "args": {"bar": 17}}] and len(out["problems"]) == 2
+
+
+def test_a_reply_is_dropped_when_part_of_the_request_was():
+    out = ask.interpret(msg("Raised Vocal 2 dB and cut Pad 3 dB.", call("track_volume", track="Vocal", change_db=2),
+                            call("track_eq", track="Pad", freq_hz=300, gain_db=-3)), {"tracks": [{"name": "Vocal"}]}, "x")
+    assert out["reply"] is None and len(out["actions"]) == 1 and out["problems"]
+
+
+def test_everyday_words_dont_name_plugins():
+    names = ["FabFilter Pro-Q 4", "Soundtoys EchoBoy", "ValhallaDelay", "ValhallaRoom"]
+    assert ask.mentioned_plugins("add a low cut filter to the vocal", names) == []
+    assert ask.mentioned_plugins("make it sound wider", names) == []
+    assert ask.mentioned_plugins("add a delay on the vocal", names) == []
+    assert ask.mentioned_plugins("put valhalla room on it", names) == ["ValhallaRoom"]
+
+
+def test_a_knob_move_needs_the_device_on_the_track():
+    raise_it = call("track_device", track="Vocal", device="Compressor", settings=[{"param": "Threshold", "change": 2}])
+    out = ask.interpret(msg("Raised it.", raise_it), {"tracks": [{"name": "Vocal", "devices": []}]}, "raise the threshold")
+    assert out["actions"] == [] and "no Compressor" in out["problems"][0]
+    out = ask.interpret(msg("Raised it.", raise_it), {"tracks": [{"name": "Vocal", "devices": ["Compressor"]}]}, "raise the threshold")
+    assert out["actions"][0]["args"]["settings"] == [{"param": "Threshold", "change": 2.0}]

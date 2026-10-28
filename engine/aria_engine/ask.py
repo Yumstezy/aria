@@ -49,7 +49,8 @@ STOCK = {
     "Redux": "Sample Rate (Hz), Bit Depth, Dry/Wet (%)",
     "Channel EQ": "Highpass On (On/Off), Low Gain (dB), Mid Gain (dB), Mid Freq (Hz), High Gain (dB), Output (dB)",
 }
-GAIN_KNOB = re.compile(r"gain|output|volume|makeup|ceiling", re.I)
+GAIN_KNOB = re.compile(r"gain|output|volume|makeup|ceiling|drive", re.I)
+PERCENT_KNOB = re.compile(r"dry.?wet|mix|amount", re.I)
 
 # One EQ Eight band, shared by eq_band and track_eq
 EQ_PROPS = {
@@ -160,7 +161,7 @@ would help, use "suggest" for it instead, and it waits for their yes.
 You get JSON context: the latest Mix check findings (what sticks out, where, by how much), the bars it covered,
 the playhead bar, the tempo, the markers already in the producer's Live set (name and bar), and their tracks (name). When they name a
 part of the song, like "the drop", use a marker with that name; if there isn't one, say so. "Make bars 97 to 112 the drop"
-(a stretch of bars becomes a section): use set_section, not add_marker. Use only numbers from the context or from the producer's words. Never invent a number.
+(a stretch of bars becomes a section): use set_section, not add_marker. Numbers come from the context, the producer's words, or the standard starting points listed below (say when you use one). Never invent any other number.
 If they ask for a fix from the findings, use the finding's frequency.
 EQ uses Live's own EQ Eight, which every producer has. Pick the shape from their words:
 - "cut the low end", "high-pass", "remove the lows below X": shape low_cut at X. "hard", "steep" or "brick wall": steep true.
@@ -242,14 +243,31 @@ Reply in one or two short sentences. No emojis, no em dashes.""".replace(
 
 
 def _numbers(text):
+    text = re.sub(r"(?<=\d),(?=\d{3}\b)", "", str(text))          # "3,500 Hz" is one number
+    text = re.sub(r"(?<=\d)\s*[-\u2013]\s*(?=\d)", " to ", text)    # "97-112" is a range, not -112
     return [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", text)]
+
+
+# Numbers the reply may use that aren't in any value, only where they apply: cut slopes with a cut,
+# the 16 bars a check records with a check
+CUT_SLOPES = {12.0, 48.0}
+CHECK_BARS = 16.0
 
 
 def _allowed(context, request, actions):
     allowed = {0.0}
+    if any(isinstance(a.get("args"), dict) and a["args"].get("shape") in ("low_cut", "high_cut") for a in actions):
+        allowed |= CUT_SLOPES
+    if context.get("bars") or any(a.get("type") == "check_mix" for a in actions):
+        allowed.add(CHECK_BARS)
 
     def add(v):
         if isinstance(v, bool):
+            return
+        if isinstance(v, str):
+            # Numbers inside names and text: "808 Bass", "Drop 2", "Pro-Q 4", an option like "0.4 s", what was done before
+            for n in _numbers(v):
+                add(n)
             return
         if isinstance(v, (int, float)):
             for x in (v, abs(v)):
@@ -264,8 +282,6 @@ def _allowed(context, request, actions):
                 add(x)
 
     add(context)
-    for n in plugin_names(context):
-        add(_numbers(n))
     for n in _numbers(request):
         add(n)
     for a in actions:
@@ -274,15 +290,23 @@ def _allowed(context, request, actions):
 
 
 def match_track(name, tracks):
-    """The set's track this name means: an exact match ignoring case, else the one track
-    whose name contains it or is contained in it. None when nothing or more than one fits."""
-    want = " ".join(str(name or "").lower().split())
+    """The set's track this name means: an exact match ignoring case, else the one track whose name contains
+    it as whole words ("new vocal" finds "NEW VOCAL 2"), or whose name it contains without adding a number
+    ("the kick track" finds "Kick", "Vocal 2" doesn't find "Vocal"). None when nothing, or more than one, fits:
+    Aria doesn't guess, and two tracks with the same name can't be told apart."""
+    norm = lambda s: " ".join(str(s or "").lower().split())
+    want = norm(name)
     if not want:
         return None
-    for t in tracks:
-        if " ".join(t.lower().split()) == want:
-            return t
-    near = [t for t in tracks if want in t.lower() or t.lower() in want]
+    exact = [t for t in tracks if norm(t) == want]
+    if exact:
+        return exact[0] if len(exact) == 1 else None
+    words = lambda s: re.findall(r"[a-z0-9]+", s)
+    def inside(small, big):
+        w, b = words(small), words(big)
+        return bool(w) and any(b[i:i + len(w)] == w for i in range(len(b) - len(w) + 1))
+    near = [t for t in tracks if (len(want) >= 3 and inside(want, norm(t)))
+            or (len(norm(t)) >= 3 and inside(norm(t), want) and not re.search(r"\d", want.replace(norm(t), "")))]
     return near[0] if len(near) == 1 else None
 
 
@@ -317,17 +341,26 @@ def match_plugin(name, names):
     return near.pop() if len(near) == 1 else None
 
 
+EVERYDAY_WORDS = {"filter", "sound", "sounds", "delay", "space", "vintage", "channel", "reverb", "stereo", "studio", "audio",
+                  "bass", "vocal", "vocals", "drums", "drum", "master", "limit", "limiter", "compress", "compressor", "punch",
+                  "warmth", "saturation", "width", "wider", "clean", "pitch", "shift", "chorus", "phase", "phaser", "flanger"}
+
+
 def mentioned_plugins(request, names, limit=12):
     """Installed plugins the request names: "pro q 4" finds "FabFilter Pro-Q 4", "valhalla" finds ValhallaRoom.
     Named without a version ("pro q"), every version is shown and Muse picks the newest."""
     text = _key(request)
-    words = [_key(w) for w in re.findall(r"[A-Za-z]{5,}", request or "")]
+    # A word names a plugin when a word of the plugin's name starts with it ("valhalla" finds ValhallaRoom), and it
+    # isn't an everyday word that plugin names happen to contain ("filter" in FabFilter, "sound", "delay")
+    words = [_key(w) for w in re.findall(r"[A-Za-z]{5,}", request or "") if _key(w) not in EVERYDAY_WORDS]
 
     def keys(n):
         parts = str(n).split()
         return [_key(n)] + ([_key(" ".join(parts[1:]))] if len(parts) > 1 else [])   # with and without the maker
 
-    exact = [n for n in names if any(len(k) >= 4 and k in text for k in keys(n)) or any(w in _key(n) for w in words)]
+    tokens = lambda n: [_key(t) for t in re.split(r"[\s\-_]+", str(n)) if t]
+    spelled = [n for n in names if any(len(k) >= 4 and k in text for k in keys(n))]   # the name in full wins
+    exact = spelled or [n for n in names if any(t.startswith(w) for w in words for t in tokens(n))]
     if exact:
         return exact[:limit]
     bare = [n for n in names if any(len(b) >= 4 and b in text for b in (re.sub(r"\d+$", "", k) for k in keys(n)))]
@@ -346,8 +379,12 @@ def _setting(st):
     if k == "option":
         return {"param": param, "option": str(st["option"]).strip()[:32]}
     v = float(st[k])
-    # Loudness knobs move a few dB at a time, like track_volume
-    if GAIN_KNOB.search(param) and (v > 6 if k == "value" else abs(v) > 6):
+    # Loudness knobs move a few dB at a time, like track_volume, and never far enough down to silence a track
+    if GAIN_KNOB.search(param) and (not -24 <= v <= 6 if k == "value" else abs(v) > 6):
+        return None
+    if PERCENT_KNOB.search(param) and k == "value" and not 0 <= v <= 100:
+        return None
+    if re.search(r"time|decay|attack|release|freq|predelay", param, re.I) and k == "value" and v < 0:
         return None
     return {"param": param, k: round(v, 2)}
 
@@ -381,22 +418,33 @@ def section_markers(args, markers):
     name = name[0].upper() + name[1:]   # "drop" reads as a section name: "Drop"
     out = [{"bar": first, "name": name}]
     after = last + 1
-    bars = {int(m.get("bar", 0)): str(m.get("name", "")) for m in markers if isinstance(m, dict)}
-    if after not in bars:
-        before = [b for b in bars if b <= after and not first <= b <= last]
+    bars = {}
+    for m in markers:
+        try:
+            bars[int(m["bar"])] = str(m.get("name") or "").strip()
+        except (KeyError, TypeError, ValueError):
+            continue
+    # Markers inside the new section would split it: they go (each its own Undo)
+    out += [{"delete": b} for b in sorted(bars) if first < b <= last]
+    if after not in bars and after <= 9999:
+        before = [b for b in bars if b <= after]
+        playing = bars[max(before)] if before else ""
         # The section that was playing after the new one, or a plain "After <name>" when nothing was marked
-        out.append({"bar": after, "name": bars[max(before)] if before else f"After {name}"[:MAX_NAME]})
+        out.append({"bar": after, "name": (playing or f"After {name}")[:MAX_NAME]})
     return out
 
 
 def why_dropped(name, args, tracks=(), plugins=()):
     """One plain sentence on why a call was dropped, for the producer."""
+    asked = str((args or {}).get("track") or "") if isinstance(args, dict) else ""
+    if asked and sum(1 for t in tracks if " ".join(t.lower().split()) == " ".join(asked.lower().split())) > 1:
+        return f'Two tracks are called "{asked}", so Aria can\'t tell which one. Rename one of them in Live.'
     if name == "track_plugin" and isinstance(args, dict) and not match_plugin(args.get("plugin"), plugins):
         return f'Aria can\'t find "{args.get("plugin")}" in Live\'s plugin list.'
     if name == "track_device" and isinstance(args, dict) and args.get("device") not in STOCK:
         return f'Aria can add Live\'s own devices, not "{args.get("device")}" yet.'
     if name in ("track_volume", "track_eq", "track_device", "track_plugin") and isinstance(args, dict) and \
-            not _track(args.get("track"), tracks, main_ok=name in ("track_device", "track_plugin")):
+            not _track(args.get("track"), tracks, main_ok=True):
         shown = ", ".join(f'"{t}"' for t in tracks[:8]) or "none"
         return f'No track called "{args.get("track")}" in this set. Tracks: {shown}.'
     return f"Muse asked for {name.replace('_', ' ')} with values outside Aria's limits, so Aria skipped it."
@@ -409,9 +457,11 @@ def check_guide(args, tracks=()):
         return None
     known = match_plugin(plugin, guides.plugin_names())
     entry = guides.find(known, args["preset"]) if known and args.get("preset") else None
-    if entry:
-        bands, source = guides.preset_bands(entry), "preset"
+    bands = guides.preset_bands(entry) if entry else []
+    if bands:
+        source = "preset"
     else:
+        entry = None   # a preset Aria can't draw (an older format): use Muse's own bands instead
         raw = args.get("bands") or []
         if not isinstance(raw, list) or len(raw) > 8:
             return None
@@ -459,7 +509,7 @@ def check_action(name, args, tracks=(), plugins=()):
                 return None
             return {"track": track, "device": args["device"], "settings": settings}
         if name in ("track_volume", "track_eq"):
-            track = match_track(args.get("track"), tracks)
+            track = _track(args.get("track"), tracks, main_ok=True)   # "Main" is the whole mix, never a track named like it
             if not track:
                 return None
             if name == "track_volume":
@@ -468,6 +518,8 @@ def check_action(name, args, tracks=(), plugins=()):
             eq = check_action("eq_band", args)
             return {"track": track, **eq} if eq else None
         if name == "jump_to":
+            if isinstance(args.get("bar"), bool):
+                return None
             bar = int(args["bar"])
             return {"bar": bar} if 1 <= bar <= 9999 else None
         if name == "add_marker":
@@ -502,6 +554,62 @@ def check_action(name, args, tracks=(), plugins=()):
     return None
 
 
+def _one_call(name, args, context, request, tracks, plugins, actions, suggestions, shown, problems, dropped):
+    """One tool call from Muse: checked, then added to what runs, what's suggested or what's drawn.
+    Returns the dropped count. A call that doesn't fit is dropped with a plain reason."""
+    if name == "plugin_guide":
+        g = check_guide(args, tracks)
+        if g:
+            shown.append(g)
+        else:
+            dropped += 1
+            problems.append(f'Aria has nothing to draw for {args.get("plugin") or "that plugin"} yet.')
+        return dropped
+    if name == "suggest":
+        inner = check_action(args.get("action"), args.get("args"), tracks, plugins)
+        why = str(args.get("why", "")).strip()[:MAX_WHY]
+        if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device") and why:
+            suggestions.append({"type": args["action"], "args": inner, "why": why})
+        else:
+            dropped += 1
+            problems.append(why_dropped(str(args.get("action")), args.get("args"), tracks, plugins))
+        return dropped
+    if name == "sidechain":
+        steps = sidechain_steps(args, tracks)
+        if steps:
+            actions += steps
+        else:
+            dropped += 1
+            missing = [args.get(k) for k in ("track", "from_track") if not match_track(args.get(k), tracks)]
+            listed = ", ".join(f'"{t}"' for t in tracks[:8]) or "none"
+            problems.append(f'No track called "{missing[0]}" in this set. Tracks: {listed}.' if missing
+                            else "A track can't be sidechained to itself.")
+        return dropped
+    if name == "set_section":
+        marks = section_markers(args, context.get("markers") or [])
+        if marks:
+            actions += [{"type": "delete_marker", "args": {"bar": m["delete"]}} if "delete" in m else {"type": "add_marker", "args": m}
+                        for m in marks]
+        else:
+            dropped += 1
+            problems.append("Aria needs a name and bars in order (first bar, then last) to make a section.")
+        return dropped
+    cleaned = check_action(name, args, tracks, plugins)
+    if cleaned is None:
+        dropped += 1
+        problems.append(why_dropped(name, args, tracks, plugins))
+        return dropped
+    # "Raise the threshold by 2 dB" moves a knob from where it is: only on a device that's already there.
+    # A fresh one starts at Live's default (a Compressor at 0 dB), where the move means nothing.
+    if name == "track_device" and any("change" in st for st in cleaned["settings"]) and cleaned["track"] != "Main":
+        known = next((t for t in context.get("tracks") or [] if isinstance(t, dict) and t.get("name") == cleaned["track"] and "devices" in t), None)
+        if known is not None and not any(_key(cleaned["device"]) in _key(d) for d in known["devices"] or []):
+            problems.append(f'There\'s no {cleaned["device"]} on "{cleaned["track"]}" yet to change. Ask Aria to add one with settings.')
+            return dropped + 1
+    actions.append({"type": name, "args": cleaned})
+    return dropped
+
+
 def interpret(message, context, request):
     """Turn Muse's reply into {reply, actions, suggestions, dropped, problems}. Exposed for tests."""
     actions, suggestions, dropped, problems, shown = [], [], 0, [], []
@@ -512,51 +620,17 @@ def interpret(message, context, request):
         try:
             args = json.loads(call.function.arguments or "{}")
         except json.JSONDecodeError:
+            args = None
+        if not isinstance(args, dict):
             dropped += 1
+            problems.append(f"Muse sent {name.replace('_', ' ')} in a shape Aria can't read, so Aria skipped it.")
             continue
-        if name == "plugin_guide":
-            g = check_guide(args, tracks)
-            if g:
-                shown.append(g)
-            else:
-                dropped += 1
-                problems.append(f'Aria has nothing to draw for {args.get("plugin") or "that plugin"} yet.')
-            continue
-        if name == "suggest":
-            inner = check_action(args.get("action"), args.get("args"), tracks, plugins)
-            why = str(args.get("why", "")).strip()[:MAX_WHY]
-            if inner is not None and args.get("action") in ("jump_to", "add_marker", "eq_band", "track_volume", "track_eq", "track_device") and why:
-                suggestions.append({"type": args["action"], "args": inner, "why": why})
-            else:
-                dropped += 1
-                problems.append(why_dropped(str(args.get("action")), args.get("args"), tracks, plugins))
-            continue
-        if name == "sidechain":
-            steps = sidechain_steps(args, tracks)
-            if steps:
-                actions += steps
-            else:
-                dropped += 1
-                missing = [args.get(k) for k in ("track", "from_track") if not match_track(args.get(k), tracks)]
-                shown = ", ".join(f'"{t}"' for t in tracks[:8]) or "none"
-                problems.append(f'No track called "{missing[0]}" in this set. Tracks: {shown}.' if missing
-                                else "A track can't be sidechained to itself.")
-            continue
-        if name == "set_section":
-            marks = section_markers(args, context.get("markers") or [])
-            if marks:
-                actions += [{"type": "add_marker", "args": m} for m in marks]
-            else:
-                dropped += 1
-                problems.append("Aria needs a name and bars in order (first bar, then last) to make a section.")
-            continue
-        cleaned = check_action(name, args, tracks, plugins)
-        if cleaned is None:
+        try:
+            dropped = _one_call(name, args, context, request, tracks, plugins, actions, suggestions, shown, problems, dropped)
+        except (KeyError, TypeError, ValueError, AttributeError):
             dropped += 1
-            problems.append(why_dropped(name, args, tracks, plugins))
-        else:
-            actions.append({"type": name, "args": cleaned})
-
+            problems.append(f"Muse sent {name.replace('_', ' ')} with values Aria can't use, so Aria skipped it.")
+        continue
     reply = (message.content or "").strip() or None
     if reply:
         reply = re.sub(r"\s*[\u2014\u2013]\s*", ", ", reply)   # no em or en dashes in anything the producer reads
@@ -564,8 +638,8 @@ def interpret(message, context, request):
         allowed = _allowed(context, request, actions + [{"args": s["args"]} for s in suggestions] + [{"args": g} for g in shown])
         if any(round(n, 2) not in allowed for n in _numbers(reply)):
             reply = None   # cited a number we don't have; the actions themselves still stand
-    if problems and not actions and not shown:
-        reply = None   # it would say it was done, and nothing was
+    if problems:
+        reply = None   # it may describe the part that was dropped; the done pills and the reasons say what really happened
     return {"reply": reply, "actions": actions, "suggestions": suggestions, "guides": shown, "dropped": dropped, "problems": problems}
 
 
