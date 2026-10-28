@@ -5,13 +5,13 @@ import time
 from pathlib import Path
 from typing import Dict, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 from pydantic import BaseModel
 import soundfile as sf
 
-from aria_engine import __version__, analysis, ask, clarity, muse, split, stems
+from aria_engine import __version__, analysis, ask, clarity, muse, split, stems, voice
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 # When the code this engine runs was last changed. The bridge compares it with the files on disk
@@ -200,3 +200,15 @@ class AskRequest(BaseModel):
 def muse_ask(req: AskRequest):
     """Ask Muse: returns checked tool calls for the device to apply, and suggestions."""
     return ask.ask(req.text, req.context)
+
+
+@app.post("/voice/transcribe")
+async def voice_transcribe(request: Request):
+    """A spoken request (the raw WAV in the body) as text, by Muse Voice Transcribe."""
+    raw = await request.body()
+    if not raw or len(raw) > MAX_FILE_BYTES:
+        raise HTTPException(400, "Send the recording as the request body.")
+    try:
+        return {"text": voice.transcribe(raw)}
+    except voice.VoiceError as e:
+        raise HTTPException(400, str(e))

@@ -175,6 +175,10 @@ Advice is now about the findings:
 - Findings, strongest first, at most 4: clashes, then a track covered by another (`masking` with track names in `masked` and `by`), then master findings.
 - A clash: `{"kind": "clash", "tracks": [a, b], "louder": a, "hz_range": [lo, hi], "diff_db": 0.4, "share": 0.52, "bars": [first, last]}`. Both tracks play strongly in that range (1/3-octave bands, next-door bands merged) within 3 dB of each other for at least half the time both play there.
 
+## Talk to Muse (voice)
+
+`POST /voice/transcribe`, body: the recording as WAV (the page sends 16-bit mono at the mic's rate). The engine converts it to the 16 kHz mono 16-bit WAV that Muse Voice Transcribe accepts (multipart: `request` `{"model": "muse-voice-transcribe-1.0", "audioEncoding": "WAV", "mode": "PUSH_TO_TALK"}` and `audio`) and returns `{"text"}`, or 400 with a plain reason (too short, over 30 s, no key, no words heard). The words then go to Ask Muse like typed ones.
+
 ## Groove match
 
 `POST /groove/match`
@@ -267,7 +271,7 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
   - `open_window {screen}`: open the window in the saved layout (docked left by default). The screen size lets it dock on the first open.
   - `close_chat {back?}`: close the chat and put the main window back in the layout it had before the pop-out (full or docked). With `back: true` (the chat's Back button) it also reopens the main window if it was closed.
   - `close_window`: close the main window only. A popped-out chat stays and takes the full docked height.
-  - `ask_key <0|1>` (from the device's "Ask key" live.text, not the page): the mapped key. A press opens Ask Muse and sends `focus_ask`; a release does nothing until voice.
+  - `ask_key <0|1>` (from the device's "Ask key" live.text, not the page): the mapped key. A press opens Ask Muse; the bridge sends `voice_key {down}` for press and release, and the popped-out chat records while it's held (a second press sends, if Live sends presses only).
   - `minimize` / `restore`: a docked window becomes a 44 x 132 tab on its edge (a popped-out chat hides too); `restore` brings both back as they were.
   - `set_theme {theme: "sky" | "night"}`: the Light / Dark switch. The bridge saves it in `window.json`, puts it in every page's URL (`?theme=`) and sends `theme` to every page.
 - Device to UI:

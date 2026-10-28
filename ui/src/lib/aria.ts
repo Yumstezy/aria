@@ -2,6 +2,7 @@
 // device/bridge.js through window.max; payloads both ways are URI-encoded JSON so Max never
 // splits them on spaces or commas. In a normal browser (development) it calls the engine directly.
 import { useSyncExternalStore } from "react";
+import { startRecording, stopRecording, transcribe } from "@/lib/voice";
 
 export const ENGINE = "http://127.0.0.1:8765";
 
@@ -89,6 +90,8 @@ interface State {
   askFocus: number;
   /** Adding or removing Aria Ears on the key tracks: what's happening, in words */
   ears: { busy: boolean; text: string | null };
+  /** Talking to Muse: listening to the mic, turning it into words, or why it couldn't */
+  voice: { state: "idle" | "listening" | "hearing"; error: string | null };
 }
 
 export type Theme = "sky" | "night";
@@ -106,7 +109,7 @@ export const inMax = typeof window !== "undefined" && !!window.max?.outlet;
 let state: State = {
   ask: { open: typeof location !== "undefined" && new URLSearchParams(location.search).get("ask") === "1", pending: null, log: [] },
   engine: { state: "starting", text: "Starting Aria" },
-  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null },
+  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null },
 };
 
 // Dark (Night) unless the producer picked Light. Inside Live the bridge saves the choice and puts it in
@@ -219,6 +222,8 @@ export function connect() {
     on<{ theme: Theme }>("theme", (t) => { applyTheme(t.theme); set({ theme: t.theme }); });
     on<Session>("session", (x) => set({ session: x }));
     on<{ busy: boolean; text: string }>("ears", (e) => set({ ears: e }));
+    // The mapped key: hold to talk, let go to send. Only the popped-out chat listens, so it records once.
+    if (new URLSearchParams(location.search).get("view") === "chat") on<{ down: boolean }>("voice_key", (k) => voiceKey(k.down));
     on("focus_ask", () => { arrive(); set({ askFocus: state.askFocus + 1 }); });
     send("ready");   // bridge.js replies with the engine state and the latest result
   } else {
@@ -276,6 +281,41 @@ export function answerSuggestion(exchange: number, index: number, yes: boolean) 
 }
 
 export const undoLast = () => send("undo");
+
+// ---------- Talk to Muse ----------
+
+let voiceSince = 0;
+let voiceErrorTimer: ReturnType<typeof setTimeout> | undefined;
+function voiceError(text: string) {
+  set({ voice: { state: "idle", error: text } });
+  clearTimeout(voiceErrorTimer);
+  voiceErrorTimer = setTimeout(() => set({ voice: { ...state.voice, error: null } }), 6000);
+}
+
+/** The mic button: first press starts listening, the next sends what was said to Muse. */
+export async function toggleVoice() {
+  const v = state.voice;
+  if (v.state === "hearing") return;
+  if (v.state === "idle") {
+    try { await startRecording(); } catch (e) { voiceError((e as Error).message); return; }
+    voiceSince = Date.now();
+    set({ voice: { state: "listening", error: null } });
+    return;
+  }
+  set({ voice: { state: "hearing", error: null } });
+  try {
+    const words = await transcribe(await stopRecording());
+    set({ voice: { state: "idle", error: null } });
+    askMuse(words);
+  } catch (e) { voiceError((e as Error).message); }
+}
+
+/** The mapped key: down starts (or, if Live sends only presses, a second press sends); up after a hold sends. */
+function voiceKey(down: boolean) {
+  const v = state.voice.state;
+  if (down) { if (v === "idle" || v === "listening") toggleVoice(); }
+  else if (v === "listening" && Date.now() - voiceSince > 400) toggleVoice();
+}
 
 /** Key tracks mode: Aria puts an Ear on each key track (by name), or takes them all off. */
 export const listenTracks = () => { if (send("listen_tracks")) set({ ears: { busy: true, text: "Finding your key tracks" } }); };

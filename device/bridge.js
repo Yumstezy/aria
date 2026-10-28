@@ -510,9 +510,13 @@ Max.addHandler("open_window", (s) => {
 });
 Max.addHandler("open_chat", (s) => openChatWindow(s && decode(s).screen));
 
-// The mapped key (the strip's "Ask key" in Live's Key Map): pressing it opens Ask Muse, ready to type.
-// Voice will use the hold; for now the release does nothing.
-Max.addHandler("ask_key", (v) => { if (v === undefined || v === "bang" || Number(v) !== 0) openChatWindow(null); });
+// The mapped key (the strip's "Ask key" in Live's Key Map): hold to talk to Muse, let go to send.
+// Pressing it opens Ask Muse; the chat page records while it's held.
+Max.addHandler("ask_key", (v) => {
+  const down = v === undefined || v === "bang" || Number(v) !== 0;
+  if (down && !chatOpen) openChatWindow(null);
+  toUI("voice_key", { down });
+});
 
 function openChatWindow(fromPage) {
   const prefs = loadWindowPrefs();

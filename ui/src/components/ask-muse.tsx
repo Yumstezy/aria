@@ -3,7 +3,7 @@
 // or its own small window when popped out. Both show the same history, which the bridge saves on this Mac.
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, setAskOpen, soundName, undoLast, useAria, type Exchange, type Finding, type Guide, type GuideBand, type Suggestion } from "@/lib/aria";
+import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, setAskOpen, soundName, toggleVoice, undoLast, useAria, type Exchange, type Finding, type Guide, type GuideBand, type Suggestion } from "@/lib/aria";
 import { EqCurve } from "@/components/eq-curve";
 import { BackIcon, CheckIcon, CloseIcon, MicIcon, SendIcon, UndoIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
@@ -170,25 +170,20 @@ export function AskThread({ className }: { className?: string }) {
   );
 }
 
-const VOICE_SOON = "Voice is coming soon. Type for now.";
-
-/** Voice input. Not hooked up yet: the button is in place, and the box says so when it's pressed. */
-export function useVoice(placeholder: string, soonText = VOICE_SOON) {
-  const [soon, setSoon] = useState(false);
-  useEffect(() => { if (soon) { const t = setTimeout(() => setSoon(false), 2500); return () => clearTimeout(t); } }, [soon]);
-  return { placeholder: soon ? soonText : placeholder, press: () => setSoon(true) };
-}
-
 export function AskInput({ autoFocus }: { autoFocus?: boolean }) {
-  const { ask, askFocus } = useAria();
+  const { ask, askFocus, voice } = useAria();
   const [text, setText] = useState("");
-  const voice = useVoice("Ask, or tell Muse what to change");
+  const placeholder = voice.error ?? (voice.state === "listening" ? "Listening. Tap the mic again to send."
+    : voice.state === "hearing" ? "Muse is turning that into words…" : "Ask, or tell Muse what to change");
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => { if (autoFocus) input.current?.focus(); }, [autoFocus, askFocus]);
   return (
     <form className="cp-composer" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { askMuse(text); setText(""); } }}>
-      <button type="button" className="cp-icon-btn" aria-label="Ask by voice" onClick={voice.press}><MicIcon /></button>
-      <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder={voice.placeholder} aria-label="Ask Muse" />
+      <button type="button" className={cn("cp-icon-btn", voice.state === "listening" && "is-live")} aria-pressed={voice.state === "listening"}
+              aria-label={voice.state === "listening" ? "Send what you said" : "Talk to Muse"} title={voice.state === "listening" ? "Send what you said" : "Talk to Muse"}
+              disabled={voice.state === "hearing" || !!ask.pending} onClick={toggleVoice}><MicIcon /></button>
+      <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} aria-label="Ask Muse"
+             className={voice.error ? "placeholder:!text-hot" : undefined} />
       <button type="submit" className={cn("cp-icon-btn", text.trim() && "is-on")} disabled={!text.trim() || !!ask.pending} aria-label="Send"><SendIcon /></button>
     </form>
   );

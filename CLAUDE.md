@@ -28,7 +28,7 @@ Done means a real Check mix in Live shows real measurements and real Muse Spark 
 - Model IDs: `muse-spark-1.1` (in Meta's examples) and `muse-spark-1.3` (newer). Keep the model in an env var, `MUSE_MODEL`.
 - Endpoints: Chat Completions and Responses both work. Tool calling is supported. Images work through `image_url` content parts.
 - Audio input isn't documented in Meta's post. Assume we send measurements, not audio, until a day 1 test proves otherwise.
-- Muse Voice Transcribe: no public docs found yet. Voice stays a stretch goal until we find the endpoint.
+- Muse Voice Transcribe (found Oct 26, built Oct 27): `POST /asr/transcribe`, model `muse-voice-transcribe-1.0`, mono 16-bit WAV at 16 or 24 kHz only. `engine/aria_engine/voice.py` converts and calls it; the Ask Muse mic and the mapped key use it.
 - Sources: https://dev.meta.ai/resources/blog/build-with-muse-spark and https://www.promptfoo.dev/docs/providers/meta/
 
 ## No invented data
