@@ -118,6 +118,8 @@ class Aria(ControlSurface):
                 if name not in names:
                     names.append(name)
             self._reply(c, {"ok": True, "plugins": names})
+        elif cmd == "tree":
+            self._reply(c, {"ok": True, "tree": self._tree(self.application().browser.plugins, int(msg.get("depth", 3)))})
         elif cmd == "load":
             self._load(c, int(msg.get("track", -1)), str(msg.get("name", "")))
         else:
@@ -125,24 +127,38 @@ class Aria(ControlSurface):
 
     # ---------- the plugin list: every loadable device under Plugins in Live's browser ----------
 
+    # Live marks a third-party plugin as loadable, not always as a device, so anything loadable under
+    # Plugins counts; folders (formats, makers) are walked. A plugin's own presets sit under it and are skipped.
     def _plugin_items(self):
-        if self._plugins is None:
+        if not self._plugins:   # an empty list is read again: Live may still be scanning
             found = []
 
             def walk(item, fmt, depth):
                 for child in item.children:
-                    if child.is_device and child.is_loadable:
+                    if child.is_loadable and not getattr(child, "is_folder", False):
                         found.append((child.name, fmt, child))
-                    elif depth < 4 and not child.is_loadable:
+                    elif depth < 5:
                         walk(child, fmt, depth + 1)
 
             for top in self.application().browser.plugins.children:
-                if top.is_device and top.is_loadable:
+                if top.is_loadable and not getattr(top, "is_folder", False):
                     found.append((top.name, "", top))
                 else:
                     walk(top, top.name, 1)
             self._plugins = found
+            self.log_message("Aria: found %d plugins" % len(found))
         return self._plugins
+
+    def _tree(self, item, depth):
+        """Names and flags under an item, for checking how Live lays out its plugins."""
+        out = []
+        for child in list(item.children)[:40]:
+            node = {"name": child.name, "loadable": bool(child.is_loadable), "device": bool(child.is_device),
+                    "folder": bool(getattr(child, "is_folder", False))}
+            if depth > 1 and not child.is_loadable:
+                node["children"] = self._tree(child, depth - 1)
+            out.append(node)
+        return out
 
     def _find(self, want):
         k = key(want)

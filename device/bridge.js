@@ -221,7 +221,8 @@ async function pluginNames() {
   if (installedPlugins) return installedPlugins;
   try {
     const r = await remote({ cmd: "plugins" });
-    if (r.ok) installedPlugins = r.plugins;
+    if (r.ok && r.plugins.length) installedPlugins = r.plugins;   // an empty list is asked again next time
+    else if (r.ok) return [];
   } catch (e) { return null; }   // helper off: Muse is told plugins can't be added
   return installedPlugins;
 }
