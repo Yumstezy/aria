@@ -12,7 +12,7 @@ import { MiniWaves } from "@/components/mini-waves";
 import { AnalyzerIcon, BackIcon, BuriedIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, LayoutIcon, MinimizeIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
-import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, lastDock, listenTracks, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode, stopListening,
+import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode, stopListening,
          soundName, useAria, useViewport, type Kind, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
@@ -292,7 +292,8 @@ function KeyTracks() {
     <div className="cp-row flex-wrap" style={{ gap: 8 }}>
       {on.length ? (
         <>
-          <span className="cp-tag cp-tag-good">Listening to {on.join(", ")}</span>
+          <span className="cp-tag cp-tag-good">Listening to {on.length} tracks</span>
+          {on.map((t, i) => <span key={i} className="cp-tag cp-tag-idle" title={t} style={{ maxWidth: 150 }}><span className="truncate">{shortName(t, 18)}</span></span>)}
           <button className="cp-btn cp-btn-ghost cp-btn-sm" disabled={ears.busy} onClick={stopListening}>Stop listening</button>
         </>
       ) : (
@@ -301,7 +302,7 @@ function KeyTracks() {
           {!ears.text && <span className="cp-meta">Names the tracks that clash. Aria adds a small Ear to Kick, Bass, Leads and Vocals.</span>}
         </>
       )}
-      {ears.text && <span className="cp-meta">{ears.text}</span>}
+      {ears.text && (ears.busy || !on.length) && <span className="cp-meta">{ears.text}</span>}
     </div>
   );
 }

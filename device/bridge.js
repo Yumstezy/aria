@@ -222,9 +222,23 @@ function remote(cmd) {
   });
 }
 
-// Key tracks by name: the parts whose clashes matter most. Up to six, in the set's order.
-const KEY_TRACK = /kick|bass|sub|808|lead|synth|vocal|vox|voice|pad|chord|keys|drum|perc|snare|clap|pluck|arp/i;
-const MAX_EARS = 6;
+// Key tracks by name: at most one per role, so each Ear hears one part. Within a role a group wins (one Ear on
+// a vocals group hears every vocal). A track named for two roles ("Kick + Bass") is skipped when the roles have
+// tracks of their own: a clash between kick and bass can only be heard with them apart.
+const ROLES = [["kick", /kick/i], ["bass", /bass|\bsub\b|808/i], ["vocal", /vocal|vox|voice/i],
+               ["lead", /lead|synth|pluck|arp/i], ["pad", /pad|chord|keys/i], ["drums", /drum|perc|snare|clap|hat/i]];
+
+function pickKeyTracks(tracks) {
+  const roles = (t) => ROLES.filter(([, re]) => re.test(t.name)).map(([r]) => r);
+  const single = new Set(tracks.filter((t) => roles(t).length === 1).flatMap(roles));
+  const picked = [];
+  for (const [role] of ROLES) {
+    const fits = tracks.filter((t) => roles(t).includes(role) && !picked.includes(t) && !(roles(t).length > 1 && roles(t).every((r) => single.has(r))));
+    const best = fits.find((t) => t.group) || fits[0];
+    if (best) picked.push(best);
+  }
+  return picked;
+}
 const EAR = "Aria Ear";
 const earsOn = (tracks) => tracks.filter((t) => (t.devices || []).includes(EAR)).map((t) => t.name);
 
@@ -233,7 +247,7 @@ Max.addHandler("listen_tracks", async () => {
   try {
     const live = await askLive("state", "live_state");
     const have = earsOn(live.tracks);
-    const pick = live.tracks.filter((t) => KEY_TRACK.test(t.name) && !have.includes(t.name)).slice(0, Math.max(0, MAX_EARS - have.length));
+    const pick = pickKeyTracks(live.tracks).filter((t) => !have.includes(t.name));
     if (have.length + pick.length < 2) {
       throw new UserError("Aria didn't find key tracks by name (Kick, Bass, Lead, Vocal and so on). Rename them, or drop Aria Ear on the tracks you want.");
     }
@@ -245,7 +259,7 @@ Max.addHandler("listen_tracks", async () => {
       if (!r.ok) throw new UserError(/unknown command/i.test(r.text) ? "Aria's helper in Live is out of date. Quit and reopen Live, then try again." : r.text);
       added.push(t.name);
     }
-    text = `Listening to ${[...have, ...added].join(", ")}. Press Check mix.`;
+    text = null;   // the row shows which tracks; nothing more to say
   } catch (e) {
     text = e instanceof UserError ? e.message : `Something went wrong: ${e.message}`;
   }

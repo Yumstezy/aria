@@ -336,7 +336,9 @@ if (typeof window !== "undefined") (window as unknown as { Aria: unknown }).Aria
 // ---------- plain words for what the engine found (DESIGN.md: words first, numbers as detail) ----------
 
 const SOUND: Record<string, string> = { vocals: "Vocal", bass: "Bass", drums: "Drums and loops", other: "Synths and keys", "the rest": "the rest of the mix", mix: "Your mix" };
-export const soundName = (s: string) => SOUND[s] || s;
+/** A track name short enough for a chip or a line ("Vocals LB aka LABAT - Juicy J - …") */
+export const shortName = (s: string, max = 24) => (s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s);
+export const soundName = (s: string) => SOUND[s] || shortName(s);
 
 export function hz(v: number) { return v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.round(v)} Hz`; }
 export function hzRange([lo, hi]: [number, number]) {
