@@ -100,13 +100,26 @@ const PLUGIN_CLASSES = ["PluginDevice", "AuPluginDevice"];
 const PLUGIN_KNOBS = 48;
 
 function pluginsOn(track) {
-  const out = [];
-  ids(track.get("devices")).forEach(function (id) {
-    const d = new LiveAPI("id " + id);
-    if (PLUGIN_CLASSES.indexOf(String(one(d, "class_name"))) < 0) return;
-    const knobs = ids(d.get("parameters")).slice(1, PLUGIN_KNOBS + 1).map(function (pid) { return String(one(new LiveAPI("id " + pid), "name")); });
-    out.push({ name: String(one(d, "name")), knobs: knobs });
+  return pluginDevices(track).map(function (x) {
+    const knobs = ids(x.dev.get("parameters")).slice(1, PLUGIN_KNOBS + 1).map(function (pid) { return String(one(new LiveAPI("id " + pid), "name")); });
+    return { name: String(one(x.dev, "name")), knobs: knobs };
   });
+}
+
+// Every third-party plugin on a track, also inside racks: a plugin saved in a rack keeps the knobs picked
+// with Configure ("Pro-Q 4 (Aria)"). top is the device on the track itself (the rack), which Undo removes.
+function pluginDevices(track) {
+  const out = [];
+  function walk(devIds, top, depth) {
+    devIds.forEach(function (id) {
+      const d = new LiveAPI("id " + id), t = top || Number(id);
+      if (PLUGIN_CLASSES.indexOf(String(one(d, "class_name"))) >= 0) out.push({ dev: d, top: t });
+      else if (depth < 2 && one(d, "can_have_chains") === 1) {
+        ids(d.get("chains")).forEach(function (cid) { walk(ids(new LiveAPI("id " + cid).get("devices")), t, depth + 1); });
+      }
+    });
+  }
+  walk(ids(track.get("devices")), null, 0);
   return out;
 }
 
@@ -467,10 +480,10 @@ function findStock(track, name) {
 
 // A third-party plugin on the track whose name matches ("Pro-Q 4" finds "FabFilter Pro-Q 4"), newest first
 function findPlugin(track, name) {
-  const devs = ids(track.get("devices")), want = key(name);
-  for (let i = devs.length - 1; i >= 0; i--) {
-    const d = new LiveAPI("id " + devs[i]), k = key(one(d, "name"));
-    if (PLUGIN_CLASSES.indexOf(String(one(d, "class_name"))) >= 0 && k && (k.indexOf(want) >= 0 || want.indexOf(k) >= 0)) return d;
+  const all = pluginDevices(track), want = key(name);
+  for (let i = all.length - 1; i >= 0; i--) {
+    const k = key(one(all[i].dev, "name"));
+    if (k && (k.indexOf(want) >= 0 || want.indexOf(k) >= 0)) return all[i];
   }
   return null;
 }
@@ -483,7 +496,7 @@ function device(trackIndex, nameText, settingsText, addedFlag) {
   if (!STOCK[name]) {
     const plug = findPlugin(track, name);
     if (!plug) { send("device_done", { ok: false, missing: true, text: name + " isn't on that track." }); return; }
-    applyDevice(plug, Number(addedFlag) === 1, trackIndex, String(one(plug, "name")), settings);
+    applyDevice(plug.dev, Number(addedFlag) === 1, trackIndex, String(one(plug.dev, "name")), settings, plug.top);
     return;
   }
   const found = findStock(track, name);
@@ -537,7 +550,8 @@ function menuValue(param, setting) {
   return best;
 }
 
-function applyDevice(dev, added, index, name, settings) {
+// top: the device on the track that holds dev (a rack), when it isn't dev itself. Undo removes that.
+function applyDevice(dev, added, index, name, settings, top) {
   const params = ids(dev.get("parameters")).map(function (id) {
     const p = new LiveAPI("id " + id);
     return { api: p, name: String(one(p, "name")), k: key(one(p, "name")) };
@@ -568,7 +582,7 @@ function applyDevice(dev, added, index, name, settings) {
                           params.map(function (p) { return p.name; }).slice(0, 40).join(", ") + "." });
     return;
   }
-  undoStack.push({ kind: "device", params: keep, deviceId: added ? Number(dev.id) : null, name: name, track: index });
+  undoStack.push({ kind: "device", params: keep, deviceId: added ? Number(top || dev.id) : null, name: name, track: index });
   const where = index < 0 ? "Main" : "\"" + one(trackAt(index), "name") + "\"";
   let text = (added ? "Added " + (/^[AEIO]/i.test(name) ? "an " : "a ") + name + " on " + where : "On the " + name + " on " + where) + (done.length ? ": " + done.join(", ") + "." : ".");
   if (missed.length) text += " Couldn't set " + missed.join(", ") + "." + hidden;

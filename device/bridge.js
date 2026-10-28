@@ -510,7 +510,8 @@ async function apply(action, tracks = []) {
       if (!first.missing) return first;
       const loaded = await remote({ cmd: "load", track: idx, name: a.plugin });
       if (!loaded.ok) return { ok: false, text: loaded.text };
-      return await askLive("device", "device_done", idx, encodeURIComponent(loaded.name), settings, 1);
+      // By the plugin's own name: it may sit inside a saved rack ("Pro-Q 4 (Aria)") with any name
+      return await askLive("device", "device_done", idx, encodeURIComponent(a.plugin), settings, 1);
     }
     case "jump_to":
       toLive("jump", a.bar);

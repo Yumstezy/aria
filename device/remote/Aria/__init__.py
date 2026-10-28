@@ -150,7 +150,7 @@ class Aria(ControlSurface):
         return self._plugins
 
     def _aria_preset(self, plugin):
-        """The producer's "<plugin> (Aria)" preset in the User Library's Presets folder, or None.
+        """The producer's "<plugin> (Aria)" rack or preset in the User Library's Presets folder, or None.
         Read each time, so a preset saved a minute ago is found."""
         want = key(plugin + " aria")
         try:
@@ -160,7 +160,13 @@ class Aria(ControlSurface):
 
         def walk(item, depth):
             for child in item.children:
-                if child.is_loadable and key(child.name.rsplit(".", 1)[0] if child.name.endswith(".adv") else child.name) == want:
+                # A rack (.adg) or device preset (.adv) keeps Live's Configure list; a plugin preset doesn't
+                name = child.name
+                if name.lower().endswith((".vstpreset", ".fxp", ".aupreset")):
+                    continue
+                if name.lower().endswith((".adg", ".adv")):
+                    name = name.rsplit(".", 1)[0]
+                if child.is_loadable and key(name) == want:
                     return child
                 if depth < 5 and not child.is_loadable:
                     hit = walk(child, depth + 1)
