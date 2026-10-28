@@ -240,34 +240,37 @@ function pickKeyTracks(tracks) {
   return picked;
 }
 const EAR = "Aria Ear";
+const EAR_READY_MS = 800;
 const earsOn = (tracks) => tracks.filter((t) => (t.devices || []).includes(EAR)).map((t) => t.name);
 
-Max.addHandler("listen_tracks", async () => {
-  let text;
-  try {
-    const live = await askLive("state", "live_state");
-    const have = earsOn(live.tracks);
-    const pick = pickKeyTracks(live.tracks).filter((t) => !have.includes(t.name));
-    if (have.length + pick.length < 2) {
-      throw new UserError("Aria didn't find key tracks by name (Kick, Bass, Lead, Vocal and so on). Rename them, or drop Aria Ear on the tracks you want.");
-    }
-    toUI("ears", { busy: true, text: `Adding Ears to ${pick.map((t) => t.name).join(", ")}` });
-    const added = [];
-    for (const t of pick) {
-      const r = await remote({ cmd: "load_ear", track: t.index });
-      // An older helper (Live reads it only at startup) doesn't know load_ear yet
-      if (!r.ok) throw new UserError(/unknown command/i.test(r.text) ? "Aria's helper in Live is out of date. Quit and reopen Live, then try again." : r.text);
-      added.push(t.name);
-    }
-    text = null;   // the row shows which tracks; nothing more to say
-  } catch (e) {
-    text = e instanceof UserError ? e.message : `Something went wrong: ${e.message}`;
+// Put an Ear on each key track that doesn't have one. Returns how many tracks have Ears; throws UserError.
+async function addEars() {
+  const live = await askLive("state", "live_state");
+  const have = earsOn(live.tracks);
+  const pick = pickKeyTracks(live.tracks).filter((t) => !have.includes(t.name));
+  if (have.length + pick.length < 2) {
+    throw new UserError("Aria didn't find key tracks by name (Kick, Bass, Lead, Vocal and so on). Rename them, or drop Aria Ear on the tracks you want.");
   }
+  if (pick.length) toUI("ears", { busy: true, text: `Adding Ears to ${pick.map((t) => t.name).join(", ")}` });
+  for (const t of pick) {
+    const r = await remote({ cmd: "load_ear", track: t.index });
+    // An older helper (Live reads it only at startup) doesn't know load_ear yet
+    if (!r.ok) throw new UserError(/unknown command/i.test(r.text) ? "Aria's helper in Live is out of date. Quit and reopen Live, then try again." : r.text);
+  }
+  return pick.length;
+}
+
+// "Name my tracks" on: Ears go on now, and Check mix puts them back if they're missing (saved in window.json).
+Max.addHandler("listen_tracks", async () => {
+  savePrefs({ ...loadWindowPrefs(), keyTracks: true });
+  let text = null;
+  try { await addEars(); } catch (e) { text = e instanceof UserError ? e.message : `Something went wrong: ${e.message}`; }
   toUI("ears", { busy: false, text });
   pushSession();
 });
 
 Max.addHandler("stop_listening", async () => {
+  savePrefs({ ...loadWindowPrefs(), keyTracks: false });
   let text;
   try { text = (await askLive("remove_ears", "ears_removed")).text; } catch (e) { text = e.message; }
   toUI("ears", { busy: false, text });
@@ -329,6 +332,18 @@ async function checkMix() {
       toLive("play");
       await started;
       live = await askLive("state", "live_state");
+    }
+
+    // "Name my tracks" is on: put the Ears on first, in this same check, so it isn't checked twice
+    if (loadWindowPrefs().keyTracks && earsOn(live.tracks).length < 2) {
+      toUI("progress", { step: "start", text: "Adding Ears to your key tracks" });
+      try {
+        if (await addEars()) await sleep(EAR_READY_MS);   // let the new Ears load before they're asked to record
+        toUI("ears", { busy: false, text: null });
+      } catch (e) {
+        toUI("ears", { busy: false, text: e instanceof UserError ? e.message : e.message });   // check without them
+      }
+      pushSession();
     }
 
     Max.post(`check_mix: tempo ${live.tempo}, beat ${live.song_beat}, chain ${JSON.stringify(live.chain)}`);
@@ -404,7 +419,8 @@ async function pushSession() {
   try {
     const live = await askLive("state", "live_state");
     toUI("session", { tempo: live.tempo, signature: live.signature, markers: live.markers,
-                      chain: { on_main: live.chain.on_main, after: live.chain.after }, ears: earsOn(live.tracks) });
+                      chain: { on_main: live.chain.on_main, after: live.chain.after }, ears: earsOn(live.tracks),
+                      keyTracks: !!loadWindowPrefs().keyTracks });
   } catch (e) { /* Live didn't answer; the window says what it doesn't know */ }
 }
 

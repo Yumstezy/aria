@@ -93,7 +93,7 @@ interface State {
 
 export type Theme = "sky" | "night";
 /** About the set, from Live: shown in headers and the Get started steps */
-export interface Session { tempo: number; signature: [number, number]; markers: { bar: number; name: string }[]; chain: { on_main: boolean; after: string[] }; ears?: string[] }
+export interface Session { tempo: number; signature: [number, number]; markers: { bar: number; name: string }[]; chain: { on_main: boolean; after: string[] }; ears?: string[]; keyTracks?: boolean }
 
 declare global {
   interface Window {

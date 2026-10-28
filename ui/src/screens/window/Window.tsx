@@ -80,7 +80,7 @@ export function AriaWindow() {
             </div>
           )}
 
-          {view === "mixcheck" && <KeyTracks />}
+          <KeyTracks />
           {view === "home" ? <Home narrow={narrow} onOpen={() => setView("mixcheck")} />
             : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />
@@ -283,26 +283,22 @@ function WhereItHappens({ r, narrow, onPick }: { r: Result | null; narrow: boole
   );
 }
 
-/** Key tracks mode: with an Aria Ear on each key track, Check mix names the tracks that clash.
-    Aria adds them by track name and takes them off again; Check mix works without them too. */
+/** "Name my tracks": with it on, Check mix puts an Aria Ear on each key track (by name) and names the tracks
+    that clash. Set it before checking, so a song isn't checked twice. Off takes the Ears off. */
 function KeyTracks() {
   const { session, ears } = useAria();
   const on = session?.ears ?? [];
+  const wanted = !!session?.keyTracks || on.length > 0;
   return (
     <div className="cp-row flex-wrap" style={{ gap: 8 }}>
-      {on.length ? (
-        <>
-          <span className="cp-tag cp-tag-good">Listening to {on.length} tracks</span>
-          {on.map((t, i) => <span key={i} className="cp-tag cp-tag-idle" title={t} style={{ maxWidth: 150 }}><span className="truncate">{shortName(t, 18)}</span></span>)}
-          <button className="cp-btn cp-btn-ghost cp-btn-sm" disabled={ears.busy} onClick={stopListening}>Stop listening</button>
-        </>
-      ) : (
-        <>
-          <button className="cp-btn cp-btn-sm" disabled={ears.busy} onClick={listenTracks}>Listen to my key tracks</button>
-          {!ears.text && <span className="cp-meta">Names the tracks that clash. Aria adds a small Ear to Kick, Bass, Leads and Vocals.</span>}
-        </>
-      )}
-      {ears.text && (ears.busy || !on.length) && <span className="cp-meta">{ears.text}</span>}
+      <span className="cp-meta" style={{ color: "var(--ink-muted)", fontWeight: 600 }}>Name my tracks</span>
+      <div className="cp-seg" role="group" aria-label="Name my tracks">
+        <button aria-pressed={!wanted} disabled={ears.busy} onClick={() => wanted && stopListening()}>Off</button>
+        <button aria-pressed={wanted} disabled={ears.busy} onClick={() => !wanted && listenTracks()}>On</button>
+      </div>
+      {on.map((t, i) => <span key={i} className="cp-tag cp-tag-idle" title={t} style={{ maxWidth: 150 }}><span className="truncate">{shortName(t, 18)}</span></span>)}
+      {ears.text ? <span className="cp-meta">{ears.text}</span>
+        : !wanted && <span className="cp-meta">Check mix then says which of your tracks clash, like Kick and Bass. Aria adds a small Ear to each key track.</span>}
     </div>
   );
 }
