@@ -8,6 +8,8 @@ producer's own tracks by name.
              range that matters to it, for most of the time it plays there
   bass_click sharp high-frequency bursts at bass note starts that don't land on a
              drum hit (to rule out kick bleed into the bass)
+  clash      two sounds both play strongly in the same narrow band at the same moments,
+             within CLASH_DB of each other, so neither stands clear (key tracks mode, step 4)
 
 Everything is measured inside this mix, so no reference is needed. Near-silent
 stretches are ignored. Nothing is reported unless it clears the thresholds.
@@ -130,6 +132,79 @@ def masking(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, releva
                 findings.append(best)
     findings.sort(key=lambda f: f["score"], reverse=True)
     return findings
+
+
+# ---------- clashes between the producer's own tracks (Aria Ear, build step 4) ----------
+
+CLASH_DB = 3.0          # within this of each other in a band: neither stands clear
+CLASH_MIN_SHARE = 0.5   # for at least this share of the time both play there
+CLASH_MIN_TIME = 0.15   # and both play there for at least this share of the loud part
+CLASH_BAND_DB = 24.0    # a band carries real energy for a track when within this of its strongest band
+THIRD_OCTAVE = [31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000,
+                1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000]
+
+
+def _band_levels(sig, rate):
+    f, t, z = stft(sig, fs=rate, nperseg=N_FFT, noverlap=N_FFT - HOP, boundary=None, padded=False)
+    p = np.abs(z) ** 2
+    edges = [(c / 2 ** (1 / 6), c * 2 ** (1 / 6)) for c in THIRD_OCTAVE]
+    return t, edges, np.array([10 * np.log10(p[(f >= lo) & (f < hi)].sum(axis=0) + 1e-12) for lo, hi in edges]), \
+        10 * np.log10(p.sum(axis=0) + 1e-12)
+
+
+def clashes(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0):
+    """Pairs of sounds that fight in the same narrow bands. Next-door bands that both clash merge
+    into one range. Ranked by how long they fight and how loud they are there. Strongest first."""
+    names = list(sounds)
+    if len(names) < 2:
+        return []
+    bands, totals, times, edges = {}, {}, None, None
+    for n in names:
+        times, edges, bands[n], totals[n] = _band_levels(_mono(sounds[n]), rate)
+    mix_total = 10 * np.log10(sum(10 ** (totals[n] / 10) for n in names) + 1e-12)
+    loud = mix_total >= mix_total.max() - QUIET_DB
+    mix_band = 10 * np.log10(sum(10 ** (bands[n] / 10) for n in names) + 1e-12)
+    bar_of = _frame_bars(times, tempo, start_beat, beats_per_bar)
+
+    def plays(n):
+        own = bands[n]
+        when_on = np.percentile(own[:, loud], 90, axis=1, keepdims=True)   # how loud each band gets when it plays
+        real = when_on >= when_on.max() - CLASH_BAND_DB        # where this track lives, not its silence
+        return real & loud & (own >= own[:, loud].max(axis=1, keepdims=True) - ACTIVE_DB) & (own >= mix_band - AUDIBLE_DB)
+
+    found = []
+    for i, a in enumerate(names):
+        for b in names[i + 1:]:
+            both = plays(a) & plays(b)
+            close = both & (np.abs(bands[a] - bands[b]) <= CLASH_DB)
+            hits = []
+            for k in range(len(edges)):
+                n_both = both[k].sum()
+                if n_both < max(4, CLASH_MIN_TIME * loud.sum()):
+                    continue
+                share = close[k].sum() / n_both
+                if share >= CLASH_MIN_SHARE:
+                    hits.append((k, share))
+            # merge next-door bands into ranges
+            run = []
+            for k, share in hits + [(None, 0)]:
+                if run and (k is None or k != run[-1][0] + 1):
+                    ks = [x[0] for x in run]
+                    sel = close[ks].any(axis=0)
+                    diff = float(np.median((bands[a][ks] - bands[b][ks])[:, sel]))
+                    level = float(np.median(np.maximum(bands[a][ks], bands[b][ks])[:, sel] - mix_band[ks][:, sel]))
+                    hit_bars = bar_of[sel]
+                    lasting = sel.sum() / loud.sum()
+                    found.append({"kind": "clash", "tracks": [a, b], "louder": a if diff > 0 else b,
+                                  "hz_range": [int(round(edges[ks[0]][0])), int(round(edges[ks[-1]][1]))],
+                                  "diff_db": round(abs(diff), 1), "share": round(float(np.mean([x[1] for x in run])), 2),
+                                  "bars": [int(hit_bars.min()), int(hit_bars.max())],
+                                  "score": lasting * 10 ** (level / 20) * len(ks) ** 0.5})
+                    run = []
+                if k is not None:
+                    run.append((k, share))
+    found.sort(key=lambda f: f["score"], reverse=True)
+    return found[:TOP_N]
 
 
 def space(sounds, rate):

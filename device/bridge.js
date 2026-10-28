@@ -66,6 +66,10 @@ const toUI = (name, payload) => {
 };
 const toLive = (...args) => Max.outlet("live", ...args);
 const toRec = (...args) => Max.outlet("rec", ...args);
+// Key tracks mode (build step 4): every Aria Ear in the set records with Main and says which track it is
+const toEars = (...args) => Max.outlet("ears", ...args);
+let earFiles = null;   // [{name, file}] from the Ears during a Check mix
+Max.addHandler("ear_back", (s) => { if (earFiles) earFiles.push(decode(s)); });
 
 class UserError extends Error {}
 
@@ -255,14 +259,16 @@ async function checkMix() {
     const file = path.join(REC_DIR, `mix-${Date.now()}.aif`);
 
     recording = { stopped: false };
+    earFiles = [];
     // Float, so overs above 0 dBFS inside Live are recorded as they are, not capped.
     toRec("samptype", "float32");
     toRec("open", file);
+    toEars("record", REC_DIR, ms, Date.now());   // the Ears start in the same moment as Main
     toRec("record", ms);
 
     const started = Date.now();
     while (Date.now() - started < ms) {
-      if (recording.stopped) { toRec(0); throw new UserError(`Playback stopped before ${BARS} bars were recorded. Press Check mix while the song plays.`); }
+      if (recording.stopped) { toRec(0); toEars("stop"); throw new UserError(`Playback stopped before ${BARS} bars were recorded. Press Check mix while the song plays.`); }
       const left = Math.max(0, Math.ceil((ms - (Date.now() - started)) / 1000));
       toUI("progress", { step: "record", text: `Listening to bars ${startBar} to ${startBar + BARS - 1}`, detail: `${left} s`, done: Date.now() - started, total: ms });
       await sleep(250);
@@ -274,9 +280,21 @@ async function checkMix() {
       throw new UserError("The recording came out empty. Is Aria on the Main track?");
     }
 
-    toUI("progress", { step: "analyze", text: "Splitting your mix and asking Muse Spark" });
+    // Each Ear's recording, by its track's name (a second track with the same name gets " 2")
+    const tracks = {};
+    for (const ear of earFiles || []) {
+      if (!fs.existsSync(ear.file) || fs.statSync(ear.file).size < 1024) continue;
+      let name = ear.name, n = 2;
+      while (tracks[name]) name = `${ear.name} ${n++}`;
+      tracks[name] = ear.file;
+    }
+    earFiles = null;
+    const keyTracks = Object.keys(tracks).length >= 2;
+
+    toUI("progress", { step: "analyze", text: keyTracks ? `Comparing ${Object.keys(tracks).length} tracks and asking Muse Spark` : "Splitting your mix and asking Muse Spark" });
     const res = await request("POST", "/mix/analyze",
-      { mix_path: file, start_beat: live.song_beat, tempo: live.tempo, bars: BARS, beats_per_bar: live.beats_per_bar }, ANALYZE_TIMEOUT_MS);
+      { mix_path: file, start_beat: live.song_beat, tempo: live.tempo, bars: BARS, beats_per_bar: live.beats_per_bar,
+        ...(keyTracks ? { tracks } : {}) }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
     }
@@ -285,6 +303,7 @@ async function checkMix() {
     pushSession();
   } catch (e) {
     recording = null;
+    earFiles = null;
     toUI("error", { text: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
   } finally {
     busy = false;

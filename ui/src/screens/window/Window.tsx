@@ -209,7 +209,7 @@ function Home({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
               {list.length === 0 ? "Nothing sticks out" : `${list.length} ${list.length === 1 ? "thing" : "things"} to fix`}
             </span>
             <span style={{ fontSize: 14, lineHeight: "20px", color: "var(--on-tile-muted)" }}>{barsLabel(result)}. {list.slice(0, 3).map((p) => p.name).join(", ")}{list.length > 3 ? " and more" : ""}</span>
-            {result.clarity.spectra && <div className="cp-push" style={{ height: 64 }}><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode === "split"} /></div>}
+            {result.clarity.spectra && <div className="cp-push" style={{ height: 64 }}><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode !== "master"} /></div>}
             <div className={result.clarity.spectra ? "" : "cp-push"}><button className="cp-btn cp-btn-light" onClick={onOpen}>See what to fix</button></div>
           </>
         ) : (
@@ -290,6 +290,7 @@ const KINDS: { kind: Kind; name: string; line: string; icon: ReactNode }[] = [
   { kind: "harsh", name: "Harsh hits", line: "Sharp peaks that sting the ear.", icon: <HarshIcon /> },
   { kind: "resonance", name: "Ringing notes", line: "One note that rings on too loud.", icon: <RingIcon /> },
   { kind: "bass_click", name: "Bass clicks", line: "Clicks where bass notes start.", icon: <ClickIcon /> },
+  { kind: "clash", name: "Clashing tracks", line: "Two tracks fighting in one range. Needs Aria Ear.", icon: <HarshIcon /> },
 ];
 // Mud is measured as synths buried in the low mids, so it gets the mud icon, not the buried one
 const iconFor = (p: Problem) => KINDS.find((x) => x.kind === (p.name === "Mud" ? "buildup" : p.findings[0].kind))!.icon;
@@ -310,7 +311,7 @@ function EmptyCheck({ narrow }: { narrow: boolean }) {
         <p className="cp-body is-quiet" style={{ margin: 0 }}>After a check, the one thing to fix first shows here, with a button that has Muse fix it for you.</p>
       </section>
       {KINDS.map((k, i) => (
-        <section key={k.kind} className={cn("cp-tile cp-card cp-stat", span(narrow, i < 3 ? 4 : 6))}>
+        <section key={k.kind} className={cn("cp-tile cp-card cp-stat", span(narrow, 4))}>
           <div className="cp-stat-head"><span className="cp-stat-icon">{k.icon}</span><span className="cp-stat-name">{k.name}</span><span className="cp-tag cp-tag-idle cp-stat-word">Not checked</span></div>
           <p className="cp-stat-line">{k.line}</p>
           <TickGauge share={0} />
@@ -333,7 +334,7 @@ function Rise({ i, className, children }: { i: number; className?: string; child
   );
 }
 
-const amountText = (p: Problem) => (p.amount.unit.startsWith("%") ? `${p.amount.value}% of notes` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`);
+const amountText = (p: Problem) => (p.amount.unit.startsWith("%") ? `${p.amount.value}${p.amount.unit}` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`);
 const fixWithMuse = (p: Problem) => { fixIt(p); setAskOpen(true); };
 
 function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen: (i: number) => void; narrow: boolean }) {
@@ -347,7 +348,7 @@ function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen
           <div className="cp-spread"><span className="cp-cap">{list.length ? "Where the problems are" : "Your mix"}</span>
             <span className="cp-meta" style={{ color: "var(--on-tile-muted)" }}>{list.length ? "Tap a number to see it" : "Hover to see the levels"}</span></div>
           {r.clarity.spectra
-            ? <Waves spectra={r.clarity.spectra} findings={r.clarity.findings} split={r.clarity.mode === "split"}
+            ? <Waves spectra={r.clarity.spectra} findings={r.clarity.findings} split={r.clarity.mode !== "master"}
                      onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
             : <p className="cp-meta" style={{ color: "var(--on-tile-muted)" }}>The picture appears after the next Check mix.</p>}
         </section>
@@ -513,7 +514,7 @@ function Compact() {
           <>
             <div className="cp-row" style={{ alignItems: "flex-end" }}>
               <span className="cp-figure"><CountUp value={list.length} /><small>{list.length === 1 ? "thing to fix" : list.length ? "things to fix" : "Nothing sticks out"}</small></span>
-              {result.clarity.spectra && <div className="ml-auto h-10 w-[150px]"><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode === "split"} /></div>}
+              {result.clarity.spectra && <div className="ml-auto h-10 w-[150px]"><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode !== "master"} /></div>}
             </div>
             <div className="flex min-h-0 flex-col overflow-y-auto">
               {list.map((p, i) => (

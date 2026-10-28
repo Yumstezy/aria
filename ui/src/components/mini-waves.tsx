@@ -1,9 +1,8 @@
 // A thumbnail of the window's "Where each part sits": the same measured curves, no labels,
 // problem zones shaded. Sized for the device strip.
-import type { Finding, Spectra } from "@/lib/aria";
+import { partColor, partNames, type Finding, type Spectra } from "@/lib/aria";
 
 const W = 220, H = 52, LO = 30, HI = 16000, FLOOR_DB = -60;
-const ORDER = ["drums", "bass", "other", "vocals"];
 const X = (hz: number) => ((Math.log10(hz) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO))) * W;
 const Y = (db: number) => 2 + (1 - (Math.max(db, FLOOR_DB) - FLOOR_DB) / -FLOOR_DB) * (H - 4);
 
@@ -18,8 +17,8 @@ function path(pts: [number, number][]) {
 const smooth = (v: number[]) => v.map((x, i) => ((v[i - 1] ?? x) + 2 * x + (v[i + 1] ?? x)) / 4);
 
 export function MiniWaves({ spectra, findings, split }: { spectra: Spectra; findings: Finding[]; split: boolean }) {
-  const involved = new Set(findings.flatMap((f) => (f.kind === "masking" ? [f.masked!] : f.kind === "bass_click" ? ["bass"] : [])));
-  const names = split ? ORDER.filter((n) => spectra.parts[n]) : ["mix"];
+  const involved = new Set(findings.flatMap((f) => (f.kind === "masking" ? [f.masked!] : f.kind === "bass_click" ? ["bass"] : f.kind === "clash" ? f.tracks! : [])));
+  const names = split && partNames(spectra).length ? partNames(spectra) : ["mix"];
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block h-full w-full" preserveAspectRatio="none" aria-hidden="true">
       {findings.filter((f) => f.kind !== "bass_click").map((f, i) => {
@@ -28,13 +27,13 @@ export function MiniWaves({ spectra, findings, split }: { spectra: Spectra; find
         return <rect key={i} x={X(lo)} y={0} width={Math.max(3, X(hi) - X(lo))} height={H} fill="var(--hot)" opacity={0.16} />;
       })}
       {names.map((n) => {
-        const v = smooth(split ? spectra.parts[n]! : spectra.mix);
+        const v = smooth(n === "mix" ? spectra.mix : spectra.parts[n]!);
         const line = path(spectra.hz.map((h, i) => [X(h), Y(v[i])]));
         const quiet = split && involved.size > 0 && !involved.has(n);
         return (
           <g key={n}>
-            <path d={`${line}L${W},${H}L0,${H}Z`} fill={`var(--part-${n})`} opacity={quiet ? 0.05 : 0.18} />
-            <path d={line} fill="none" stroke={`var(--part-${n})`} strokeWidth={1.4} opacity={quiet ? 0.3 : 1} vectorEffect="non-scaling-stroke" />
+            <path d={`${line}L${W},${H}L0,${H}Z`} fill={partColor(n, names.indexOf(n))} opacity={quiet ? 0.05 : 0.18} />
+            <path d={line} fill="none" stroke={partColor(n, names.indexOf(n))} strokeWidth={1.4} opacity={quiet ? 0.3 : 1} vectorEffect="non-scaling-stroke" />
           </g>
         );
       })}

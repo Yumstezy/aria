@@ -4,7 +4,7 @@
 // for display only; the engine's numbers stay as measured.
 import { useRef, useState, type PointerEvent } from "react";
 import { motion } from "motion/react";
-import { describe, soundName, type Finding, type Spectra } from "@/lib/aria";
+import { describe, partColor, partNames, silentParts, soundName, type Finding, type Spectra } from "@/lib/aria";
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { BANDS } from "@/lib/problems";
 
@@ -12,7 +12,6 @@ import { BANDS } from "@/lib/problems";
 const SHORT: Record<string, string> = { vocals: "Vocal", other: "Synths", bass: "Bass", drums: "Drums", mix: "Mix" };
 
 const W = 640, H = 270, PAD_B = 24, PAD_T = 34, LO = 30, HI = 16000, FLOOR_DB = -60;
-const ORDER = ["drums", "bass", "other", "vocals"];   // drawn back to front
 const TICKS = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
 
 const X = (hz: number) => ((Math.log10(hz) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO))) * W;
@@ -39,9 +38,10 @@ export function Waves({ spectra, findings, split, onZone }: {
   spectra: Spectra; findings: Finding[]; split: boolean; onZone: (f: Finding) => void;
 }) {
   const involved = new Set<string>();
-  findings.forEach((f) => { if (f.kind === "masking") involved.add(f.masked!); if (f.kind === "bass_click") involved.add("bass"); });
-  const playing = split ? ORDER.filter((n) => spectra.parts[n]) : [];
-  const silent = split ? ORDER.filter((n) => !spectra.parts[n]) : [];
+  findings.forEach((f) => { if (f.kind === "masking") involved.add(f.masked!); if (f.kind === "bass_click") involved.add("bass"); if (f.kind === "clash") f.tracks!.forEach((t) => involved.add(t)); });
+  const playing = split ? partNames(spectra) : [];   // split sounds, or the producer's tracks (Aria Ear)
+  const silent = split ? silentParts(spectra) : [];
+  const color = (n: string) => partColor(n, playing.indexOf(n));
   const showParts = playing.length >= 2;   // one part playing is the mix: draw it once, as the mix
   const names = showParts ? playing : ["mix"];
   // Every finding with a place on the axis, numbered for the pins and the chips
@@ -102,10 +102,10 @@ export function Waves({ spectra, findings, split, onZone }: {
 
         {waves.map((wv, i) => (
           <motion.g key={wv.n} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: "easeOut", delay: i * 0.06 }}>
-            <path d={`${wv.line}L${W},${H - PAD_B}L0,${H - PAD_B}Z`} fill={`var(--part-${wv.n})`} opacity={wv.quiet ? 0.06 : 0.2} />
-            <motion.path d={wv.line} fill="none" stroke={`var(--part-${wv.n})`} strokeWidth={2} opacity={wv.quiet ? 0.35 : 1}
+            <path d={`${wv.line}L${W},${H - PAD_B}L0,${H - PAD_B}Z`} fill={color(wv.n)} opacity={wv.quiet ? 0.06 : 0.2} />
+            <motion.path d={wv.line} fill="none" stroke={color(wv.n)} strokeWidth={2} opacity={wv.quiet ? 0.35 : 1}
                          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, ease: [0.3, 0.8, 0.2, 1], delay: 0.2 + i * 0.06 }} />
-            {showParts && <text x={wv.label.x} y={wv.label.y} textAnchor="middle" fill={`var(--part-${wv.n})`} opacity={wv.quiet ? 0.5 : 1} className="text-[11.5px] font-semibold">{soundName(wv.n)}</text>}
+            {showParts && <text x={wv.label.x} y={wv.label.y} textAnchor="middle" fill={color(wv.n)} opacity={wv.quiet ? 0.5 : 1} className="text-[11.5px] font-semibold">{soundName(wv.n)}</text>}
           </motion.g>
         ))}
         {hover && <line x1={X(spectra.hz[hover.i])} x2={X(spectra.hz[hover.i])} y1={PAD_T - 6} y2={H - PAD_B} stroke="currentColor" strokeOpacity={0.6} strokeWidth={1.5} />}
@@ -130,7 +130,7 @@ export function Waves({ spectra, findings, split, onZone }: {
           title={spectra.hz[hover.i] >= 1000 ? `${(spectra.hz[hover.i] / 1000).toFixed(1)} kHz` : `${spectra.hz[hover.i]} Hz`}
           rows={names.slice().reverse().map((n) => {
             const v = (n === "mix" ? spectra.mix : spectra.parts[n]!)[hover.i];
-            return { label: SHORT[n] ?? soundName(n), value: v <= FLOOR_DB ? "silent" : `${v.toFixed(0)} dB`, color: getComputedStyle(svgRef.current!).getPropertyValue(`--part-${n}`) };
+            return { label: SHORT[n] ?? soundName(n), value: v <= FLOOR_DB ? "silent" : `${v.toFixed(0)} dB`, color: getComputedStyle(svgRef.current!).getPropertyValue(color(n).slice(4, -1)) };
           })} />
       )}
 
@@ -150,7 +150,7 @@ export function Waves({ spectra, findings, split, onZone }: {
 
       <div className="flex flex-wrap gap-3.5 text-xs text-ink-muted">
         {showParts && names.map((n) => (
-          <span key={n} className="inline-flex items-center gap-1.5"><i className="h-[3px] w-3.5 rounded-sm" style={{ background: `var(--part-${n})` }} />{soundName(n)}</span>
+          <span key={n} className="inline-flex items-center gap-1.5"><i className="h-[3px] w-3.5 rounded-sm" style={{ background: color(n) }} />{soundName(n)}</span>
         ))}
         {split && playing.length === 1 && <span>Only the {soundName(playing[0]).toLowerCase()} is playing in these bars.</span>}
         {split && playing.length > 1 && silent.length > 0 && <span className="text-ink-faint">Not playing here: {silent.map((n) => soundName(n).toLowerCase()).join(", ")}</span>}

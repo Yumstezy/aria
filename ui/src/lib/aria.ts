@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react";
 
 export const ENGINE = "http://127.0.0.1:8765";
 
-export type Kind = "resonance" | "buildup" | "harsh" | "masking" | "bass_click";
+export type Kind = "resonance" | "buildup" | "harsh" | "masking" | "bass_click" | "clash";
 export interface Finding {
   kind: Kind;
   hz?: number;
@@ -15,6 +15,9 @@ export interface Finding {
   share?: number;
   bars: [number, number];
   masked?: string;
+  tracks?: [string, string];   // clash: the two tracks fighting (key tracks mode)
+  louder?: string;
+  diff_db?: number;
   by?: string;
   range?: string;
   starts?: number;
@@ -336,7 +339,22 @@ export function hzRange([lo, hi]: [number, number]) {
 }
 
 /** What it is, where in frequency, how much, and a sentence describing the measurement. */
+// The parts in the picture: split sounds in a fixed order, or the producer's own tracks (key tracks mode)
+const SPLIT_ORDER = ["drums", "bass", "other", "vocals"];
+const TRACK_COLORS = ["var(--part-vocals)", "var(--part-other)", "var(--part-bass)", "var(--cool)", "var(--part-drums)", "var(--watch)"];
+export function partNames(spectra: Spectra): string[] {
+  const all = Object.keys(spectra.parts).filter((n) => spectra.parts[n]);
+  return all.every((n) => SPLIT_ORDER.includes(n)) ? SPLIT_ORDER.filter((n) => all.includes(n)) : all;
+}
+export function silentParts(spectra: Spectra): string[] { return Object.keys(spectra.parts).filter((n) => !spectra.parts[n]); }
+export function partColor(n: string, i: number) { return SPLIT_ORDER.includes(n) || n === "mix" ? `var(--part-${n})` : TRACK_COLORS[i % TRACK_COLORS.length]; }
+
 export function describe(f: Finding): { name: string; where: string; size: string; about: string } {
+  if (f.kind === "clash") {
+    const [a, b] = f.tracks!;
+    return { name: `${a} and ${b} clash`, where: hzRange(f.hz_range), size: `${f.diff_db!.toFixed(1)} dB apart`,
+      about: `${a} and ${b} both play strongly in ${hzRange(f.hz_range)}, within ${f.diff_db!.toFixed(1)} dB of each other, ${Math.round(f.share! * 100)}% of the time both play there.` };
+  }
   if (f.kind === "masking") {
     const name = f.masked === "other" && f.range === "low-mid" ? "Mud" : `${soundName(f.masked!)} buried`;
     return {

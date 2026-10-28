@@ -4,6 +4,7 @@
        └──► sfrecord~ 2                      records Main while Check mix runs
     jweb (strip UI) ──► node.script bridge.js ──► route jweb window live rec
     live.text "Ask key" ──► prepend ask_key ──┘   (map a key to it in Live: it opens Ask Muse)
+    route ears ──► send aria_ear      receive aria_ear_back ──► prepend ear_back ──► bridge   (Aria Ear, step 4)
                                  ▲                 │      │     └──► sfrecord~
                                  │                 │      └──► v8 live.js
                                  │                 └──► jweb
@@ -85,7 +86,11 @@ def build():
         window,
         chat,
         obj("bridge", "node.script bridge.js @autostart 1 @watch 1", [8.0, 300.0, 230.0, 22.0], 1, 2),
-        obj("route-out", "route jweb window chat live rec", [8.0, 340.0, 190.0, 22.0], 1, 6),
+        obj("route-out", "route jweb window chat live rec ears", [8.0, 340.0, 220.0, 22.0], 1, 7),
+        # Key tracks mode: broadcast "record" to every Aria Ear, and hear back which track each one is
+        obj("ears-send", "send aria_ear", [240.0, 380.0, 85.0, 22.0], 1, 0),
+        obj("ears-back", "receive aria_ear_back", [240.0, 260.0, 130.0, 22.0], 0, 1),
+        obj("ears-prepend", "prepend ear_back", [240.0, 285.0, 100.0, 22.0], 1, 1),
         obj("dump", "print aria-node", [250.0, 340.0, 90.0, 22.0], 1, 0),
         obj("live", "v8 live.js", [150.0, 380.0, 80.0, 22.0], 1, 1),
         obj("route-defer", "route defer", [150.0, 420.0, 70.0, 22.0], 1, 2),
@@ -110,6 +115,9 @@ def build():
         wire("route-out", "chat", 2, 0),
         wire("route-out", "live", 3, 0),
         wire("route-out", "rec", 4, 0),
+        wire("route-out", "ears-send", 5, 0),
+        wire("ears-back", "ears-prepend"),
+        wire("ears-prepend", "bridge"),
         wire("window", "bridge"),
         wire("chat", "bridge"),
         # Live API: replies, deferred changes, ready signal

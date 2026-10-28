@@ -3,7 +3,7 @@ import threading
 from contextlib import asynccontextmanager
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -80,6 +80,8 @@ class MixRequest(BaseModel):
     bars: Optional[int] = None
     beats_per_bar: Optional[float] = None
     reference_path: Optional[str] = None
+    # Key tracks mode (Aria Ear, build step 4): {track name: wav path}, recorded at the same moment as mix_path
+    tracks: Optional[Dict[str, str]] = None
 
 
 def _audio_file(path_str):
@@ -125,6 +127,35 @@ def find_clarity(audio, rate, tempo, start_beat, beats_per_bar):
     return found
 
 
+TRACKS_TOP_N = 4
+
+
+def find_tracks(paths, rate, audio, timing):
+    """Key tracks mode: the producer's own tracks, by name. Clashes first (neither track stands clear),
+    then a track covered by another, then what the master shows."""
+    sounds = {}
+    for name, p in paths.items():
+        try:
+            x, r = sf.read(str(_audio_file(p)), always_2d=True, dtype="float64")
+        except (RuntimeError, sf.LibsndfileError) as e:
+            raise HTTPException(400, f"Can't read the recording of {name}: {e}")
+        if r != rate:
+            raise HTTPException(400, f"{name} was recorded at {r} Hz, Main at {rate} Hz.")
+        sounds[name] = x
+    n = min(len(x) for x in sounds.values())
+    sounds = {k: v[:n] for k, v in sounds.items()}
+    master = clarity.analyze(audio, rate, **timing)
+    found_clash = stems.clashes(sounds, rate, **timing)
+    found_cover = stems.masking(sounds, rate, **timing)
+    for f in found_clash + found_cover:
+        f.pop("score", None)
+    master["findings"] = (found_clash + found_cover + master["findings"])[:TRACKS_TOP_N]
+    master["mode"] = "tracks"
+    master["tracks"] = list(sounds)
+    master["spectra"] = stems.spectra(sounds, rate)
+    return master
+
+
 @app.post("/mix/analyze")
 def mix_analyze(req: MixRequest):
     path = _audio_file(req.mix_path)
@@ -137,7 +168,11 @@ def mix_analyze(req: MixRequest):
     except (RuntimeError, sf.LibsndfileError) as e:
         raise HTTPException(400, f"Can't read {path.name} as audio: {e}")
     measured = analysis.measure_array(audio, rate)
-    found = find_clarity(audio, rate, req.tempo, req.start_beat, req.beats_per_bar or 4.0)
+    timing = dict(tempo=req.tempo, start_beat=req.start_beat, beats_per_bar=req.beats_per_bar or 4.0)
+    if req.tracks and len(req.tracks) >= 2:
+        found = find_tracks(req.tracks, rate, audio, timing)
+    else:
+        found = find_clarity(audio, rate, req.tempo, req.start_beat, req.beats_per_bar or 4.0)
 
     context = {k: v for k, v in {"bars": req.bars, "tempo": req.tempo}.items() if v is not None}
     if "all" in measured["unmeasured"]:

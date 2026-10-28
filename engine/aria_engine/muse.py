@@ -12,7 +12,7 @@ import re
 
 from openai import OpenAI, OpenAIError
 
-KINDS = {"resonance", "buildup", "harsh", "masking", "bass_click"}
+KINDS = {"resonance", "buildup", "harsh", "masking", "bass_click", "clash"}
 TIMEOUT_SEC = 20
 SHORT_WORDS = 12          # the one-line version shown before the full note
 MAX_TOKENS = 1500
@@ -40,6 +40,11 @@ You get JSON:
     "other" covered in the low-mid range is muddy low-mids.
   - "bass_click": a click at the start of bass notes, on "clicky_share" of "starts" note starts,
     "size_db" above the bass's usual top end
+  - "clash": two of the producer's own tracks ("tracks", by their names in Live) both play strongly in "hz_range"
+    at the same moments, within "diff_db" of each other, so neither stands clear, for "share" of the time both play
+    there. "louder" is the one slightly on top. Fix in words: cut one of the two in that range (usually the one that
+    matters less there), sidechain one to the other, or move one in the stereo field. "fix" is null.
+  In key tracks mode, "masked" and "by" are the producer's track names, not split sounds. Use them as they are.
   "bars" is [first, last]. "share" and "clicky_share" are fractions (0.97 means 97 percent).
 - "measured": loudness and band levels, for background.
 
@@ -60,7 +65,7 @@ Rules:
 
 Answer with JSON only:
 {"summary": "one sentence, the most useful thing to know",
- "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click", "short": "at most 10 words", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
+ "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click|clash", "short": "at most 10 words", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
 
 
 def _numbers(text):

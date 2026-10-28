@@ -64,6 +64,8 @@ Ableton Live
       jweb (strip, 400 x 169)     the device strip UI
       jweb (window, opened)       the full Aria window
       node.script bridge.js       HTTP to the engine, routes messages to jweb and the Live API
+  key tracks (optional)
+    Aria Ear.amxd                 records its track with Main at Check mix, by name (send aria_ear / aria_ear_back)
                  |
                  | HTTP JSON on 127.0.0.1:8765
                  v

@@ -23,11 +23,12 @@ export function problemsOf(r: Result): Problem[] {
     const notes = (r.advice?.notes ?? []).filter((n) => indexes.includes(n.finding));
     const lo = Math.min(...findings.map((x) => x.hz_range[0])), hi = Math.max(...findings.map((x) => x.hz_range[1]));
     const worst = findings.reduce((a, b) => ((b.gap_db ?? 0) < (a.gap_db ?? 0) ? b : a));
-    const amount = f.kind === "masking" ? { value: Math.abs(worst.gap_db!).toFixed(1), unit: "dB under" }
+    const amount = f.kind === "clash" ? { value: String(Math.round(f.share! * 100)), unit: "% of the time" }
+      : f.kind === "masking" ? { value: Math.abs(worst.gap_db!).toFixed(1), unit: "dB under" }
       : f.kind === "bass_click" ? { value: String(Math.round(f.clicky_share! * 100)), unit: "% of notes" }
       : { value: `+${f.size_db!.toFixed(1)}`, unit: "dB" };
     const share = f.kind === "bass_click" ? f.clicky_share! : f.kind === "masking" ? worst.share! : (f.share ?? 0);
-    const shareLabel = f.kind === "bass_click" ? `${f.starts} note starts` : `${Math.round(share * 100)}% of the time`;
+    const shareLabel = f.kind === "bass_click" ? `${f.starts} note starts` : f.kind === "clash" ? `${Math.round(share * 100)}% of the time both play` : `${Math.round(share * 100)}% of the time`;
     return {
       name: d.name,
       where: f.kind === "masking" ? hzRange([lo, hi]) : d.where,
@@ -42,7 +43,7 @@ export function problemsOf(r: Result): Problem[] {
 export function statusWord(p: Problem): string {
   const f = p.findings[0];
   if (f.kind === "masking") return p.name === "Mud" ? "Muddy" : "Buried";
-  return { resonance: "Ringing", buildup: "Build-up", harsh: "Harsh", bass_click: "Clicking" }[f.kind];
+  return { resonance: "Ringing", buildup: "Build-up", harsh: "Harsh", bass_click: "Clicking", clash: "Clashing" }[f.kind];
 }
 
 /** The bars a check covered */

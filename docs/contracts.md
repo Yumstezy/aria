@@ -167,6 +167,13 @@ Advice is now about the findings:
 - `you` and `pro` are 0 to 1, scaled for the bars.
 - `detail` feeds the chart helpers in the Detailed view, with the same field names the helpers take.
 
+### Key tracks mode: Aria Ear (build step 4, Oct 27)
+
+- Each `device/Aria Ear.amxd` on a key track listens on `aria_ear`. At Check mix the bridge sends `record <dir> <ms> <stamp>` there in the same moment it starts recording Main; each Ear records its track to `<dir>/ear-<stamp>-<device id>.aif` and answers on `aria_ear_back` with `{name, file}` (its track's name in Live). The bridge also sends `stop` if playback stops early.
+- With two or more Ear recordings, `POST /mix/analyze` gets `tracks: {track name: path}` (a repeated name gets " 2"). `clarity.mode` is `"tracks"`, `clarity.tracks` lists the names, and `clarity.spectra.parts` is keyed by track name.
+- Findings, strongest first, at most 4: clashes, then a track covered by another (`masking` with track names in `masked` and `by`), then master findings.
+- A clash: `{"kind": "clash", "tracks": [a, b], "louder": a, "hz_range": [lo, hi], "diff_db": 0.4, "share": 0.52, "bars": [first, last]}`. Both tracks play strongly in that range (1/3-octave bands, next-door bands merged) within 3 dB of each other for at least half the time both play there.
+
 ## Groove match
 
 `POST /groove/match`
