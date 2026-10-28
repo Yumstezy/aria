@@ -372,7 +372,7 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
   - Re-add `device/Aria.amxd` on Main. Drop `device/Aria Ear.amxd` on 2 to 4 key tracks (Kick, Bass, Leads, Vocals).
   - Plant a clash: push Kick and Bass into the same low band in a known stretch (8 bars), play it, press Check mix. Fix first should name both tracks, the band and the bars.
   - Try "I'm using Pro-Q 4, add air to my vocals" (the guide card), minimize and the Layout menu.
-  - Invite the ML teammate, Raghav Agarwal (GitHub RaghavAgarwal18), with Write access; he starts at `ml/README.md`. Real mixes with ratings are needed before the Oct 31 checkpoint.
+  - Raghav Agarwal (RaghavAgarwal18) was invited with Write access on Oct 28; he starts at `ml/README.md` once he accepts. He needs the rated mixes (good, mid, bad) before the Oct 31 checkpoint.
 - **Claude:** Step 4's pass in Live, then Step 5 ("Fix it for me" on a clash: the cut on the right track, with Undo).
 
 ## Decisions so far
