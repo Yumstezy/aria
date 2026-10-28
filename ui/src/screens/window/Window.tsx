@@ -11,7 +11,7 @@ import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
 import { AnalyzerIcon, BackIcon, BuriedIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, LayoutIcon, MinimizeIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon } from "@/components/icons";
-import { bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
+import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, lastDock, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode,
          soundName, useAria, useViewport, type Kind, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,7 @@ export function AriaWindow() {
               {narrow && (
                 <div className="cp-row" style={{ gap: 2 }}>
                   <LayoutMenu mode={lastDock()} />
+                  <IconButton label="Minimize to the edge" onClick={minimize}><MinimizeIcon style={{ width: 15, height: 15 }} /></IconButton>
                   <IconButton label="Close" onClick={closeWindow}><CloseIcon style={{ width: 15, height: 15 }} /></IconButton>
                 </div>
               )}
@@ -97,8 +98,8 @@ function IconButton({ label, onClick, children, pressed }: { label: string; onCl
   );
 }
 
-/** Every way to lay out the window, in one place: full, docked left or right, minimized to the edge, and
-    Ask Muse popped out or back. The current layout is ticked. */
+/** Every way to lay out the window, in one place: full, docked left or right, and Ask Muse popped out or back.
+    The current layout is ticked. Minimize and close sit beside it as their own buttons (Ian). */
 function LayoutMenu({ mode, chatOut }: { mode: "full" | "left" | "right"; chatOut?: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -131,7 +132,6 @@ function LayoutMenu({ mode, chatOut }: { mode: "full" | "left" | "right"; chatOu
           {item("Docked left", <DockLeftIcon style={{ width: 16, height: 16 }} />, () => setWindowMode("left"), mode === "left" && !chatOut)}
           {item("Docked right", <DockRightIcon style={{ width: 16, height: 16 }} />, () => setWindowMode("right"), mode === "right" && !chatOut)}
           <div style={{ height: 1, background: "var(--hairline)", margin: "6px 4px" }} />
-          {mode !== "full" && item("Minimize to the edge", <MinimizeIcon style={{ width: 15, height: 15 }} />, minimize)}
           {chatOut ? item("Back to one window", <BackIcon style={{ width: 14, height: 14 }} />, closeChat)
                    : item("Pop out Ask Muse", <ChatIcon style={{ width: 15, height: 15 }} />, openChat)}
         </div>
@@ -222,7 +222,7 @@ function Home({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
               <MixIcon style={{ width: 22, height: 22, flex: "none" }} />
               <div style={{ display: "grid", gap: 2 }}>
                 <b style={{ fontSize: 14 }}>Play the busiest part, then press Check mix</b>
-                <span style={{ fontSize: 12, color: "var(--on-tile-muted)" }}>Buried vocals, mud, harsh hits, ringing notes and bass clicks</span>
+                <span style={{ fontSize: 12, color: "var(--on-tile-muted)" }}>Buried sounds, mud, harsh hits, ringing notes and bass clicks</span>
               </div>
             </div>
           </>
@@ -299,10 +299,10 @@ function EmptyCheck({ narrow }: { narrow: boolean }) {
   return (
     <div className="cp-bento">
       <section className={cn("cp-tile cp-hero", span(narrow, 7))} style={{ minHeight: narrow ? 0 : 228, gap: 10 }}>
-        <span className="cp-cap">Where each part sits</span>
+        <span className="cp-cap">Where the problems are</span>
         <span style={{ fontSize: 34, lineHeight: "38px", fontWeight: 700, letterSpacing: "-.03em" }}>Not checked yet</span>
         <span style={{ fontSize: 14, color: "var(--on-tile-muted)" }}>Play the busiest part of your song and press Check mix. Aria listens to 16 bars.</span>
-        <div className="cp-score cp-push">{["Vocal", "Synths", "Bass", "Drums"].map((p) => <span key={p}><i />{p}</span>)}</div>
+        <div className="cp-score cp-push">{BANDS.map((b) => <span key={b.name}><i />{b.name}</span>)}</div>
       </section>
       <section className={cn("cp-tile cp-solid", span(narrow, 5))} style={{ minHeight: narrow ? 0 : 228, gap: 8 }}>
         <span className="cp-cap">Fix first</span>
@@ -344,8 +344,8 @@ function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen
     <div className="cp-bento">
       <Rise i={0} className={span(narrow, 7)}>
         <section className="cp-tile cp-hero" style={{ gap: 6, minHeight: narrow ? 0 : 320 }}>
-          <div className="cp-spread"><span className="cp-cap">Where each part sits</span>
-            <span className="cp-meta" style={{ color: "var(--on-tile-muted)" }}>{r.clarity.mode === "split" ? "Hover to see each part's level" : "Your whole mix"}</span></div>
+          <div className="cp-spread"><span className="cp-cap">{list.length ? "Where the problems are" : "Your mix"}</span>
+            <span className="cp-meta" style={{ color: "var(--on-tile-muted)" }}>{list.length ? "Tap a number to see it" : "Hover to see the levels"}</span></div>
           {r.clarity.spectra
             ? <Waves spectra={r.clarity.spectra} findings={r.clarity.findings} split={r.clarity.mode === "split"}
                      onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
@@ -499,11 +499,12 @@ function Compact() {
   return (
     <div className="cp-stage is-flush">
       <section className="cp-tile cp-compact h-full" style={{ gap: 10 }}>
-        <div className="cp-spread">
+        <div className="cp-spread" style={{ zIndex: 5 }}>{/* above the rows, so the Layout menu covers them */}
           <div className="cp-mark"><Mark size={22} /><b>Mix check</b></div>
           <div className="cp-row" style={{ gap: 2 }}>
             <button className="cp-btn cp-btn-primary cp-btn-sm" disabled={!!progress} onClick={checkMix}>{progress ? "Checking" : result ? "Check again" : "Check mix"}</button>
             <LayoutMenu mode={lastDock()} chatOut />
+            <IconButton label="Minimize to the edge" onClick={minimize}><MinimizeIcon style={{ width: 15, height: 15 }} /></IconButton>
             <IconButton label="Close" onClick={closeWindow}><CloseIcon style={{ width: 15, height: 15 }} /></IconButton>
           </div>
         </div>

@@ -3,18 +3,22 @@
 // or its own small window when popped out. Both show the same history, which the bridge saves on this Mac.
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, setAskOpen, undoLast, useAria, type Exchange, type Finding, type Guide, type GuideBand, type Suggestion } from "@/lib/aria";
+import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, setAskOpen, soundName, undoLast, useAria, type Exchange, type Finding, type Guide, type GuideBand, type Suggestion } from "@/lib/aria";
 import { EqCurve } from "@/components/eq-curve";
 import { BackIcon, CheckIcon, CloseIcon, MicIcon, SendIcon, UndoIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
-// Starting points built from what Aria found, so the first ask is one tap
-function starters(findings: Finding[]): string[] {
+// Starting points built from what Aria found and what's playing, so the first ask is one tap.
+// Not every song has a vocal: the reverb idea goes to whichever lead part is there.
+function starters(findings: Finding[], playing: Record<string, unknown> | null): string[] {
   const out: string[] = [];
   const ringing = findings.find((f) => f.kind === "resonance" || f.kind === "harsh");
   if (ringing) out.push(`Tame the ${hz(ringing.hz!)} ${ringing.kind === "harsh" ? "harsh hits" : "ringing note"}`);
-  if (findings.some((f) => f.kind === "masking" && f.masked === "vocals")) out.push("Make the vocal easier to hear");
-  out.push("Add some reverb to the vocal");
+  const buried = findings.find((f) => f.kind === "masking" && f.masked !== "other");
+  if (buried) out.push(`Make the ${soundName(buried.masked!).toLowerCase()} easier to hear`);
+  if (findings.some((f) => f.kind === "masking" && f.masked === "other")) out.push("Clean up the mud");
+  const lead = !playing ? "lead" : playing.vocals ? "vocal" : playing.other ? "synths" : null;
+  if (lead) out.push(`Add some reverb to the ${lead}`);
   out.push("Check my mix again");
   return out.slice(0, 4);
 }
@@ -110,7 +114,7 @@ export function AskThread({ className }: { className?: string }) {
         <>
           <p className="cp-meta">Ask for a change in plain words. If you ask, it happens right away, with Undo.</p>
           <div className="cp-ask-sugs">
-            {starters(result?.clarity.findings ?? []).map((s) => <button key={s} className="cp-btn cp-btn-sm" onClick={() => askMuse(s)}>{s}</button>)}
+            {starters(result?.clarity.findings ?? [], result?.clarity.spectra?.parts ?? null).map((s) => <button key={s} className="cp-btn cp-btn-sm" onClick={() => askMuse(s)}>{s}</button>)}
           </div>
         </>
       )}

@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { Mark } from "@/components/brand";
 import { MicIcon } from "@/components/icons";
 import { checkMix, fixIt, jumpTo, openChat, openWindow, useAria, type Result } from "@/lib/aria";
-import { bandsWith, problemsOf, statusWord } from "@/lib/problems";
+import { problemsOf, statusWord, type Problem } from "@/lib/problems";
 
 const STEP: Record<string, string> = { record: "Listening to 16 bars", analyze: "Splitting and asking Muse" };
 
@@ -57,41 +57,49 @@ function Card() {
   );
 }
 
+// Where the problem is, low to high: one bar with the problem marked and named (Ian: the seven band
+// chips were hard to read in a card this small)
+const LO = 20, HI = 20000;
+const at = (f: number) => `${((Math.log10(f) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO))) * 100}%`;
+
+function FreqBar({ p }: { p: Problem }) {
+  const f = p.findings[0], point = f.kind === "resonance" || f.kind === "harsh";
+  const lo = point ? f.hz! * 0.9 : f.hz_range[0], hi = point ? f.hz! * 1.1 : f.hz_range[1];
+  const mid = Math.sqrt(lo * hi);
+  return (
+    <div className="relative" style={{ height: 26 }} aria-label={`Where: ${p.where}`}>
+      <div className="absolute inset-x-0 top-1 h-[6px] rounded-full bg-well" />
+      <div className="absolute top-0 h-[14px] rounded-full bg-hot" style={{ left: `calc(${at(lo)} - 3px)`, width: `calc(${at(hi)} - ${at(lo)} + 6px)` }} />
+      <span className="cp-meta absolute left-0 top-[13px]" style={{ fontSize: 9.5 }}>Low</span>
+      <span className="absolute top-[13px] -translate-x-1/2 whitespace-nowrap font-semibold text-hot" style={{ left: at(mid), fontSize: 10.5 }}>{p.where}</span>
+      <span className="cp-meta absolute right-0 top-[13px]" style={{ fontSize: 9.5 }}>High</span>
+    </div>
+  );
+}
+
 function AfterCheck({ r }: { r: Result }) {
   const list = problemsOf(r);
   const p = list[0];
-  // Where in the mix, low to high: the fix-first problem filled, the others outlined
-  const row = (
-    <div className="cp-secrow" aria-label="Where in the mix">
-      {bandsWith(list).map((b) => {
-        const first = !!p && b.found.includes(p);
-        return <span key={b.name} className={first ? "is-hot" : b.found.length ? "is-watch" : ""} style={{ "--n": 1 } as CSSProperties}
-                     title={b.found.length ? `${b.name}: ${b.found.map((x) => x.name).join(", ")}` : b.name}>{b.short ?? b.name}</span>;
-      })}
-    </div>
-  );
   if (!p) {
     return (
       <section className="cp-tile cp-card" style={{ gap: 6 }}>
         <div className="cp-spread"><span className="cp-cap">Mix check</span><span className="cp-tag cp-tag-good">Clear</span></div>
         <b style={{ fontSize: 14, lineHeight: "18px" }}>Nothing sticks out</b>
-        {row}
         <span className="cp-meta cp-push" style={{ fontSize: 11 }}>Check another part of the song next.</span>
       </section>
     );
   }
   return (
-    <section className="cp-tile cp-card" style={{ gap: 6 }}>
+    <section className="cp-tile cp-card" style={{ gap: 5 }}>
       <div className="cp-spread"><span className="cp-cap">Fix first</span><span className="cp-tag cp-tag-hot">{statusWord(p)}</span></div>
-      <div className="flex min-w-0 items-baseline gap-1.5">
-        <b className="truncate" style={{ fontSize: 14, lineHeight: "18px" }}>{p.name}</b>
-        <span className="cp-meta shrink-0" style={{ fontSize: 11 }}>{p.where}</span>
-      </div>
-      {row}
+      {/* Muse's plain words first ("Boxy ringing clouds the low mids"), the measurement's name if Muse had none */}
+      <b className="line-clamp-2" style={{ fontSize: 13, lineHeight: "16px" }} title={p.name}>{p.short || p.name}</b>
+      <FreqBar p={p} />
       <div className="cp-row cp-push" style={{ gap: 8 }}>
         <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={() => { fixIt(p); openChat(); }}>Fix it</button>
-        {list.length > 1 && <button className="cp-meta hover:underline" style={{ fontSize: 11, background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={openWindow}>
-          {list.length - 1} more in the window</button>}
+        <button className="cp-btn cp-btn-ghost cp-btn-sm" style={{ padding: "0 6px" }} onClick={() => jumpTo(p.bar)} title={`Play bar ${p.bar} in Live`}>Hear it</button>
+        {list.length > 1 && <button className="cp-meta ml-auto hover:underline" style={{ fontSize: 11, background: "none", border: 0, padding: 0, cursor: "pointer" }} onClick={openWindow}>
+          {list.length - 1} more</button>}
       </div>
     </section>
   );
