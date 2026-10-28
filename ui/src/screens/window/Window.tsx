@@ -224,12 +224,12 @@ function WhereItHappens({ r, narrow, onPick }: { r: Result | null; narrow: boole
         <span className="cp-cap">Where it is in the mix</span>
         {r ? <span className="cp-meta">Low to high. Tap one to see it</span> : <span className="cp-tag cp-tag-idle">No check yet</span>}
       </div>
-      <div className={cn("cp-where", !r && "is-empty")}>
+      <div className={cn("cp-where", !r && "is-empty", narrow && "is-wrap")}>
         {bands.map((b) => (
           <button key={b.name} className={b.found.length ? "is-hot" : ""} style={n(1)} title={range(b)}
                   onClick={() => (b.found[0] && onPick ? onPick(b.found[0]) : undefined)}>
-            {narrow ? b.short ?? b.name : b.name}
-            <small>{!r ? (narrow ? "" : range(b)) : b.found.length ? b.found.map((p) => statusWord(p)).join(", ") : "Clear"}</small>
+            {b.name}
+            <small>{!r ? range(b) : b.found.length ? b.found.map((p) => statusWord(p)).join(", ") : "Clear"}</small>
           </button>
         ))}
       </div>
@@ -417,6 +417,7 @@ function Detailed({ r, narrow }: { r: Result; narrow: boolean }) {
           {["bass", "mids", "treble"].map((b) => <Stat key={"w" + b} label={`Width ${b}`} value={m.width[b] === null || m.width[b] === undefined ? null : Math.round(m.width[b]! * 100)} unit="%" why={why[`width.${b}`] || why.all} />)}
         </div>
         <p className="cp-meta">Loudness and peak are here for reference. Aria's advice is about clarity.</p>
+        <p className="cp-meta">Found by Aria's measurement rules (version 1). The mix model we're training on rated mixes joins in once it beats its baselines.</p>
       </section>
       {r.clarity.stems && (
         <section className={cn("cp-tile cp-card", span(narrow, 5))} style={{ gap: 12 }}>
