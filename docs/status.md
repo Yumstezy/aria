@@ -2,6 +2,29 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
+## Where we are (Oct 28)
+
+Feature freeze end of day Nov 2. Submit by noon PT Nov 4. "Built" means it passes its tests here; "Live" means Ian has checked it in Live.
+
+| Step | What it is | State |
+|---|---|---|
+| 0 to 2 | Repo, day 1 tests, the first working Check mix in Live | Done, Live |
+| 3 | Problems in the whole mix: ringing notes, build-up, harsh hits | Done, Live |
+| 3b | Split mode (Meta's Demucs): buried vocal, mud, bass clicks | Done, Live |
+| 4 | Aria Ear: which of your tracks clash, by name. Name my tracks adds the Ears for you | Built; Live check pending |
+| 5 | Muse's advice, the Simple view, Fix it (Muse makes the change, with Undo) | Built; Fix it on a clash pending in Live |
+| 6 | Ask Muse drives Live: EQ, volume, 20 stock devices (add or change), sections and markers, sidechain, mute, solo, tempo, Undo, plugin guides, voice | Built and reviewed (Oct 28); Live checks pending |
+| 7 | Checkpoint (Oct 31): 3 test mixes pass | Blocked: needs 3 test mixes with one planted problem each |
+| 8 | Reference track: compare with a song you want to sound like | Later, after the model |
+| 9 | Groove match | Not started; likely cut (Ian to decide) |
+| 11 | README, demo video | Nov 3 to 4 |
+| Model | Good, mid and bad mixes in one genre; says what pulls a mix down | Raghav invited; the rated mixes are sorted in a shared Drive (Oct 28). Next: extract features, three tiers, first numbers by Oct 31 |
+
+What changed most recently:
+- **The device on Main is just buttons (Oct 28, Ian).** Check mix (its progress fills the button), Ask, Open window (with a count after a check), glassy and muted to sit with Live's own devices. 150 x 169. Results live in the window.
+- **Adding a device adds a new one (Oct 28, Ian).** "Add a compressor" never changes the producer's own; "raise the threshold" changes the one Aria added, else the last one.
+- **Step 6 review (Oct 28):** see "Step 6 dialed in" below.
+
 ## Done: Step 1, Day 1 tests (Oct 26)
 
 Run with `engine/spikes/muse_spike.py`. The measurements in it are a test fixture and the audio is a generated test tone, so neither reaches the app.
@@ -340,6 +363,7 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
 - **Presets (Oct 27):** Ian's DØWD racks are renamed into `User Library/Aria Presets/`. A catalog of 6,717 presets (DØWD, FabFilter, Valhalla, Ozone) is built by `engine/aria_engine/presets.py`. A Remote Script is the likely way to load racks and plugins (spike S6).
 - **Stock devices (Oct 27, sixth pass).** Ian: "make sure the top 20 most used are implemented just how the EQ 8 is". New tool `track_device` with 20 stock devices plus a plain EQ Eight (list in `docs/contracts.md`). Same steps as EQ Eight: use the one on the track or add it, set knobs by display, Undo. Knob names come from Live's own control-surface bank definitions, read from the Live app. Third-party plugins: Muse says it can't yet and offers the stock device as a suggestion. Checked against the real API: reverb, compressor, glue, delay, width, saturation, set ratio and threshold, limit Main, Pro-Q 4 and Valhalla all come back right. Not yet run in Live.
 - **Pro-Q 4's knobs are hidden (Oct 27, night).** Update: Live's save button on a VST3 plugin writes a `.vstpreset`, which doesn't keep the Configure list. Saving Pro-Q 4 inside an Audio Effect Rack (`.adg`) does, so the helper loads "<plugin> (Aria)" racks or `.adv` presets only, and `live.js` finds plugins inside racks (Undo removes the rack). In Live, Pro-Q 4 loads but shows Aria only Device On: Live hides the knobs of plugins with hundreds of them until the producer picks some with Configure, and no API can do that for us. So: (1) the Remote Script loads a User Library preset named "<plugin> (Aria)" instead of the bare plugin when one exists, and Ian saves one per plugin once, after configuring it; (2) when the knobs are hidden, Muse says so and suggests the same move with EQ Eight or a stock device, and the bridge now keeps the follow-up's suggestions.
+- **Data (Oct 28).** The rated mixes for the model are sorted in a shared Drive (audio stays out of git, as `ml/README.md` says).
 - **Step 6 dialed in (Oct 28).** Ian: "really dial in step 6... everything needs to work as intended... push the boundaries". Three code reviews (engine, bridge and Live, UI) plus 27 real requests found and fixed: honest replies were erased by the number check; a reply could describe a dropped part; set_section named the rest wrong; "Main" could land on "Main Vox"; one bad tool call crashed a request; "filter" pulled in FabFilter presets; two quick Do its crossed replies; markers broke while playing; Undo stayed on undone changes; a layout change wiped the saved theme; jumps didn't wait; findings could map to the wrong bars after adding Ears; the whole UI re-rendered on every progress tick; the thread blinked when Muse answered; a window that moved without resizing sat blank for a second. New: sidechain, mute, solo, tempo, delete marker; "fix everything" offers one suggestion per finding. Tests: engine 93, bridge 21.
 - **Step 6, sections (Oct 28).** With the real API: "jump to the second chorus" goes to bar 65 from Live's markers; "make bars 1 to 16 the intro" names bar 1; "cut the harshness in the choruses" cuts the measured 3.4 kHz on Main for the whole song. New `set_section`: "make bars 97 to 112 the drop" adds Drop at 97 and Outro at 113, so the rest keeps its name. Live pass still to do.
 - **The model's direction (Oct 28, Ian).** One genre; mixes that already come rated as good, mid or bad, so no rating round. The model learns what separates the tiers and says what pulls a mix down, with numbers. The reference track comes later as a second view, for a particular sound. `docs/ml-plan.md` updated; `ml/` still has the two-label version, so Raghav's first change is the three tiers.

@@ -23,7 +23,7 @@ from pathlib import Path
 from amxd import FONT, obj, template_patch, wire, write_amxd
 
 OUT = Path(__file__).resolve().parent.parent / "Aria.amxd"
-STRIP_W, STRIP_H = 400.0, 169.0   # the mini strip, design/screens/10-strip-states.png (Ian, Oct 27)
+STRIP_W, STRIP_H = 150.0, 169.0   # just the buttons, glassy and muted like Live's devices (Ian, Oct 28)
 WINDOW_W, WINDOW_H = 1200.0, 860.0
 CHAT_W, CHAT_H = 400.0, 620.0
 
@@ -66,7 +66,7 @@ def build():
     # The mapped key: Live maps keys and MIDI only to its own controls, so the strip has one small
     # live.text under the page's left column. Key Map (Cmd+K), click it, press a key: that key opens Ask Muse.
     ask_key = {"box": {"id": "askkey", "maxclass": "live.text", "varname": "Ask Muse", "numinlets": 1, "numoutlets": 2, "outlettype": ["", ""],
-                       "patching_rect": [400.0, 300.0, 60.0, 20.0], "presentation": 1, "presentation_rect": [10.0, 147.0, 98.0, 14.0],
+                       "patching_rect": [400.0, 300.0, 60.0, 20.0], "presentation": 1, "presentation_rect": [10.0, 148.0, 130.0, 14.0],
                        "mode": 0, "text": "Ask key", "texton": "Ask key", "fontname": "Arial", "fontsize": 9.0,
                        "bgcolor": [0.0, 0.0, 0.0, 0.0], "bgoncolor": [0.122, 0.373, 0.816, 1.0], "bordercolor": [0.0, 0.0, 0.0, 0.0],
                        "focusbordercolor": [0.122, 0.373, 0.816, 1.0], "textcolor": [0.275, 0.333, 0.439, 1.0], "textoncolor": [1.0, 1.0, 1.0, 1.0],

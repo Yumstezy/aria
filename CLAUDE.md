@@ -61,7 +61,7 @@ Ableton Live
     Aria.amxd (Max for Live audio effect)
       plugin~ -> sfrecord~        records the master to a wav while Mix check runs
       live.path / live.object     Live API: tempo, song time, cue points, clip file paths, EQ Eight params
-      jweb (strip, 400 x 169)     the device strip UI
+      jweb (strip, 150 x 169)     the device on Main: Check mix, Ask, Open window
       jweb (window, opened)       the full Aria window
       node.script bridge.js       HTTP to the engine, routes messages to jweb and the Live API
   key tracks (optional)

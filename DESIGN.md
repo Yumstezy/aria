@@ -71,7 +71,7 @@ Two themes: **Night**, the dark default (Ian, Oct 27), and **Sky**, the optional
 
 ## Layout
 
-- **Device strip:** 400 x 169 on the master channel (`cp-strip is-mini`). Left: the Aria mark, Check mix, Ask and Open window. Right: one card with the next step, or the one fix with a row of frequency bands (Sub to Air, the problem's bands filled) and a Fix it button.
+- **Device on Main (Oct 28, Ian):** 150 x 169, just the buttons: Check mix (its progress fills the button), Ask (opens Ask Muse in its own window), Open window (a small count after a check). Glassy and muted, token colors mixed down, so it sits with Live's own devices. Everything else lives in the window.
 - **Window:** a 184px side rail plus a 12 column bento. The rail holds Home, Mix check, Live analyzer, Groove match and Reference, with Ask Muse pinned at the bottom.
 - **Ask Muse** is a pop-up over the current screen, never a page.
 
