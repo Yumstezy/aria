@@ -331,6 +331,7 @@ export async function toggleVoice() {
     // "starting" at once, so a second press or a key release while the mic opens is handled, not lost
     releasedWhileStarting = false;
     set({ voice: { state: "starting", error: null } });
+    send("ensure_engine");   // the words go to the engine; start it if it isn't running
     try { await startRecording(); } catch (e) { voiceError((e as Error).message); return; }
     voiceSince = Date.now();
     set({ voice: { state: "listening", error: null } });

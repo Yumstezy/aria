@@ -54,7 +54,7 @@ export async function transcribe(wav: Blob): Promise<string> {
   try {
     res = await fetch(ENGINE + "/voice/transcribe", { method: "POST", headers: { "Content-Type": "audio/wav" }, body: wav, signal: stop.signal });
   } catch {
-    throw new Error(stop.signal.aborted ? "Muse took too long to hear that. Try again." : "The Aria engine isn't running.");
+    throw new Error(stop.signal.aborted ? "Muse took too long to hear that. Try again." : "Aria couldn't reach its engine. Try again in a moment.");
   } finally {
     clearTimeout(timer);
   }

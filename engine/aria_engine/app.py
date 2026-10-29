@@ -51,7 +51,7 @@ if os.environ.get("ARIA_PARENT_PID", "").isdigit():
 # Any other site open in the browser is refused.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["null"],
+    allow_origins=["null", "file://"],   # a file page's origin: Chrome says "null", Live's web view says "file://"
     allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],

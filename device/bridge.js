@@ -466,6 +466,8 @@ Max.addHandler("set_theme", (s) => {
   toUI("theme", { theme });
 });
 Max.addHandler("check_mix", () => serial(checkMix));
+// The mic: the page sends the words to the engine itself, so make sure it's running
+Max.addHandler("ensure_engine", async () => { try { await ensureEngine(); } catch (e) { setEngine("error", e.message); } });
 // ---------- the window ----------
 
 function loadWindowPrefs() {

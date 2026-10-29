@@ -57,3 +57,11 @@ def test_no_key_and_no_words_are_plain_errors(monkeypatch):
         assert False
     except voice.VoiceError as e:
         assert "didn't catch any words" in str(e)
+
+
+def test_a_page_in_lives_web_view_may_send_a_recording():
+    # Live's web view gives a file page the origin "file://"; Chrome gives "null". Both must pass the preflight.
+    for origin in ("null", "file://"):
+        res = TestClient(app).options("/voice/transcribe", headers={"Origin": origin, "Access-Control-Request-Method": "POST",
+                                                                    "Access-Control-Request-Headers": "content-type"})
+        assert res.status_code == 200, origin
