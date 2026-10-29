@@ -506,13 +506,18 @@ let pendingDevice = null;
 
 const key = function (name) { return String(name).toLowerCase().replace(/[^a-z0-9]/g, ""); };
 
+// The device of that kind to change: the newest one Aria added, else the last one on the track
+const ariaAdded = [];   // ids of devices Aria put on, newest last
 function findStock(track, name) {
-  const devs = ids(track.get("devices"));
+  const devs = ids(track.get("devices")), fits = [];
   for (let i = 0; i < devs.length; i++) {
     const d = new LiveAPI("id " + devs[i]);
-    if (STOCK[name].indexOf(String(one(d, "class_name"))) >= 0 || key(one(d, "class_display_name")) === key(name)) return d;
+    if (STOCK[name].indexOf(String(one(d, "class_name"))) >= 0 || key(one(d, "class_display_name")) === key(name)) fits.push(d);
   }
-  return null;
+  if (!fits.length) return null;
+  const mine = fits.filter(function (d) { return ariaAdded.indexOf(Number(d.id)) >= 0; });
+  mine.sort(function (a, b) { return ariaAdded.indexOf(Number(b.id)) - ariaAdded.indexOf(Number(a.id)); });
+  return mine[0] || fits[fits.length - 1];
 }
 
 // A third-party plugin on the track whose name matches ("Pro-Q 4" finds "FabFilter Pro-Q 4"), newest first
@@ -525,8 +530,10 @@ function findPlugin(track, name) {
   return null;
 }
 
-// addedFlag is 1 when the bridge just had Live load this plugin, so Undo removes it
-function device(trackIndex, nameText, settingsText, addedFlag) {
+// addedFlag is 1 when the bridge just had Live load this plugin, so Undo removes it.
+// mode "add" puts on a new device even when the track has one (the producer's own is never touched);
+// "change" changes the one Aria added, else the last one of that kind.
+function device(trackIndex, nameText, settingsText, addedFlag, mode) {
   const name = decodeURIComponent(String(nameText));
   const settings = JSON.parse(decodeURIComponent(settingsText || "%5B%5D"));
   const track = trackAt(trackIndex);
@@ -536,9 +543,10 @@ function device(trackIndex, nameText, settingsText, addedFlag) {
     applyDevice(plug.dev, Number(addedFlag) === 1, trackIndex, String(one(plug.dev, "name")), settings, plug.top);
     return;
   }
-  const found = findStock(track, name);
+  const found = mode === "add" ? null : findStock(track, name);
   if (found) { applyDevice(found, false, trackIndex, name, settings); return; }
-  pendingDevice = { index: trackIndex, name: name, settings: settings, tries: (INSERT_AS[name] || [name]).slice() };
+  pendingDevice = { index: trackIndex, name: name, settings: settings, tries: (INSERT_AS[name] || [name]).slice(),
+                    before: ids(track.get("devices")) };
   insertNext();
 }
 
@@ -554,7 +562,9 @@ function insertNext() {
 
 function device_continue() {
   const p = pendingDevice;
-  const found = findStock(trackAt(p.index), p.name);
+  // The device that wasn't there before: the new one, never the producer's own of the same kind
+  const fresh = ids(trackAt(p.index).get("devices")).filter(function (id) { return p.before.indexOf(id) < 0; });
+  const found = fresh.length ? new LiveAPI("id " + fresh[0]) : null;
   if (!found && p.tries.length) { insertNext(); return; }
   pendingDevice = null;
   if (!found) { send("device_done", { ok: false, text: "Aria couldn't add a " + p.name + ". Put one on that track, then ask again." }); return; }
@@ -614,6 +624,7 @@ function applyDevice(dev, added, index, name, settings, top) {
   // A big plugin may show Live only "Device On" until the producer picks knobs with Configure
   const hidden = params.length <= 1 ? " Live isn't showing its knobs to Aria. Press Configure on the " + name +
                  " in Live, move the knobs you want Aria to use, then ask again." : "";
+  if (added) ariaAdded.push(Number(dev.id));
   if (!added && !keep.length) {
     send("device_done", { ok: false, text: hidden ? hidden.trim() : "Aria couldn't find " + missed.join(", ") + " on the " + name + ". Its knobs: " +
                           params.map(function (p) { return p.name; }).slice(0, 40).join(", ") + "." });

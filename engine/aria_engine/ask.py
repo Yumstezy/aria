@@ -98,11 +98,15 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {"track": {"type": "string"}, **EQ_PROPS}, "required": ["track", "freq_hz"]}}},
     {"type": "function", "function": {
         "name": "track_device",
-        "description": "Add one of Live's stock devices to a track (or Main), or adjust the one already there, and set its knobs. "
-                       "Aria uses the device of that kind already on the track if there is one. Use track_eq or eq_band for EQ Eight.",
+        "description": "Add one of Live's stock devices to a track (or Main), or change one already there, and set its knobs. "
+                       "Use track_eq or eq_band for EQ Eight.",
         "parameters": {"type": "object", "properties": {
             "track": {"type": "string", "description": "Exact track name from context.tracks, or Main for the whole mix."},
             "device": {"type": "string", "enum": list(STOCK)},
+            "mode": {"type": "string", "enum": ["add", "change"],
+                     "description": "add: they asked to add or put on a device (\"add a compressor\", \"put reverb on it\"): Aria adds a new "
+                                    "one even if the track already has one, and never touches theirs. change: they asked to change one "
+                                    "that's there (\"raise the threshold\", \"more reverb\"): Aria changes the one it added, else the last one."},
             "settings": {"type": "array", "maxItems": MAX_SETTINGS, "description": "Knobs to set. Leave empty to add the device as it comes.",
                          "items": SETTING_ITEM}},
             "required": ["track", "device"]}}},
@@ -194,7 +198,8 @@ named like Synth, Keys, Pad, Lead or Chords; prefer a group track when there is 
 matches, don't guess: name the tracks you see and ask which one.
 Other effects use Live's stock devices, which every producer has, with track_device. Knobs and units:
 {STOCK_LINES}
-Use the device already on the track when there is one (context.tracks lists each track's devices).
+"Add" or "put on" a device means a new one (mode add), even if the track already has one: never change the
+producer's own device unless they ask to change it (mode change). context.tracks lists each track's devices.
 Everyday starting points when they give no numbers (say what you used):
 - compress a vocal: Compressor Threshold -18 dB, Ratio 3, Attack 10 ms, Release 100 ms
 - glue the drums or the mix: Glue Compressor Threshold -15 dB, Ratio 2, Attack 10 ms, Makeup 2 dB
@@ -402,7 +407,7 @@ def sidechain_steps(args, tracks):
     threshold = DUCK.get(args.get("amount") or "medium", DUCK["medium"])
     settings = [{"param": "S/C On", "option": "On"}, {"param": "Threshold", "value": threshold}, {"param": "Ratio", "value": 4.0},
                 {"param": "Attack", "value": 1.0}, {"param": "Release", "value": 150.0}]
-    return [{"type": "track_device", "args": {"track": track, "device": "Compressor", "settings": settings}},
+    return [{"type": "track_device", "args": {"track": track, "device": "Compressor", "settings": settings, "mode": "add"}},   # its own, never theirs
             {"type": "route_sidechain", "args": {"track": track, "from_track": source}}]
 
 
@@ -507,7 +512,9 @@ def check_action(name, args, tracks=(), plugins=()):
             settings = [_setting(st) for st in raw]
             if any(st is None for st in settings) or (args["device"] == "EQ Eight" and settings):
                 return None
-            return {"track": track, "device": args["device"], "settings": settings}
+            # A move (change) is always on a device that's there; otherwise "add" unless Muse said "change"
+            mode = "change" if any("change" in st for st in settings) else ("change" if args.get("mode") == "change" else "add")
+            return {"track": track, "device": args["device"], "settings": settings, "mode": mode}
         if name in ("track_volume", "track_eq"):
             track = _track(args.get("track"), tracks, main_ok=True)   # "Main" is the whole mix, never a track named like it
             if not track:

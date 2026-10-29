@@ -133,8 +133,8 @@ def test_stock_devices_come_back_cleaned_on_a_track_or_main():
         call("track_device", track="Main", device="Limiter", settings=[{"param": "Ceiling", "value": -1}]))))
     assert out["actions"] == [
         {"type": "track_device", "args": {"track": "NEW VOCAL", "device": "Compressor",
-                                          "settings": [{"param": "Threshold", "value": -18.0}, {"param": "Makeup", "option": "On"}]}},
-        {"type": "track_device", "args": {"track": "Main", "device": "Limiter", "settings": [{"param": "Ceiling", "value": -1.0}]}}]
+                                          "settings": [{"param": "Threshold", "value": -18.0}, {"param": "Makeup", "option": "On"}], "mode": "add"}},
+        {"type": "track_device", "args": {"track": "Main", "device": "Limiter", "settings": [{"param": "Ceiling", "value": -1.0}], "mode": "add"}}]
 
 
 def test_a_relative_change_moves_a_knob_from_where_it_is():
@@ -330,3 +330,14 @@ def test_a_knob_move_needs_the_device_on_the_track():
     assert out["actions"] == [] and "no Compressor" in out["problems"][0]
     out = ask.interpret(msg("Raised it.", raise_it), {"tracks": [{"name": "Vocal", "devices": ["Compressor"]}]}, "raise the threshold")
     assert out["actions"][0]["args"]["settings"] == [{"param": "Threshold", "change": 2.0}]
+
+
+def test_add_means_a_new_device_and_a_move_means_the_one_there():
+    tracks = {"tracks": [{"name": "Vocal", "devices": ["Compressor"]}]}
+    add = ask.interpret(msg("Adding one.", call("track_device", track="Vocal", device="Compressor", mode="add",
+                                                settings=[{"param": "Threshold", "value": -18}])), tracks, "add a compressor")
+    assert add["actions"][0]["args"]["mode"] == "add"
+    move = ask.interpret(msg("Raised it.", call("track_device", track="Vocal", device="Compressor",
+                                                 settings=[{"param": "Threshold", "change": 2}])), tracks, "raise the threshold")
+    assert move["actions"][0]["args"]["mode"] == "change"
+    assert ask.sidechain_steps({"track": "Vocal", "from_track": "Kick"}, ["Vocal", "Kick"])[0]["args"]["mode"] == "add"

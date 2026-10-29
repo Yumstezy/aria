@@ -652,7 +652,8 @@ async function apply(action, tracks = []) {
     case "track_eq":
       return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track), a.shape || "bell", a.steep ? 1 : 0);
     case "track_device":
-      return await askLive("device", "device_done", trackIndex(a.track), encodeURIComponent(a.device), encodeURIComponent(JSON.stringify(a.settings || [])));
+      return await askLive("device", "device_done", trackIndex(a.track), encodeURIComponent(a.device), encodeURIComponent(JSON.stringify(a.settings || [])),
+                           0, a.mode === "change" ? "change" : "add");
     case "route_sidechain":
       return await askLive("route_sidechain", "route_done", trackIndex(a.track), encodeURIComponent(a.from_track));
     case "delete_marker":
