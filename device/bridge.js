@@ -535,9 +535,14 @@ function showWindow(url) {
   Max.outlet("window", "url", url);
   const prefs = loadWindowPrefs();
   // The chat is still out: stack again, the window on top
-  if (chatOpen && prefs.mode !== "full") placeStack(prefs.mode === "left" ? "left" : "right", prefs.screen || FALLBACK_SCREEN);
-  else placeWindow(prefs);
+  // Up first: a window that isn't showing yet ignores its size, and would open at its default spot
   Max.outlet("window", "front");
+  const place = () => {
+    if (chatOpen && prefs.mode !== "full") placeStack(prefs.mode === "left" ? "left" : "right", prefs.screen || FALLBACK_SCREEN);
+    else placeWindow(prefs);
+  };
+  place();
+  setTimeout(place, 300);
 }
 
 // The strip sends the screen size, so the window can dock on its very first open
@@ -650,7 +655,7 @@ async function apply(action, tracks = []) {
     case "track_volume":
       return await askLive("volume", "volume_done", trackIndex(a.track), a.change_db);
     case "track_eq":
-      return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track), a.shape || "bell", a.steep ? 1 : 0);
+      return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track), a.shape || "bell", a.steep ? 1 : 0, a.mode || "aria");
     case "track_device":
       return await askLive("device", "device_done", trackIndex(a.track), encodeURIComponent(a.device), encodeURIComponent(JSON.stringify(a.settings || [])),
                            0, a.mode === "change" ? "change" : "add");
@@ -671,7 +676,7 @@ async function apply(action, tracks = []) {
       return { ok: true, text: `Marker "${m.name}" at bar ${m.bar}.` };
     }
     case "eq_band":
-      return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, -1, a.shape || "bell", a.steep ? 1 : 0);
+      return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, -1, a.shape || "bell", a.steep ? 1 : 0, a.mode || "aria");
     case "undo":
       return await askLive("undo", "undo_done");
     case "check_mix":

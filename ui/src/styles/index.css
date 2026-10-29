@@ -53,6 +53,8 @@ html.see-through, html.see-through body, .see-through .cp-stage { background: tr
 }
 
 /* The device on Main (Oct 28, Ian): glassy and muted like Live's own devices. Token colors, mixed down. */
+/* The device page never scrolls or bounces: a trackpad or wheel over Live's device would slide it around */
+html.is-strip, html.is-strip body, html.is-strip #root { overflow: hidden; overscroll-behavior: none; width: 100%; height: 100%; position: fixed; inset: 0; }
 .aria-strip {
   color: var(--ink);
   background:

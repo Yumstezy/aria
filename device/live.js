@@ -19,6 +19,7 @@ let pendingMarker = null;
 let pendingRemoval = null;   // a marker being removed (set_or_delete_cue toggles it off): by Undo, or by delete_marker
 let markerRestoring = false; // the next marker() call puts back a deleted marker (Undo), so it isn't an undo step itself
 const undoStack = [];        // every change Aria made, newest last
+const ariaAdded = [];        // ids of devices Aria put on (EQ Eights and stock devices), newest last
 
 function one(api, prop) {
   const v = api.get(prop);
@@ -307,13 +308,18 @@ let pendingEq = null;
 
 function mainTrack() { return new LiveAPI("live_set master_track"); }
 
-function findEq(track) {
-  const devs = ids(track.get("devices"));
+// Which EQ Eight a move goes on. "aria" (the default): the one Aria added on this track, never the producer's own;
+// none yet means a new one. "change": theirs (the last one), when they asked to change their EQ. "add": always new.
+function findEq(track, mode) {
+  if (mode === "add") return null;
+  const devs = ids(track.get("devices")), fits = [];
   for (let i = 0; i < devs.length; i++) {
     const d = new LiveAPI("id " + devs[i]);
-    if (one(d, "class_name") === EQ_CLASS) return d;
+    if (one(d, "class_name") === EQ_CLASS) fits.push(d);
   }
-  return null;
+  const mine = fits.filter(function (d) { return ariaAdded.indexOf(Number(d.id)) >= 0; });
+  if (mine.length) return mine[mine.length - 1];
+  return mode === "change" && fits.length ? fits[fits.length - 1] : null;
 }
 
 // Parse a parameter's display string: "3.10 kHz" -> 3100, "-4.0 dB" -> -4, "0.71" -> 0.71.
@@ -376,28 +382,31 @@ const BAND_ORDER = {
   bell: ["4", "5", "3", "6", "2", "7", "1", "8"], notch: ["4", "5", "3", "6", "2", "7", "1", "8"]
 };
 
-function eq(freq, gain, q, trackIndex, shape, steep) {
+function eq(freq, gain, q, trackIndex, shape, steep, mode) {
   const index = trackIndex === undefined ? -1 : trackIndex;
   const opts = { shape: SHAPES[shape] ? shape : "bell", steep: steep === 1 || steep === "1" || steep === true };
   const track = trackAt(index);
-  let device = findEq(track);
+  let device = findEq(track, mode ? String(mode) : "aria");
   if (device) { applyEq(device, false, freq, gain, q, index, opts); return; }
   const devs = ids(track.get("devices"));
   // On Main, add it just before Aria so Aria still hears the result; elsewhere at the end
   const at = index < 0 ? Math.max(0, devs.indexOf(Number(new LiveAPI("this_device").id))) : devs.length;
+  pendingEq = { freq: freq, gain: gain, q: q, index: index, opts: opts, before: devs };
   try { track.call("insert_device", "EQ Eight", at); } catch (e) { post("insert_device failed: " + e + "\n"); }
-  pendingEq = { freq: freq, gain: gain, q: q, index: index, opts: opts };
   outlet(0, "defer", "eq_continue");
 }
 
 function eq_continue() {
   const p = pendingEq;
   pendingEq = null;
-  const device = findEq(trackAt(p.index));
+  // The EQ Eight that wasn't there before: the new one, never the producer's own
+  const fresh = ids(trackAt(p.index).get("devices")).filter(function (id) { return p.before.indexOf(id) < 0; });
+  const device = fresh.length ? new LiveAPI("id " + fresh[0]) : null;
   if (!device) {
     send("eq_done", { ok: false, text: "Aria couldn't add an EQ Eight. Put one on that track, then ask again." });
     return;
   }
+  ariaAdded.push(Number(device.id));
   applyEq(device, true, p.freq, p.gain, p.q, p.index, p.opts);
 }
 
@@ -507,7 +516,6 @@ let pendingDevice = null;
 const key = function (name) { return String(name).toLowerCase().replace(/[^a-z0-9]/g, ""); };
 
 // The device of that kind to change: the newest one Aria added, else the last one on the track
-const ariaAdded = [];   // ids of devices Aria put on, newest last
 function findStock(track, name) {
   const devs = ids(track.get("devices")), fits = [];
   for (let i = 0; i < devs.length; i++) {

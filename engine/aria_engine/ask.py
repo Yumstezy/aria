@@ -62,6 +62,9 @@ EQ_PROPS = {
     "gain_db": {"type": "number", "minimum": -6, "maximum": 6, "description": "For bell and shelves only. Negative cuts."},
     "steep": {"type": "boolean", "description": "Cuts only: true for a hard 48 dB/oct cut, false for a gentle 12 dB/oct one."},
     "q": {"type": "number", "minimum": 0.3, "maximum": 12, "description": "Width. Leave out for the default; 4 to 8 for a narrow ringing note."},
+    "mode": {"type": "string", "enum": ["add", "change"],
+             "description": "Leave out: Aria uses the EQ Eight it added on that track, or adds one (never the producer's own). "
+                            "add: they asked to add an EQ: always a new EQ Eight. change: they asked to change their own EQ."},
 }
 
 # The action menu Muse may use today, with the limits the device enforces too.
@@ -542,6 +545,8 @@ def check_action(name, args, tracks=(), plugins=()):
             q = float(args.get("q") or (CUT_Q if shape in ("low_cut", "high_cut") else DEFAULT_Q))
             ok = 20 <= f <= 20000 and -6 <= g <= 6 and 0.3 <= q <= 12 and (shape in NO_GAIN or g != 0)
             out = {"shape": shape, "freq_hz": round(f), "gain_db": round(g, 1), "q": round(q, 2)}
+            if args.get("mode") in ("add", "change"):
+                out["mode"] = args["mode"]
             if shape in ("low_cut", "high_cut"):
                 out["steep"] = bool(args.get("steep", False))
             return out if ok else None
