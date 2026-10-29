@@ -548,6 +548,9 @@ function showWindow(url) {
 }
 
 // The strip sends the screen size, so the window can dock on its very first open
+// A screen that failed to draw says why, so it shows in the Max log
+Max.addHandler("ui_error", (s) => Max.post(`ui_error: ${decode(s).message}`));
+
 Max.addHandler("open_window", (s) => {
   const screen = s && decode(s).screen;
   if (screen) savePrefs({ ...loadWindowPrefs(), screen });

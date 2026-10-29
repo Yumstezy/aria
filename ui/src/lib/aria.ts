@@ -410,7 +410,7 @@ export const openWindow = () => { if (!send("open_window", { screen: screenRect(
 export const addMarker = (bar: number) => send("add_marker", { bar, name: "Aria check" });
 
 /** For previews and tests: show a result without the device (window.Aria.showResult in the console). */
-export function showResult(r: Result) { set({ result: r, progress: null, error: null }); }
+export function showResult(r: Result | null) { set({ result: r, progress: null, error: null }); }
 if (typeof window !== "undefined") (window as unknown as { Aria: unknown }).Aria = { showResult, askMuse: (t: string) => askMuse(t) };
 
 // ---------- plain words for what the engine found (DESIGN.md: words first, numbers as detail) ----------

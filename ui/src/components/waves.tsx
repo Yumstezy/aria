@@ -47,7 +47,7 @@ export function Waves({ spectra, findings, split, onZone }: {
   const zones = findings.map((f) => {
     const point = f.kind === "resonance" || f.kind === "harsh";
     const lo = point ? f.hz! * 0.92 : f.hz_range[0], hi = point ? f.hz! * 1.08 : f.hz_range[1];
-    const amount = f.kind === "masking" ? `${f.gap_db!.toFixed(0)} dB` : f.kind === "bass_click" ? "clicks" : `+${f.size_db!.toFixed(0)} dB`;
+    const amount = f.kind === "masking" ? `${f.gap_db!.toFixed(0)} dB` : f.kind === "bass_click" ? "clicks" : f.kind === "clash" ? "clash" : `+${f.size_db!.toFixed(0)} dB`;
     return { f, lo: Math.max(LO, lo), hi: Math.min(HI, hi), where: point ? hzShort(Math.round(f.hz!)) + " Hz" : `${hzShort(Math.round(f.hz_range[0]))}–${hzShort(Math.round(f.hz_range[1]))} Hz`, amount };
   });
   const svgRef = useRef<SVGSVGElement>(null);
