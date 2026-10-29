@@ -435,7 +435,6 @@ export function partNames(spectra: Spectra): string[] {
   const all = Object.keys(spectra.parts).filter((n) => spectra.parts[n]);
   return all.every((n) => SPLIT_ORDER.includes(n)) ? SPLIT_ORDER.filter((n) => all.includes(n)) : all;
 }
-export function silentParts(spectra: Spectra): string[] { return Object.keys(spectra.parts).filter((n) => !spectra.parts[n]); }
 export function partColor(n: string, i: number) { return SPLIT_ORDER.includes(n) || n === "mix" ? `var(--part-${n})` : TRACK_COLORS[i % TRACK_COLORS.length]; }
 
 export function describe(f: Finding): { name: string; where: string; size: string; about: string } {

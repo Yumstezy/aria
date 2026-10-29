@@ -4,7 +4,7 @@
 // for display only; the engine's numbers stay as measured.
 import { useMemo, useRef, useState, type PointerEvent } from "react";
 import { motion } from "motion/react";
-import { describe, partColor, partNames, silentParts, soundName, type Finding, type Spectra } from "@/lib/aria";
+import { describe, partColor, partNames, soundName, type Finding, type Spectra } from "@/lib/aria";
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { BANDS } from "@/lib/problems";
 
@@ -40,7 +40,6 @@ export function Waves({ spectra, findings, split, onZone }: {
   const involved = new Set<string>();
   findings.forEach((f) => { if (f.kind === "masking") involved.add(f.masked!); if (f.kind === "bass_click") involved.add("bass"); if (f.kind === "clash") f.tracks!.forEach((t) => involved.add(t)); });
   const playing = split ? partNames(spectra) : [];   // split sounds, or the producer's tracks (Aria Ear)
-  const silent = split ? silentParts(spectra) : [];
   const color = (n: string) => partColor(n, playing.indexOf(n));
   const showParts = playing.length >= 2;   // one part playing is the mix: draw it once, as the mix
   const names = showParts ? playing : ["mix"];
@@ -159,7 +158,6 @@ export function Waves({ spectra, findings, split, onZone }: {
           <span key={n} className="inline-flex items-center gap-1.5"><i className="h-[3px] w-3.5 rounded-sm" style={{ background: color(n) }} />{soundName(n)}</span>
         ))}
         {split && playing.length === 1 && <span>Only the {soundName(playing[0]).toLowerCase()} is playing in these bars.</span>}
-        {split && playing.length > 1 && silent.length > 0 && <span className="text-ink-faint">Not playing here: {silent.map((n) => soundName(n).toLowerCase()).join(", ")}</span>}
       </div>
     </div>
   );

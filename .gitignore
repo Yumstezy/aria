@@ -21,3 +21,6 @@ test-pack/out/
 
 # UI build tooling (ui/dist is committed so running Aria never needs Node)
 ui/node_modules/
+
+# Ian's own audio for the checkpoint stays local
+test-pack/mixes/
