@@ -82,6 +82,10 @@ Two themes: **Night**, the dark default (Ian, Oct 27), and **Sky**, the optional
 - The full window and the strip paint their own ground and orbs. Docked windows and the popped-out chat are tinted glass over Live (86% of the ground), by Ian's call on Oct 27.
 - Ask Muse is a 400px pop-up over the current screen (`cp-ask-pop`). Each request gets one reply. A change that was asked for is done right away, with the done pill (`cp-did`) and Undo. Muse's own proposals use one `cp-suggest` card with Do it and Not now.
 
+## Logo
+
+The bird (the team's own, Oct 28): `design/brand/aria-mark.png`, a black mark on transparent. In the UI it's a mask (`Mark` in `ui/src/components/brand.tsx`), so it is light on Night and dark on Sky, the color of the text beside it.
+
 ## Components
 
 These live in `design/ds/components/bundle.css`. The `cp-` prefix is an internal code name.

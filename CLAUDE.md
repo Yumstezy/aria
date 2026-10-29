@@ -106,7 +106,7 @@ docs/          build steps, contracts, screens
 - Docked windows and the popped-out chat are see-through glass over Live (Ian, Oct 27). The full window and the strip paint the ground and orbs.
 - Mix check opens in Simple view: a plain verdict first, then the numbers. Detailed view is one tap away.
 - Ask Muse is a pop-up over the current screen, never a separate page.
-- The product name on screen is Aria. The logo isn't chosen yet, so keep the placeholder bars icon.
+- The product name on screen is Aria. The logo is the bird (made by the team, Oct 28): `design/brand/aria-mark.png`, used in the UI as a mask (`ui/src/components/brand.tsx` `Mark`) so it takes the text color of the theme.
 
 ## Engine rules
 
