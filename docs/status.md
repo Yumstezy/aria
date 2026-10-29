@@ -2,7 +2,7 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
-## Where we are (Oct 28)
+## Where we are (Oct 28, evening)
 
 Feature freeze end of day Nov 2. Submit by noon PT Nov 4. "Built" means it passes its tests here; "Live" means Ian has checked it in Live.
 
@@ -11,9 +11,9 @@ Feature freeze end of day Nov 2. Submit by noon PT Nov 4. "Built" means it passe
 | 0 to 2 | Repo, day 1 tests, the first working Check mix in Live | Done, Live |
 | 3 | Problems in the whole mix: ringing notes, build-up, harsh hits | Done, Live |
 | 3b | Split mode (Meta's Demucs): buried vocal, mud, bass clicks | Done, Live |
-| 4 | Aria Ear: which of your tracks clash, by name. Name my tracks adds the Ears for you | Built; Live check pending |
-| 5 | Muse's advice, the Simple view, Fix it (Muse makes the change, with Undo) | Built; Fix it on a clash pending in Live |
-| 6 | Ask Muse drives Live: EQ, volume, 20 stock devices (add or change), sections and markers, sidechain, mute, solo, tempo, Undo, plugin guides, voice | Built and reviewed (Oct 28); Live checks pending |
+| 4 | Aria Ear: which of your tracks clash, by name. Name my tracks adds the Ears for you | Done, Live (Oct 28) |
+| 5 | Muse's advice, the Simple view, Fix it (Muse makes the change, with Undo) | Done, Live (Oct 28) |
+| 6 | Ask Muse drives Live: EQ, volume, 20 stock devices (add or change), sections and markers, sidechain, mute, solo, tempo, Undo, plugin guides, voice | Done, Live (Oct 28): Ian ran the whole test list |
 | 7 | Checkpoint (Oct 31): 3 test mixes pass | Blocked: needs 3 test mixes with one planted problem each |
 | 8 | Reference track: compare with a song you want to sound like | Later, after the model |
 | 9 | Groove match | Not started; likely cut (Ian to decide) |
