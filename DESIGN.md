@@ -71,7 +71,7 @@ Two themes: **Night**, the dark default (Ian, Oct 27), and **Sky**, the optional
 
 ## Layout
 
-- **Device on Main (Oct 28, Ian):** 150 x 169, just the buttons: Check mix (its progress fills the button), Ask (opens Ask Muse in its own window), Open window (a small count after a check). Glassy and muted, token colors mixed down, so it sits with Live's own devices. Everything else lives in the window.
+- **Device on Main (Oct 28, Ian picked "Lamp"):** 150 x 169, like a stock Live device. A status light with one word (Ready, Listening 7 s, 3 to fix, Clear), Check (amber, its progress fills it) and Ask side by side, Open window below. Live's own neutral greys and amber, as `--live-*` tokens in `ui/src/styles/index.css` (Aria's design tokens are blue-tinted). The pop-out window keeps Aria's look. Everything else lives in the window.
 - **Window:** a 184px side rail plus a 12 column bento. The rail holds Home, Mix check, Live analyzer, Groove match and Reference, with Ask Muse pinned at the bottom.
 - **Ask Muse** is a pop-up over the current screen, never a page.
 

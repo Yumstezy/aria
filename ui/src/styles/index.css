@@ -52,31 +52,38 @@ html.see-through, html.see-through body, .see-through .cp-stage { background: tr
   --hot: var(--hot-glow); --part-vocals: var(--on-tile); --part-other: var(--good-glow); --part-bass: var(--hot-glow); --part-drums: var(--on-tile-muted); --part-mix: var(--on-tile);
 }
 
-/* The device on Main (Oct 28, Ian): glassy and muted like Live's own devices. Token colors, mixed down. */
-/* The device page never scrolls or bounces: a trackpad or wheel over Live's device would slide it around */
-html.is-strip, html.is-strip body, html.is-strip #root { overflow: hidden; overscroll-behavior: none; width: 100%; height: 100%; position: fixed; inset: 0; }
-.aria-strip {
-  color: var(--ink);
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--ink) 7%, transparent), transparent 55%),
-    color-mix(in srgb, var(--card) 72%, var(--ink-faint) 28%);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 12%, transparent);
+/* The device on Main (Oct 28, Ian picked "Lamp"): like a stock Live device. Live's own neutral greys and amber,
+   added as Live-style tokens because Aria's design tokens are blue-tinted (Ian approved, Oct 28). */
+:root, [data-theme="night"] {
+  --live-panel: #3a3a3a; --live-button: #4b4b4b; --live-button-hover: #565656; --live-edge: #1f1f1f;
+  --live-text: #dcdcdc; --live-dim: #a8a8a8; --live-amber: #e3a43a; --live-on-amber: #1a1a1a;
+  --live-lamp-off: #7a7a7a; --live-lamp-hot: #e0703a; --live-lamp-clear: #7fbf7f;
 }
-.aria-strip svg rect { fill: color-mix(in srgb, var(--action) 55%, var(--ink-faint)); }
+[data-theme="sky"] {
+  --live-panel: #c8c8c8; --live-button: #dadada; --live-button-hover: #e4e4e4; --live-edge: #8f8f8f;
+  --live-text: #1e1e1e; --live-dim: #555555; --live-amber: #e3a43a; --live-on-amber: #1a1a1a;
+  --live-lamp-off: #8a8a8a; --live-lamp-hot: #d0602a; --live-lamp-clear: #4f9f4f;
+}
+.aria-strip { background: var(--live-panel); color: var(--live-text); font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
+.aria-strip svg rect { fill: var(--live-amber); }
+.aria-lamp { width: 8px; height: 8px; border-radius: 50%; background: var(--live-lamp-off); flex: none; }
+.aria-lamp.is-busy { background: var(--live-amber); box-shadow: 0 0 6px var(--live-amber); animation: aria-lamp 1.2s ease-in-out infinite; }
+.aria-lamp.is-hot { background: var(--live-lamp-hot); }
+.aria-lamp.is-clear { background: var(--live-lamp-clear); }
+@keyframes aria-lamp { 50% { opacity: 0.45; } }
 .aria-strip-btn {
-  height: 30px; border: 0; border-radius: 10px; cursor: pointer; color: var(--ink-muted);
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
-  transition: background 160ms ease-out, color 160ms ease-out;
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 5px; overflow: hidden;
+  border: 1px solid var(--live-edge); border-radius: 3px; background: var(--live-button); color: var(--live-text);
+  font: 600 11px/1 -apple-system, "Helvetica Neue", Arial, sans-serif; cursor: pointer; padding: 0 6px;
 }
-.aria-strip-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 11%, transparent); color: var(--ink); }
-.aria-strip-btn:active:not(:disabled) { transform: scale(0.98); }
-.aria-strip-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-.aria-strip-btn.is-accent { color: var(--ink); background: color-mix(in srgb, var(--action) 20%, color-mix(in srgb, var(--ink) 6%, transparent)); }
+.aria-strip-btn:hover:not(:disabled) { background: var(--live-button-hover); }
+.aria-strip-btn:active:not(:disabled) { filter: brightness(0.92); }
+.aria-strip-btn:focus-visible { outline: 1px solid var(--live-amber); outline-offset: 1px; }
+.aria-strip-btn.is-amber { background: var(--live-amber); color: var(--live-on-amber); }
+.aria-strip-btn.is-amber:hover:not(:disabled) { filter: brightness(1.06); }
+.aria-strip-btn.is-dim { color: var(--live-dim); }
 .aria-strip-btn:disabled { cursor: default; }
-.aria-strip-fill { background: color-mix(in srgb, var(--action) 30%, transparent); }
-.aria-strip-count { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; display: grid; place-items: center;
-  font-size: 10.5px; color: color-mix(in srgb, var(--hot) 75%, var(--ink-muted)); background: color-mix(in srgb, var(--hot) 16%, transparent); }
+.aria-strip-fill { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--live-on-amber) 22%, transparent); }
 
 /* The strip's frequency row: seven bands in a small card, so the labels sit a little smaller */
 .cp-strip .cp-secrow span { font-size: 9px; padding: 0 1px; letter-spacing: -0.01em; }

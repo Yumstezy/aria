@@ -21,7 +21,8 @@ Feature freeze end of day Nov 2. Submit by noon PT Nov 4. "Built" means it passe
 | Model | Good, mid and bad mixes in one genre; says what pulls a mix down | Raghav invited; the rated mixes are sorted in a shared Drive (Oct 28). Next: extract features, three tiers, first numbers by Oct 31 |
 
 What changed most recently:
-- **The device on Main is just buttons (Oct 28, Ian).** Check mix (its progress fills the button), Ask, Open window (with a count after a check), glassy and muted to sit with Live's own devices. 150 x 169. Results live in the window.
+- **The device on Main looks like a Live device (Oct 28, Ian picked "Lamp" of four mockups).** A status light with one word, Check and Ask side by side, Open window below, in Live's greys and amber. The page never scrolls, so it doesn't slide with the mouse. 150 x 169. Results live in the window.
+- **EQ moves go on Aria's own EQ Eight (Oct 28).** Never the producer's, unless they ask to change their EQ; "add an EQ" is always new. Open window docks reliably on first open.
 - **Adding a device adds a new one (Oct 28, Ian).** "Add a compressor" never changes the producer's own; "raise the threshold" changes the one Aria added, else the last one.
 - **Step 6 review (Oct 28):** see "Step 6 dialed in" below.
 

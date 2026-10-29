@@ -68,8 +68,8 @@ def build():
     ask_key = {"box": {"id": "askkey", "maxclass": "live.text", "varname": "Ask Muse", "numinlets": 1, "numoutlets": 2, "outlettype": ["", ""],
                        "patching_rect": [400.0, 300.0, 60.0, 20.0], "presentation": 1, "presentation_rect": [10.0, 148.0, 130.0, 14.0],
                        "mode": 0, "text": "Ask key", "texton": "Ask key", "fontname": "Arial", "fontsize": 9.0,
-                       "bgcolor": [0.0, 0.0, 0.0, 0.0], "bgoncolor": [0.122, 0.373, 0.816, 1.0], "bordercolor": [0.0, 0.0, 0.0, 0.0],
-                       "focusbordercolor": [0.122, 0.373, 0.816, 1.0], "textcolor": [0.275, 0.333, 0.439, 1.0], "textoncolor": [1.0, 1.0, 1.0, 1.0],
+                       "bgcolor": [0.0, 0.0, 0.0, 0.0], "bgoncolor": [0.89, 0.643, 0.227, 1.0], "bordercolor": [0.0, 0.0, 0.0, 0.0],
+                       "focusbordercolor": [0.89, 0.643, 0.227, 1.0], "textcolor": [0.55, 0.55, 0.55, 1.0], "textoncolor": [0.1, 0.1, 0.1, 1.0],
                        "parameter_enable": 1,
                        "saved_attribute_attributes": {"valueof": {"parameter_longname": "Ask Muse", "parameter_shortname": "Ask",
                                                                   "parameter_type": 2, "parameter_mmax": 1, "parameter_enum": ["off", "on"]}}}}
