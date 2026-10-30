@@ -24,6 +24,7 @@ export const PopOutIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWid
 // Mix check's kinds of problem, for the tiles
 export const BuriedIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={1.9} {...p}><path d="M4 9h4l5-4v14l-5-4H4z" /><path d="M17 10l4 4M21 10l-4 4" /></svg>;
 export const MudIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={1.9} {...p}><path d="M3 15c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0M3 10c2-1.5 4-1.5 6 0s4 1.5 6 0 4-1.5 6 0" /></svg>;
+export const ClashIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} {...p}><circle cx="9" cy="12" r="5.5" /><circle cx="15" cy="12" r="5.5" /></svg>;
 export const HarshIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={1.9} {...p}><path d="M3 12h3l2-5 3 10 3-8 2 3h5" /></svg>;
 export const RingIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={1.9} {...p}><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /></svg>;
 export const ClickIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={1.9} {...p}><path d="M3 17h4l2-10 2 10h10" /></svg>;

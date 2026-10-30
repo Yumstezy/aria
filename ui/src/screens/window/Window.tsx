@@ -9,11 +9,12 @@ import { TickGauge } from "@/components/tick-gauge";
 import { CountUp } from "@/components/count-up";
 import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
-import { AnalyzerIcon, BackIcon, BuriedIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, LayoutIcon, MinimizeIcon, GrooveIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
+import { ProblemThumb } from "@/components/problem-thumb";
+import { BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
-import { barsLabel, checkMix, closeChat, closeWindow, describe, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode, stopListening,
-         soundName, useAria, useAriaSel, useViewport, type Kind, type Result } from "@/lib/aria";
+import { barsLabel, checkMix, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode, stopListening,
+         partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
 type View = "home" | "mixcheck";
@@ -44,37 +45,42 @@ export function AriaWindow() {
   if (compact) return <Compact />;
 
   const status = progress ? `${progress.text}${progress.detail ? ` · ${progress.detail}` : ""}` : error ?? note;
-  const sessionLine = session ? `This session · ${Math.round(session.tempo)} BPM · ${session.signature[0]}/${session.signature[1]}` : "This session";
 
   return (
     <div className={cn("cp-stage", narrow && "is-flush")} style={narrow ? undefined : { height: "100vh", minHeight: 0 }}>
       <div className="cp-glass cp-window" style={{ height: narrow ? "100vh" : "100%", gridTemplateColumns: narrow ? "60px minmax(0, 1fr)" : undefined }}>
         <Rail view={view} setView={setView} narrow={narrow} />
         <main className="cp-main overflow-y-auto" style={narrow ? { padding: 14 } : undefined}>
-          <header className={cn("cp-spread", narrow && "flex-wrap")}>
-            <div className={cn(narrow && "flex w-full items-start justify-between")}>
-              <div>
-                <span className="cp-cap">{view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : sessionLine}</span>
-                <h1 className="cp-title" style={{ marginTop: 4 }}>{view === "mixcheck" ? "Mix check" : "Home"}</h1>
+          <header className="grid gap-2">
+            <div className="flex items-center gap-2.5" style={{ minHeight: 32 }}>
+              <span className="flex items-center gap-2 text-[14px] text-ink-muted">{view === "mixcheck" ? <MixIcon style={{ width: 16, height: 16 }} /> : <HomeIcon style={{ width: 16, height: 16 }} />}{view === "mixcheck" ? "Mix check" : "Home"}</span>
+              <div className="ml-auto flex items-center gap-2">
+                {!narrow && view === "mixcheck" && result && (
+                  <div className="cp-seg" role="group" aria-label="View">
+                    <button aria-pressed={!detailed} onClick={() => setDetailed(false)}>Simple</button>
+                    <button aria-pressed={detailed} onClick={() => setDetailed(true)}>Detailed</button>
+                  </div>
+                )}
+                <button className="cp-btn cp-btn-primary" disabled={!!progress} onClick={checkMix}>{progress ? "Checking" : result ? (narrow ? "Check" : "Check again") : "Check mix"}</button>
+                {narrow ? (
+                  <>
+                    <LayoutMenu mode={lastDock()} />
+                    <IconButton label="Minimize to the edge" onClick={minimize}><MinimizeIcon style={{ width: 15, height: 15 }} /></IconButton>
+                    <IconButton label="Close" onClick={closeWindow}><CloseIcon style={{ width: 15, height: 15 }} /></IconButton>
+                  </>
+                ) : <LayoutMenu mode="full" />}
               </div>
-              {narrow && (
-                <div className="cp-row" style={{ gap: 2 }}>
-                  <LayoutMenu mode={lastDock()} />
-                  <IconButton label="Minimize to the edge" onClick={minimize}><MinimizeIcon style={{ width: 15, height: 15 }} /></IconButton>
-                  <IconButton label="Close" onClick={closeWindow}><CloseIcon style={{ width: 15, height: 15 }} /></IconButton>
-                </div>
-              )}
             </div>
-            <div className="cp-row flex-wrap justify-end">
-              {view === "mixcheck" && result && (
-                <div className="cp-seg" role="group" aria-label="View">
-                  <button aria-pressed={!detailed} onClick={() => setDetailed(false)}>Simple</button>
-                  <button aria-pressed={detailed} onClick={() => setDetailed(true)}>Detailed</button>
-                </div>
-              )}
-              <button className="cp-btn cp-btn-primary" disabled={!!progress} onClick={checkMix}>{progress ? "Checking" : result ? "Check again" : "Check mix"}</button>
-              {!narrow && <LayoutMenu mode="full" />}
-            </div>
+            <h1 className="cp-title" style={{ fontSize: narrow ? 28 : 34, lineHeight: narrow ? "34px" : "40px" }}>
+              {view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : "Home"}
+              <span className="text-ink-faint">{view === "mixcheck" ? (result?.recording.tempo ? ` ${Math.round(result.recording.tempo)} BPM` : "") : session ? ` ${Math.round(session.tempo)} BPM` : ""}</span>
+            </h1>
+            {narrow && view === "mixcheck" && result && (
+              <div className="cp-seg justify-self-start" role="group" aria-label="View">
+                <button aria-pressed={!detailed} onClick={() => setDetailed(false)}>Simple</button>
+                <button aria-pressed={detailed} onClick={() => setDetailed(true)}>Detailed</button>
+              </div>
+            )}
           </header>
           {(status || engine.state !== "up") && (
             <div className="cp-row flex-wrap" role="status">
@@ -83,7 +89,7 @@ export function AriaWindow() {
             </div>
           )}
 
-          <KeyTracks />
+          <KeyTracks quiet={!!result} />
           {view === "home" ? <Home narrow={narrow} onOpen={openMixCheck} />
             : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />
@@ -144,40 +150,69 @@ function LayoutMenu({ mode, chatOut }: { mode: "full" | "left" | "right"; chatOu
   );
 }
 
+/** The side menu (Ember, Oct 29): Ask Muse first, then where to go, then the tracks Aria heard, each with how
+    many problems it's in. Docked, it's icons only. Tools that aren't built yet stay off it. */
 const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView: (v: View) => void; narrow: boolean }) {
-  const theme = useAriaSel((s) => s.theme), ask = { open: useAriaSel((s) => s.ask.open) };
-  const item = (id: View | null, label: string, icon: ReactNode) => (
+  const theme = useAriaSel((s) => s.theme), askOpen = useAriaSel((s) => s.ask.open), result = useAriaSel((s) => s.result);
+  const list = result ? problemsOf(result) : [];
+  const spectra = result?.clarity.spectra, names = spectra ? partNames(spectra) : [];
+  const tracksMode = (result?.clarity.mode as string) === "tracks";
+  const silent = spectra && tracksMode ? Object.keys(spectra.parts).filter((k) => !spectra.parts[k]) : [];
+  const count = (name: string) => list.filter((p) => p.findings.some((f) => f.tracks?.includes(name) || f.masked === name || (f.kind === "bass_click" && name === "bass"))).length;
+  const item = (id: View | null, label: string, icon: ReactNode, end?: ReactNode) => (
     <a key={label} href="#" title={label} aria-current={id === view ? "page" : undefined} style={narrow ? { justifyContent: "center", padding: 0 } : undefined}
        onClick={(e: MouseEvent) => { e.preventDefault(); if (id) setView(id); else notice(`${label} is coming soon.`); }}>
-      {icon}{!narrow && label}
+      {icon}{!narrow && label}{!narrow && end}
     </a>
   );
   return (
-    <aside className="cp-rail" style={narrow ? { padding: "16px 8px", alignItems: "stretch" } : undefined}>
-      <div className="cp-mark" style={narrow ? { justifyContent: "center" } : undefined}><Mark size={26} />{!narrow && <b>Aria</b>}</div>
+    <aside className="cp-rail" style={narrow ? { padding: "16px 8px", alignItems: "stretch", gap: 6 } : undefined}>
+      <div className="cp-mark" style={narrow ? { justifyContent: "center", marginBottom: 8 } : { padding: "0 8px 12px" }}><Mark size={narrow ? 24 : 22} />{!narrow && <b style={{ fontSize: 17, fontWeight: 600 }}>Aria</b>}</div>
+      {!narrow && (
+        <button className="flex h-10 items-center gap-2.5 whitespace-nowrap rounded-[11px] border px-2.5 text-[14px] text-ink-muted" aria-expanded={askOpen}
+                style={{ borderColor: "var(--glass-edge)", background: "var(--card)" }} onClick={() => setAskOpen(!askOpen)}
+                title="In Live, press Cmd+K, click Ask key on the Aria strip, then press a key.">
+          <MicIcon style={{ width: 16, height: 16 }} />Ask Muse
+          <span className="ml-auto rounded-md border px-1.5 font-mono text-[11px]" style={{ borderColor: "var(--glass-edge)" }}>key</span>
+        </button>
+      )}
+      {!narrow && <div className="ae-sec" style={{ borderTop: 0 }}>Navigation</div>}
       <nav className="cp-nav" aria-label="Tools">
         {item("home", "Home", <HomeIcon />)}
-        {item("mixcheck", "Mix check", <MixIcon />)}
-        {item(null, "Live analyzer", <AnalyzerIcon />)}
-        {item(null, "Groove match", <GrooveIcon />)}
-        {item(null, "Reference", <ReferenceIcon />)}
+        {item("mixcheck", "Mix check", <MixIcon />, list.length ? <span className="ae-count">{list.length}</span> : null)}
+        {item(null, "Reference", <ReferenceIcon />, <span className="ae-soon">soon</span>)}
       </nav>
+      {!narrow && names.length > 0 && (
+        <>
+          <div className="ae-sec">{tracksMode ? "Your tracks" : "Parts Aria heard"}</div>
+          <div className="cp-nav">
+            {names.map((name, i) => (
+              <a key={name} href="#" title={soundName(name)} onClick={(e) => { e.preventDefault(); setView("mixcheck"); }}>
+                <span className="ae-dot" style={{ color: partColor(name, i) }} /><span className="truncate">{soundName(name)}</span><span className="ae-count">{count(name)}</span>
+              </a>
+            ))}
+            {silent.map((name) => (
+              <a key={name} href="#" style={{ color: "var(--ink-faint)" }} title={`${name} was silent in these bars`} onClick={(e) => e.preventDefault()}>
+                <span className="ae-dot" style={{ color: "var(--track)" }} /><span className="truncate">{name}</span><span className="ae-count">silent</span>
+              </a>
+            ))}
+          </div>
+        </>
+      )}
       {narrow ? (
-        <button className="cp-icon-btn" style={{ marginTop: "auto", alignSelf: "center" }} title={theme === "sky" ? "Switch to dark" : "Switch to light"}
-                aria-label={theme === "sky" ? "Switch to dark" : "Switch to light"} onClick={() => setTheme(theme === "sky" ? "night" : "sky")}>
-          {theme === "sky" ? <MoonIcon /> : <SunIcon />}
-        </button>
+        <>
+          <button className="cp-icon-btn" style={{ marginTop: "auto", alignSelf: "center", background: "transparent" }} title={theme === "sky" ? "Switch to dark" : "Switch to light"}
+                  aria-label={theme === "sky" ? "Switch to dark" : "Switch to light"} onClick={() => setTheme(theme === "sky" ? "night" : "sky")}>
+            {theme === "sky" ? <MoonIcon /> : <SunIcon />}
+          </button>
+          <button className="cp-ask-btn" aria-expanded={askOpen} aria-label="Ask Muse" style={{ justifyContent: "center", padding: 0 }} onClick={() => setAskOpen(!askOpen)}><MicIcon /></button>
+        </>
       ) : (
-        <div className="cp-seg" role="group" aria-label="Appearance" style={{ alignSelf: "flex-start", marginTop: "auto", marginBottom: 14 }}>
-          <button aria-pressed={theme === "sky"} onClick={() => setTheme("sky")}>Light</button>
-          <button aria-pressed={theme === "night"} onClick={() => setTheme("night")}>Dark</button>
+        <div className="cp-seg" role="group" aria-label="Appearance" style={{ marginTop: "auto", display: "flex" }}>
+          <button className="flex-1" aria-pressed={theme === "sky"} onClick={() => setTheme("sky")}>Light</button>
+          <button className="flex-1" aria-pressed={theme === "night"} onClick={() => setTheme("night")}>Dark</button>
         </div>
       )}
-      <div className="cp-ask-dock">
-        <button className="cp-ask-btn" aria-expanded={ask.open} aria-label="Ask Muse" style={narrow ? { justifyContent: "center", padding: 0 } : undefined}
-                onClick={() => setAskOpen(!ask.open)}><MicIcon />{!narrow && "Ask Muse"}</button>
-        {!narrow && <span className="cp-meta" title="In Live, press Cmd+K, click Ask key on the Aria strip, then press a key.">or press your mapped key</span>}
-      </div>
     </aside>
   );
 });
@@ -245,8 +280,6 @@ const Home = memo(function Home({ narrow, onOpen }: { narrow: boolean; onOpen: (
       {tool("Mix check", <MixIcon style={{ width: 20, height: 20 }} />,
             !result ? <span className="cp-tag cp-tag-idle">Not run yet</span>
               : list.length ? <span className="cp-tag cp-tag-hot">{list.length} to fix</span> : <span className="cp-tag cp-tag-good">Clear</span>, onOpen)}
-      {tool("Live analyzer", <AnalyzerIcon style={{ width: 20, height: 20 }} />, <span className="cp-tag cp-tag-idle">Coming soon</span>, soon("Live analyzer"))}
-      {tool("Groove match", <GrooveIcon style={{ width: 20, height: 20 }} />, <span className="cp-tag cp-tag-idle">Coming soon</span>, soon("Groove match"))}
       {tool("Reference", <ReferenceIcon style={{ width: 20, height: 20 }} />, <span className="cp-tag cp-tag-idle">Coming soon</span>, soon("Reference"))}
 
       <WhereItHappens r={result} narrow={narrow} onPick={onOpen} />
@@ -289,20 +322,20 @@ function WhereItHappens({ r, narrow, onPick }: { r: Result | null; narrow: boole
 
 /** "Name my tracks": with it on, Check mix puts an Aria Ear on each key track (by name) and names the tracks
     that clash. Set it before checking, so a song isn't checked twice. Off takes the Ears off. */
-const KeyTracks = memo(function KeyTracks() {
+const KeyTracks = memo(function KeyTracks({ quiet }: { quiet?: boolean }) {
   const session = useAriaSel((s) => s.session), ears = useAriaSel((s) => s.ears);
   const on = session?.ears ?? [];
   const wanted = !!session?.keyTracks || on.length > 0;
   return (
     <div className="cp-row flex-wrap" style={{ gap: 8 }}>
-      <span className="cp-meta" style={{ color: "var(--ink-muted)", fontWeight: 600 }}>Name my tracks</span>
+      <span className="cp-meta" style={{ color: "var(--ink-muted)", fontWeight: 500 }} title="Check mix then says which of your tracks clash, like Kick and Bass. Aria adds a small Ear to each key track.">Name my tracks</span>
       <div className="cp-seg" role="group" aria-label="Name my tracks">
         <button aria-pressed={!wanted} disabled={ears.busy} onClick={() => wanted && stopListening()}>Off</button>
         <button aria-pressed={wanted} disabled={ears.busy} onClick={() => !wanted && listenTracks()}>On</button>
       </div>
       {on.map((t, i) => <span key={i} className="cp-tag cp-tag-idle" title={t} style={{ maxWidth: 150 }}><span className="truncate">{shortName(t, 18)}</span></span>)}
       {ears.text ? <span className="cp-meta">{ears.text}</span>
-        : !wanted && <span className="cp-meta">Check mix then says which of your tracks clash, like Kick and Bass. Aria adds a small Ear to each key track.</span>}
+        : !wanted && !quiet && <span className="cp-meta">Check mix then says which of your tracks clash, like Kick and Bass. Aria adds a small Ear to each key track.</span>}
     </div>
   );
 });
@@ -315,7 +348,7 @@ const KINDS: { kind: Kind; name: string; line: string; icon: ReactNode }[] = [
   { kind: "harsh", name: "Harsh hits", line: "Sharp peaks that sting the ear.", icon: <HarshIcon /> },
   { kind: "resonance", name: "Ringing notes", line: "One note that rings on too loud.", icon: <RingIcon /> },
   { kind: "bass_click", name: "Bass clicks", line: "Clicks where bass notes start.", icon: <ClickIcon /> },
-  { kind: "clash", name: "Clashing tracks", line: "Two tracks fighting in one range. Needs Aria Ear.", icon: <HarshIcon /> },
+  { kind: "clash", name: "Clashing tracks", line: "Two tracks fighting in one range. Needs Aria Ear.", icon: <ClashIcon /> },
 ];
 // Mud is measured as synths buried in the low mids, so it gets the mud icon, not the buried one
 const iconFor = (p: Problem) => KINDS.find((x) => x.kind === (p.name === "Mud" ? "buildup" : p.findings[0].kind))!.icon;
@@ -359,100 +392,130 @@ function Rise({ i, className, children }: { i: number; className?: string; child
   );
 }
 
-const amountText = (p: Problem) => (p.amount.unit.startsWith("%") ? `${p.amount.value}${p.amount.unit}` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`);
+const amountText = (p: Problem) => (p.amount.unit.startsWith("%") ? `${p.amount.value}%` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`);
 const fixWithMuse = (p: Problem) => { fixIt(p); setAskOpen(true); };
 
+/** Mix check, Simple (Ember, Oct 29): three small cards (how many, fix first with its picture, who Aria heard),
+    then the picture beside a short numbered list. A row opens to Muse's words and the buttons. */
 const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen: (i: number) => void; narrow: boolean }) {
   const list = problemsOf(r);
-  const first = list[0], selected = list[open];
-  const tileSpan = list.length >= 3 ? 4 : list.length === 2 ? 6 : 12;
+  const first = list[0];
+  const spectra = r.clarity.spectra, names = spectra ? partNames(spectra) : [];
+  const tracksMode = (r.clarity.mode as string) === "tracks";
+  const whoOf = (p: Problem) => p.findings.flatMap((f) => (f.kind === "clash" ? f.tracks! : f.kind === "masking" ? [f.masked!] : [])).filter((n, k, a) => names.includes(n) && a.indexOf(n) === k);
+  const legend = names.length >= 2 && (
+    <div className="flex flex-wrap gap-3.5 text-[12.5px] text-ink-muted">
+      {names.map((n, i) => <span key={n} className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: partColor(n, i) }} />{soundName(n)}</span>)}
+    </div>
+  );
   return (
-    <div className="cp-bento">
-      <Rise i={0} className={span(narrow, 7)}>
-        <section className="cp-tile cp-hero" style={{ gap: 6, minHeight: narrow ? 0 : 320 }}>
-          <div className="cp-spread"><span className="cp-cap">{list.length ? "Where the problems are" : "Your mix"}</span>
-            <span className="cp-meta" style={{ color: "var(--on-tile-muted)" }}>{list.length ? "Tap a number to see it" : "Hover to see the levels"}</span></div>
-          {r.clarity.spectra
-            ? <Waves spectra={r.clarity.spectra} findings={r.clarity.findings} split={r.clarity.mode !== "master"}
-                     onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
-            : <p className="cp-meta" style={{ color: "var(--on-tile-muted)" }}>The picture appears after the next Check mix.</p>}
-        </section>
-      </Rise>
-
-      <Rise i={1} className={span(narrow, 5)}>
-        <section className="cp-tile cp-solid" style={{ gap: 8, minHeight: narrow ? 0 : 320 }}>
-          {first ? (
-            <>
-              <div className="cp-spread"><span className="cp-cap">Fix first</span><span className="cp-tag cp-tag-hot">{statusWord(first)}</span></div>
-              <h2 className="cp-tile-title" style={{ fontSize: 20, lineHeight: "25px" }}>{first.name}</h2>
-              <span className="cp-meta">{barsOf(first)} · {first.where}</span>
-              <p className="cp-body is-quiet line-clamp-4" style={{ margin: 0 }}>{first.short}</p>
-              <div className="cp-row cp-push">
-                <button className="cp-btn cp-btn-light" onClick={() => fixWithMuse(first)}>Fix it</button>
-                <button className="cp-btn cp-btn-ghost" onClick={() => jumpTo(first.bar)}>Hear it in Live</button>
-              </div>
-              {list.length > 1 && <span className="cp-meta">{list.length - 1} more below</span>}
-            </>
-          ) : (
-            <>
-              <div className="cp-spread"><span className="cp-cap">This check</span><span className="cp-tag cp-tag-good">Clear</span></div>
-              <h2 className="cp-tile-title" style={{ fontSize: 20, lineHeight: "25px" }}>Nothing sticks out</h2>
-              <p className="cp-body is-quiet" style={{ margin: 0 }}>{r.advice?.summary ?? "Check another part of the song next."}</p>
-            </>
-          )}
-        </section>
-      </Rise>
-
-      {list.map((p, i) => (
-        <Rise key={p.name + i} i={2 + i} className={span(narrow, tileSpan)}>
-          <section className={cn("cp-tile cp-card cp-stat cursor-pointer", open === i && "ring-2 ring-[var(--action)]")} onClick={() => setOpen(open === i ? -1 : i)}>
-            <div className="cp-stat-head">
-              <span className="cp-stat-icon">{iconFor(p)}</span>
-              <span className="cp-stat-name">{p.name}</span>
-              <span className="cp-tag cp-tag-hot cp-stat-word">{amountText(p)}</span>
-            </div>
-            <p className="cp-stat-line line-clamp-2">{p.short}</p>
-            <TickGauge share={p.share} label={`${p.shareLabel} · ${barsOf(p)}`} />
+    <div className="grid gap-3">
+      <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 0.75fr) minmax(0, 1.6fr)" : "minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, 1fr)" }}>
+        <Rise i={0}>
+          <section className="cp-tile cp-card" style={{ gap: 2 }}>
+            <span className="cp-cap">To fix</span>
+            <span className="ae-big"><CountUp value={list.length} /></span>
+            <div className="mt-2 flex flex-wrap gap-1.5">{list.map((p, i) => <button key={i} className="ae-kind" title={p.name} aria-label={p.name} onClick={() => setOpen(i)}>{iconFor(p)}</button>)}</div>
           </section>
         </Rise>
-      ))}
-
-      <AnimatePresence mode="wait">
-        {selected && (
-          <motion.div key={open} className="span-12 grid" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
-                      transition={{ duration: 0.25, ease: EASE }}>
-            <ProblemDetail p={selected} />
-          </motion.div>
+        <Rise i={1}>
+          <section className="cp-tile cp-card" style={{ minHeight: narrow ? 0 : 150, display: "grid", gridTemplateColumns: first ? `minmax(0, 1fr) ${narrow ? "34%" : "42%"}` : "1fr", gap: 12 }}>
+            {first ? (
+              <>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="cp-cap">Fix first</span>
+                  <span style={{ fontSize: narrow ? 17 : 22, lineHeight: narrow ? "22px" : "28px", fontWeight: 500, letterSpacing: "-.01em" }}>{first.name}</span>
+                  <span className="ae-mono">{first.where}</span>
+                  <span className="ae-mono" style={{ color: "var(--hot)" }}>{amountText(first)}</span>
+                  <div className="mt-auto flex gap-1.5 pt-2">
+                    <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={() => fixWithMuse(first)}>Fix it</button>
+                    {!narrow && <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={() => jumpTo(first.bar)}>Hear it</button>}
+                  </div>
+                </div>
+                <div className="ae-thumb"><ProblemThumb p={first} spectra={spectra} /></div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <span className="cp-cap">This check</span>
+                <span style={{ fontSize: 22, fontWeight: 500 }}>Nothing sticks out</span>
+                <span className="text-[13px] text-ink-muted">{r.advice?.summary ?? "Check another part of the song next."}</span>
+              </div>
+            )}
+          </section>
+        </Rise>
+        {!narrow && (
+          <Rise i={2}>
+            <section className="cp-tile cp-card" style={{ gap: 2 }}>
+              <span className="cp-cap">{tracksMode ? "Listening to" : "Split into"}</span>
+              <span className="ae-big">{names.length || 1}<span className="ml-1.5 text-[15px] text-ink-muted">{tracksMode ? "tracks" : names.length ? "parts" : "mix"}</span></span>
+              <div className="mt-2 flex">
+                {(names.length ? names : ["mix"]).map((n, i) => (
+                  <span key={n} title={soundName(n)} className="grid size-[30px] place-items-center rounded-full text-[11px] font-semibold"
+                        style={{ background: names.length ? partColor(n, i) : "var(--ink-muted)", color: "var(--on-action)", border: "2px solid var(--card)", marginRight: -8 }}>
+                    {soundName(n).charAt(0).toUpperCase()}
+                  </span>
+                ))}
+              </div>
+            </section>
+          </Rise>
         )}
-      </AnimatePresence>
+      </div>
 
-      <WhereItHappens r={r} narrow={narrow} onPick={(p) => setOpen(list.indexOf(p))} />
+      <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 1fr)" : "minmax(0, 1.55fr) minmax(0, 1fr)", alignItems: "start" }}>
+        <Rise i={3}>
+          <section className="cp-tile cp-card" style={{ gap: 8 }}>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+              <span className="text-[14px] font-medium text-ink">{list.length ? "Where the problems are" : "Your mix"}</span>
+              <span className="font-mono text-[11.5px] text-ink-faint">{list.length ? "tap a number" : "hover for levels"}</span>
+              {!narrow && <div className="ml-auto">{legend}</div>}
+            </div>
+            {narrow && legend}
+            {spectra
+              ? <Waves spectra={spectra} findings={r.clarity.findings} split={r.clarity.mode !== "master"} bare
+                       onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
+              : <p className="cp-meta">The picture appears after the next Check mix.</p>}
+          </section>
+        </Rise>
+        {list.length > 0 && (
+          <Rise i={4}>
+            <section className="cp-tile cp-card" style={{ paddingTop: 4, paddingBottom: 4, gap: 0 }}>
+              {list.map((p, i) => (
+                <div key={p.name + i}>
+                  <button className="ae-row" aria-expanded={open === i} onClick={() => setOpen(open === i ? -1 : i)}>
+                    <span className="ae-pin">{i + 1}</span>
+                    <span className="min-w-0">
+                      <span className="flex items-center gap-2 text-[14px] font-medium"><span className="truncate">{p.name}</span>
+                        {whoOf(p).map((n) => <span key={n} className="ae-dot" style={{ color: partColor(n, names.indexOf(n)), width: 7, height: 7 }} />)}</span>
+                      <span className="ae-mono block truncate">{p.where}</span>
+                    </span>
+                    <span className="ae-mono whitespace-nowrap">{amountText(p)}</span>
+                    <span className="flex items-center gap-1.5 text-ink-muted"><span className="ae-kind" style={{ width: 28, height: 28 }}>{iconFor(p)}</span>
+                      <BackIcon style={{ width: 13, height: 13, transform: open === i ? "rotate(90deg)" : "rotate(180deg)", transition: "transform 160ms" }} /></span>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {open === i && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22, ease: EASE }} className="overflow-hidden">
+                        <div className="grid gap-2.5 pb-3.5 pl-[38px]">
+                          <p className="m-0 text-[13.5px] text-ink">{p.short}</p>
+                          {p.notes.map((note, k) => <p key={k} className="m-0 text-[12.5px] leading-[18px] text-ink-muted">{note.text}</p>)}
+                          <span className="ae-mono">{barsOf(p)}</span>
+                          <div className="flex gap-1.5">
+                            <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={() => fixWithMuse(p)}>Fix it</button>
+                            <button className="cp-btn cp-btn-sm" onClick={() => jumpTo(p.bar)}>Hear it in Live</button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              ))}
+            </section>
+          </Rise>
+        )}
+      </div>
     </div>
   );
 });
-
-function ProblemDetail({ p }: { p: Problem }) {
-  return (
-    <section className="cp-tile cp-card" style={{ gap: 12 }}>
-      <div className="cp-spread flex-wrap">
-        <span className="cp-tile-title">{p.name}</span>
-        <div className="cp-row">
-          <button className="cp-btn" onClick={() => jumpTo(p.bar)}>Hear it in Live</button>
-          <button className="cp-btn cp-btn-primary" onClick={() => fixWithMuse(p)}>Fix it</button>
-        </div>
-      </div>
-      {p.notes.length
-        ? p.notes.map((note, k) => <p key={k} className="cp-body" style={{ maxWidth: 760 }}>{note.text}</p>)
-        : <p className="cp-body" style={{ color: "var(--ink-muted)" }}>{describe(p.findings[0]).about}</p>}
-      <div className="cp-row flex-wrap" style={{ gap: 6 }}>
-        {p.findings.map((f, k) => {
-          const d = describe(f);
-          return <span key={k} className="cp-tag" style={{ fontFamily: "var(--font-mono)" }}>{d.where} · {d.size} · bars {f.bars[0]}{f.bars[1] !== f.bars[0] ? `–${f.bars[1]}` : ""}</span>;
-        })}
-      </div>
-    </section>
-  );
-}
 
 function Stat({ label, value, unit, why }: { label: string; value: number | null | undefined; unit: string; why?: string }) {
   const missing = value === null || value === undefined;

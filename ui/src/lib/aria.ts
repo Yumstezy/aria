@@ -433,7 +433,7 @@ export function hzRange([lo, hi]: [number, number]) {
 /** What it is, where in frequency, how much, and a sentence describing the measurement. */
 // The parts in the picture: split sounds in a fixed order, or the producer's own tracks (key tracks mode)
 const SPLIT_ORDER = ["drums", "bass", "other", "vocals"];
-const TRACK_COLORS = ["var(--part-vocals)", "var(--part-other)", "var(--part-bass)", "var(--cool)", "var(--part-drums)", "var(--watch)"];
+const TRACK_COLORS = ["var(--trk-0)", "var(--trk-1)", "var(--trk-2)", "var(--trk-3)", "var(--trk-4)", "var(--trk-5)"];
 export function partNames(spectra: Spectra): string[] {
   const all = Object.keys(spectra.parts).filter((n) => spectra.parts[n]);
   // The producer's tracks in name order, so each keeps its color from one check to the next

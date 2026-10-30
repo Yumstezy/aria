@@ -34,8 +34,9 @@ function path(pts: [number, number][]) {
   return d;
 }
 
-export function Waves({ spectra, findings, split, onZone }: {
-  spectra: Spectra; findings: Finding[]; split: boolean; onZone: (f: Finding) => void;
+/** bare: just the picture and the ruler; the page shows the problems and the legend itself (Ember layout). */
+export function Waves({ spectra, findings, split, onZone, bare }: {
+  spectra: Spectra; findings: Finding[]; split: boolean; onZone: (f: Finding) => void; bare?: boolean;
 }) {
   const involved = new Set<string>();
   findings.forEach((f) => { if (f.kind === "masking") involved.add(f.masked!); if (f.kind === "bass_click") involved.add("bass"); if (f.kind === "clash") f.tracks!.forEach((t) => involved.add(t)); });
@@ -103,7 +104,7 @@ export function Waves({ spectra, findings, split, onZone }: {
 
         {zones.map((z, i) => (
           <g key={i} className="cursor-pointer [&:hover>rect]:opacity-35" onClick={() => onZone(z.f)}>
-            <rect x={X(z.lo)} y={PAD_T - 6} width={Math.max(6, X(z.hi) - X(z.lo))} height={H - PAD_B - PAD_T + 6} fill="var(--hot)" opacity={0.22} />
+            <rect x={X(z.lo)} y={PAD_T - 6} width={Math.max(6, X(z.hi) - X(z.lo))} height={H - PAD_B - PAD_T + 6} fill="var(--hot)" opacity={0.09} />
             <circle cx={z.pin} cy={14} r={10} fill="var(--hot)" />
             <text x={z.pin} y={18} textAnchor="middle" fill="var(--tile-core)" className="text-[11px] font-bold">{i + 1}</text>
           </g>
@@ -111,10 +112,10 @@ export function Waves({ spectra, findings, split, onZone }: {
 
         {waves.map((wv, i) => (
           <motion.g key={wv.n} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: "easeOut", delay: i * 0.06 }}>
-            <path d={`${wv.line}L${W},${H - PAD_B}L0,${H - PAD_B}Z`} fill={color(wv.n)} opacity={wv.quiet ? 0.06 : 0.2} />
-            <motion.path d={wv.line} fill="none" stroke={color(wv.n)} strokeWidth={2} opacity={wv.quiet ? 0.35 : 1}
+            <path d={`${wv.line}L${W},${H - PAD_B}L0,${H - PAD_B}Z`} fill={color(wv.n)} opacity={wv.quiet ? 0.02 : 0.06} />
+            <motion.path d={wv.line} fill="none" stroke={color(wv.n)} strokeWidth={1.75} opacity={wv.quiet ? 0.35 : 1}
                          initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, ease: [0.3, 0.8, 0.2, 1], delay: 0.2 + i * 0.06 }} />
-            {showParts && <text x={wv.label.x} y={wv.label.y} textAnchor="middle" fill={color(wv.n)} opacity={wv.quiet ? 0.5 : 1} className="text-[11.5px] font-semibold">{soundName(wv.n)}</text>}
+            {showParts && !bare && <text x={wv.label.x} y={wv.label.y} textAnchor="middle" fill={color(wv.n)} opacity={wv.quiet ? 0.5 : 1} className="text-[11.5px] font-semibold">{soundName(wv.n)}</text>}
           </motion.g>
         ))}
         {hover && <line x1={X(spectra.hz[hover.i])} x2={X(spectra.hz[hover.i])} y1={PAD_T - 6} y2={H - PAD_B} stroke="currentColor" strokeOpacity={0.6} strokeWidth={1.5} />}
@@ -144,7 +145,7 @@ export function Waves({ spectra, findings, split, onZone }: {
       )}
 
       {/* The problems, numbered like the pins. Tap one to read about it. */}
-      {zones.length > 0 && (
+      {zones.length > 0 && !bare && (
         <div className="flex flex-wrap gap-1.5">
           {zones.map((z, i) => (
             <button key={i} onClick={() => onZone(z.f)}
@@ -158,7 +159,7 @@ export function Waves({ spectra, findings, split, onZone }: {
       )}
 
       <div className="flex flex-wrap gap-3.5 text-xs text-ink-muted">
-        {showParts && names.map((n) => (
+        {showParts && !bare && names.map((n) => (
           <span key={n} className="inline-flex items-center gap-1.5"><i className="h-[3px] w-3.5 rounded-sm" style={{ background: color(n) }} />{soundName(n)}</span>
         ))}
         {split && playing.length === 1 && <span>Only the {soundName(playing[0]).toLowerCase()} is playing in these bars.</span>}

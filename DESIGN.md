@@ -2,6 +2,17 @@
 
 Frosted glass over soft blue. Show the problem as a picture first, say it in plain words second, give the numbers last. The full system is in `design/ds/` (tokens, CSS, chart helpers) and every screen is in `design/screens/`.
 
+## Ember direction (Oct 29)
+
+Ian picked the look of an "Ember" dashboard: "notice the spacing and way all components fit, they also use images and icons rather than text". It now overrides the blue tile look in the window (the device on Main keeps its Live look).
+
+- Neutral near-black ground (`#0a0a0b`), cards a step lighter (`#141416`) with 1px hairline edges, 16 px corners. Light is the same in neutral greys and white. Set in `ui/src/styles/index.css` ("Ember"), which re-points the design-system tokens; `design/ds/` stays as it was.
+- Small muted labels in sentence case over big light numbers. Frequencies, amounts and bars in monospace.
+- Primary buttons are plain white (black in Light). No glows: thin colored lines (Ian: "the glow may be too much").
+- One color per track or part, the same on the chart, the dots in the side menu and the list (`--trk-0` to `--trk-5`).
+- Pictures and icons instead of words: an icon per problem kind, the Fix first card shows the clashing parts' real curves (or Muse's EQ cut), and the side menu lists the tracks Aria heard with how many problems each is in.
+- Mix check, Simple: To fix, Fix first, Listening to, then the picture beside a numbered list. A row opens to Muse's words and Fix it.
+
 ## Principles
 
 - **Verdict first.** Lead with one plain status word (Good, Too bright, A bit light, Too flat, In time), then the number, then the chart.

@@ -118,3 +118,77 @@ html.see-through, html.see-through body, .see-through .cp-stage { background: tr
 ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 ::-webkit-scrollbar-thumb { background: var(--track); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active { background: var(--ink-faint); }
+
+/* ---------- Ember (Ian, Oct 29) ----------
+   Neutral near-black instead of blue, cards a step lighter with hairline edges, tight even spacing,
+   small muted labels over big light numbers, monospace for details, thin colored lines with no glow.
+   This layer re-points the design-system tokens and trims a few cp- components; the ds files stay as they are.
+   Night is written as :root[data-theme] so it outranks the plain :root (light) block below it. */
+:root[data-theme="night"], [data-theme="night"] {
+  --ground: #0a0a0b; --orb-1: transparent; --orb-2: transparent;
+  --glass: #0e0e10; --glass-edge: rgba(255,255,255,0.10);
+  --card: #141416; --card-edge: rgba(255,255,255,0.07); --well: rgba(255,255,255,0.06);
+  --hairline: rgba(255,255,255,0.07); --track: rgba(255,255,255,0.16);
+  --ink: #ededef; --ink-muted: #8e8e96; --ink-faint: #62626a;
+  --tile-top: #141416; --tile-base: #141416; --tile-bottom: #141416; --tile-core: #0b0b0c;
+  --on-tile: #ededef; --on-tile-muted: #8e8e96;
+  --solid: #141416; --on-solid: #ededef; --on-solid-muted: #8e8e96; --chip: rgba(255,255,255,0.06);
+  --action: #ededef; --on-action: #0b0b0c; --action-glow: transparent; --focus-ring: #6ea8ff;
+  --hot: #ff8a5b; --hot-glow: #ff8a5b; --good: #4ade80; --good-glow: #4ade80; --cool: #6ea8ff; --watch: #f5c451;
+  --shadow-tile: none; --shadow-rim: none; --shadow-rim-tile: none;
+  --side: #0e0e10; --card-2: #1a1a1d;
+  --trk-0: #f5c451; --trk-1: #6ea8ff; --trk-2: #ff7eb6; --trk-3: #4ade80; --trk-4: #a78bfa; --trk-5: #5eead4;
+}
+:root, [data-theme="sky"] {
+  --ground: #f4f4f5; --orb-1: transparent; --orb-2: transparent;
+  --glass: #fafafa; --glass-edge: rgba(0,0,0,0.08);
+  --card: #ffffff; --card-edge: rgba(0,0,0,0.07); --well: rgba(0,0,0,0.045);
+  --hairline: rgba(0,0,0,0.07); --track: rgba(0,0,0,0.16);
+  --ink: #111113; --ink-muted: #6b6b73; --ink-faint: #9b9ba3;
+  --tile-top: #ffffff; --tile-base: #ffffff; --tile-bottom: #ffffff; --tile-core: #ffffff;
+  --on-tile: #111113; --on-tile-muted: #6b6b73;
+  --solid: #ffffff; --on-solid: #111113; --on-solid-muted: #6b6b73; --chip: rgba(0,0,0,0.045);
+  --action: #111113; --on-action: #ffffff; --action-glow: transparent; --focus-ring: #2f6fe0;
+  --hot: #e8622c; --hot-glow: #e8622c; --good: #16a34a; --good-glow: #16a34a; --cool: #2f6fe0; --watch: #c98a0b;
+  --shadow-tile: 0 1px 2px rgba(0,0,0,0.04); --shadow-rim: none; --shadow-rim-tile: none;
+  --side: #fafafa; --card-2: #f4f4f5;
+  --trk-0: #d99a0b; --trk-1: #2f6fe0; --trk-2: #db2777; --trk-3: #16a34a; --trk-4: #7c3aed; --trk-5: #0d9488;
+}
+/* Split parts and the producer's tracks share one palette */
+:root, [data-theme="sky"], [data-theme="night"], .cp-hero {
+  --part-vocals: var(--trk-2); --part-other: var(--trk-1); --part-bass: var(--trk-0); --part-drums: var(--trk-4); --part-mix: var(--ink);
+}
+.cp-hero { background: var(--card); border: 1px solid var(--card-edge); --hairline: var(--card-edge); }
+.cp-hero::before { display: none; }
+.cp-tile { border-radius: 16px; padding: 16px 18px; }
+.cp-card, .cp-solid { border: 1px solid var(--card-edge); }
+.cp-window { border-radius: 18px; }
+.cp-rail { background: var(--side); gap: 4px; padding: 16px 12px; }
+.cp-cap { font-size: 13px; line-height: 18px; font-weight: 450; letter-spacing: 0; text-transform: none; color: var(--ink-muted); }
+.cp-hero .cp-cap, .cp-solid .cp-cap { color: var(--ink-muted); }
+.cp-title { font-weight: 450; letter-spacing: -0.02em; }
+.cp-btn { border-radius: 9px; font-weight: 500; box-shadow: none; }
+.cp-btn:hover { box-shadow: none; filter: brightness(1.08); }
+.cp-btn-primary, .cp-btn-light { background: var(--action); color: var(--on-action); box-shadow: none; }
+.cp-seg { border-radius: 10px; background: var(--card); border: 1px solid var(--card-edge); }
+.cp-seg button { border-radius: 7px; font-weight: 500; }
+.cp-seg button[aria-pressed="true"] { background: var(--card-2); box-shadow: 0 0 0 1px var(--glass-edge); }
+.cp-nav a { font-weight: 450; color: var(--ink-muted); border-radius: 10px; }
+.cp-nav a[aria-current="page"] { background: var(--card-2); box-shadow: 0 0 0 1px var(--glass-edge); }
+.cp-tag { border-radius: 7px; font-family: var(--font-mono); font-weight: 500; }
+.cp-ask-btn { border-radius: 11px; box-shadow: none; }
+.cp-icon-btn { border-radius: 9px; }
+
+/* New pieces */
+.ae-sec { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink-faint); padding: 14px 10px 6px; border-top: 1px solid var(--hairline); margin-top: 6px; }
+.ae-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex: none; }
+.ae-count { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--ink-faint); font-weight: 400; }
+.ae-soon { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-faint); border: 1px solid var(--hairline); border-radius: 6px; padding: 0 5px; }
+.ae-big { font-size: 34px; line-height: 40px; font-weight: 450; letter-spacing: -0.02em; }
+.ae-mono { font-family: var(--font-mono); font-size: 12px; color: var(--ink-muted); }
+.ae-kind { width: 30px; height: 30px; border-radius: 9px; background: var(--card-2); border: 1px solid var(--glass-edge); display: grid; place-items: center; color: var(--hot); flex: none; }
+.ae-kind svg { width: 15px; height: 15px; }
+.ae-pin { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--font-mono); color: var(--on-action); background: var(--hot); flex: none; }
+.ae-thumb { border-radius: 12px; background: var(--card-2); border: 1px solid var(--hairline); overflow: hidden; }
+.ae-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--hairline); width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; color: var(--ink); font: inherit; cursor: pointer; }
+.ae-row:first-child { border-top: 0; }
