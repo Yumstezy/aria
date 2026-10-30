@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
+import pyloudnorm as pyln
 from pydantic import BaseModel
 import soundfile as sf
 
@@ -279,6 +280,58 @@ def song_sections(req: SectionsRequest):
     if names or not out["sections"]:
         _sections_cache[key] = out
     return out
+
+
+class Take(BaseModel):
+    path: str
+    start_beat: float = 0.0
+
+
+class BeforeAfterRequest(BaseModel):
+    before: Take
+    after: Take
+    tempo: float
+    bars: int = 16
+    findings: list = []
+
+
+@app.post("/mix/before-after")
+def before_after(req: BeforeAfterRequest):
+    """The same bars after a fix (Oct 30): both takes lined up beat for beat, loudness matched, and how much each
+    problem's range changed. Negative change_db: less of it than before."""
+    takes = []
+    for t in (req.before, req.after):
+        try:
+            x, r = sf.read(str(_audio_file(t.path)), always_2d=True, dtype="float64")
+        except (RuntimeError, sf.LibsndfileError) as e:
+            raise HTTPException(400, f"Can't read {Path(t.path).name}: {e}")
+        takes.append((x, r, t.start_beat))
+    (bx, br, bb), (ax, ar, ab) = takes
+    if br != ar:
+        raise HTTPException(400, "The two takes were recorded at different sample rates.")
+    # Line up on the beat: the later-starting take sets where both begin
+    sec_per_beat = 60.0 / req.tempo
+    start = max(bb, ab)
+    bx, ax = bx[int(round((start - bb) * sec_per_beat * br)):], ax[int(round((start - ab) * sec_per_beat * ar)):]
+    n = min(len(bx), len(ax), int(req.bars * 4 * sec_per_beat * br))
+    if n < br * 2:
+        raise HTTPException(400, "The two takes don't overlap enough to compare.")
+    bx, ax = bx[:n], ax[:n]
+    out = reference.compare(ax, ar, bx, br)          # after against before, both at the same loudness
+    if out["error"]:
+        raise HTTPException(400, out["error"])
+    # Each problem's range, from the fine curve (after minus before, loudness matched)
+    hz = np.array(out["curve"]["hz"]); diff = np.array(out["curve"]["mine"]) - np.array(out["curve"]["ref"])
+    problems = []
+    for i, f in enumerate(req.findings):
+        lo, hi = (f.get("hz_range") or [None, None])[:2]
+        sel = (hz >= lo) & (hz <= hi) if lo and hi else np.zeros(len(hz), bool)
+        problems.append({"index": i, "kind": f.get("kind"), "hz_range": [lo, hi],
+                         "change_db": round(float(diff[sel].mean()), 1) if sel.any() else None})
+    meter = pyln.Meter(br)
+    lufs = lambda x: round(float(meter.integrated_loudness(x)), 1)
+    return {"curve": out["curve"], "bands": out["bands"], "problems": problems, "seconds": round(n / br, 1),
+            "lufs": {"before": lufs(bx), "after": lufs(ax)}}
 
 
 class AskRequest(BaseModel):

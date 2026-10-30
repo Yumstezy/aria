@@ -88,6 +88,18 @@ With no reference, the engine compares nothing. It returns what it measured and 
 
 Without `reference_path`, the result has `typical: {mixes, bands: [{name, lo, hi, value_db, median_db, range_db: [p10, p90], outside}], error}`: each of 8 bands' share of the mix (30 Hz to 16 kHz, measured exactly as `ml/detail.py` does) against the mixes people rated good in `ml/data/features.csv`. A band more than 0.5 dB outside where 8 in 10 of them sit becomes a finding `{kind: "typical", band, hz, hz_range, value_db, median_db, range_db, diff_db, outside_db, mixes, bars}`, at most 2, fuller ones first. Muse says "more (or less) than most good mixes" and may cut a fuller one. With a reference, `typical` is null. Once `ml/data/curves.csv` exists (`ml/curves.py`), `typical.curve` is `{hz, mine, ref, lo, hi, mixes}`: your EQ curve, the good mixes' middle and the range 8 in 10 sit in, at twelfth octaves with loudness taken out, drawn like the reference chart (yours gold, the typical good mix blue, the range a soft band).
 
+### Before and after (Oct 30)
+
+`POST /mix/before-after {before: {path, start_beat}, after: {path, start_beat}, tempo, bars, findings}`: the same bars after a fix. The takes are lined up on the beat (the later start sets where both begin), cut to the same length, loudness matched, and compared as a reference comparison would be (after against before). Returns `{curve: {hz, mine: after, ref: before}, bands, problems: [{index, kind, hz_range, change_db}], seconds, lufs: {before, after}}`; negative `change_db` is less of it than before. The bridge's `recheck` plays from the last check's first bar and records long enough to cover the same beats; the UI gets `before_after` and `before_after_progress`.
+
+### Live analyzer (Oct 30)
+
+The device's filter bank (31 third octaves from 31.25 Hz, `fffb~` then RMS) is read 20 times a second while the window's analyzer is open (`analyzer_on` / `analyzer_off` from the page; the bridge turns the device's metro on and off through the `an` outlet). The bridge sends `analyzer [31 dB values]` to the window only.
+
+### Arrangement edits (Oct 30)
+
+`arrangement_edit {sections}` from the page: the producer's renamed parts and moved edges (4 bars at a time, no part under 4 bars). The bridge keeps them for markers and for which part a check heard, and marks the song `edited`.
+
 ### With a reference (build step 8, as built Oct 29)
 
 The producer chooses a song from Finder on the Reference screen (Live's web view takes no dropped files; Ian, Oct 29). The page sends the file itself (an exception to "paths, not audio": the page can't see the chosen file's path) as the raw body of `POST /reference?name=<file name>`. The engine keeps it once per song (by content) in `~/Library/Application Support/Aria/references/` and returns `{path, name, seconds}`. wav, aiff, flac, mp3 and ogg; anything else is a 400. The page sends `set_reference {path, name}` to the bridge, which saves it in `window.json` and adds `reference_path` to every `/mix/analyze` until `clear_reference`.
