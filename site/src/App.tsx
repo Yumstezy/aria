@@ -200,7 +200,7 @@ const BEATS = [
   { t: "0:09", title: "It listens", line: "It finds what sounds wrong.", shot: "Mix check: numbered problems on the graph" },
   { t: "0:12", title: "Compare", line: "And shows how you compare to songs you love.", shot: "Gold and blue lines on one graph" },
   { t: "0:15", title: "And more", line: "Live analyzer. Groove match. Song sections. Mix score.", shot: "Quick cuts of the Additional features pictures" },
-  { t: "0:18", title: "Logo", line: "Built with Meta Muse Spark.", shot: "The bird and \"Aria\" typing in" },
+  { t: "0:18", title: "Logo, with a wink", line: "aria, make my song sound good. make no mistakes.", shot: "Types into the Ask Muse box like a real request, then the bird and \"Built with Meta Muse Spark\" below it" },
 ];
 
 const SHOTS = [
