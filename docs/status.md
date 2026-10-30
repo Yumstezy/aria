@@ -2,7 +2,7 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
-## Where we are (Oct 28, evening)
+## Where we are (Oct 29, evening)
 
 Feature freeze end of day Nov 2. Submit by noon PT Nov 4. "Built" means it passes its tests here; "Live" means Ian has checked it in Live.
 
@@ -14,13 +14,15 @@ Feature freeze end of day Nov 2. Submit by noon PT Nov 4. "Built" means it passe
 | 4 | Aria Ear: which of your tracks clash, by name. Name my tracks adds the Ears for you | Done, Live (Oct 28) |
 | 5 | Muse's advice, the Simple view, Fix it (Muse makes the change, with Undo) | Done, Live (Oct 28) |
 | 6 | Ask Muse drives Live: EQ, volume, 20 stock devices (add or change), sections and markers, sidechain, mute, solo, tempo, Undo, plugin guides, voice | Done, Live (Oct 28): Ian ran the whole test list |
-| 7 | Checkpoint (Oct 31): 3 test mixes pass | Blocked: needs 3 test mixes with one planted problem each |
+| 7 | Checkpoint (Oct 31): 3 test mixes pass | Ran Oct 29 on Ian's song: 1 of 3. Spikes are found; broad low-mid boosts are not. Parked until the model (Ian) |
 | 8 | Reference track: compare with a song you want to sound like | Later, after the model |
 | 9 | Groove match | Not started; likely cut (Ian to decide) |
 | 11 | README, demo video | Nov 3 to 4 |
 | Model | Good, mid and bad mixes in one genre; says what pulls a mix down | Raghav invited; the rated mixes are sorted in a shared Drive (Oct 28). Next: extract features, three tiers, first numbers by Oct 31 |
 
 What changed most recently:
+- **Checkpoint run (Oct 29), 1 of 3.** Ian planted three problems in his own 165 BPM song, each in its own 16 bars, with a clean control (`test-pack/answer-key.json`; the audio stays local in `test-pack/mixes/`). The synth spike (+4.9 dB at 3.6 kHz in the mix) was found as harsh hits at 3.62 kHz. The bass (+3.3 dB at 180 Hz) and drums (+4 dB from 360 to 720 Hz) boosts were missed in every mode. Aria finds sharp problems and parts fighting at one level; it can't call a broad range "too much" without something to compare with. The fix is a comparison built from the good-rated mixes (the model track). Ian: come back to it once the model is done.
+- **The window vanished after a check that found a clash (fixed Oct 29).** The chart read a size every clash lacks, the page threw, and the see-through window drew nothing; reopening replayed the result. Both pages now sit in an error boundary that shows a card and logs `ui_error` to the Max log.
 - **The device on Main looks like a Live device (Oct 28, Ian picked "Lamp" of four mockups).** A status light with one word, Check and Ask side by side, Open window below, in Live's greys and amber. The page never scrolls, so it doesn't slide with the mouse. 150 x 169. Results live in the window.
 - **EQ moves go on Aria's own EQ Eight (Oct 28).** Never the producer's, unless they ask to change their EQ; "add an EQ" is always new. Open window docks reliably on first open.
 - **Adding a device adds a new one (Oct 28, Ian).** "Add a compressor" never changes the producer's own; "raise the threshold" changes the one Aria added, else the last one.

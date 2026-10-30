@@ -301,12 +301,15 @@ Actions Muse may call: `jump_to`, `add_marker`, `eq_band`, `track_volume`, `trac
 
 ## Answer key
 
-`test-pack/answer-key.json`:
+`test-pack/answer-key.json` (Oct 29: one entry per planted file, with what was planted, what it measurably changed against the clean control, and what Aria should find):
 
 ```json
 {
-  "mixes": [ { "file": "mix-harsh-chorus.wav", "problem": "treble", "sections": ["Chorus 1", "Chorus 2"] } ],
-  "reference": { "file": "reference.wav", "sections": [ { "name": "Intro", "start_bar": 1, "bars": 8 } ] },
-  "loops": [ { "moving": "perc.wav", "anchor": "hat.wav", "offset_ms": -19 } ]
+  "mixes": [ { "file": "mixes/B.wav", "bars": [33, 48], "planted": "Synth, EQ Eight bell 4 kHz +12 dB",
+               "measured": "Mix +4.9 dB at 3.6 kHz against control.wav",
+               "expect": [ { "kind": ["resonance", "harsh"], "hz": [3000, 5000] } ], "result_oct29": "found" } ],
+  "control": { "file": "mixes/control.wav", "bars": [1, 16], "findings_oct29": ["..."] },
+  "reference": null,
+  "loops": []
 }
 ```

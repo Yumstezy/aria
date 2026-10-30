@@ -1,5 +1,36 @@
 {
-  "mixes": [],
+  "mixes": [
+    {
+      "file": "mixes/A.wav",
+      "bars": [17, 32],
+      "planted": "Bass track, EQ Eight bell 250 Hz +8 dB Q 0.7",
+      "measured": "Mix +3.3 dB at 180 Hz against control.wav",
+      "expect": [{ "kind": ["buildup", "masking", "clash"], "hz": [150, 400] }],
+      "result_oct29": "missed in master and split mode; not yet checked with Name my tracks"
+    },
+    {
+      "file": "mixes/B.wav",
+      "bars": [33, 48],
+      "planted": "Synth track, EQ Eight bell about 4 kHz +12 dB",
+      "measured": "Mix +4.9 dB at 3.6 kHz against control.wav",
+      "expect": [{ "kind": ["resonance", "harsh"], "hz": [3000, 5000] }],
+      "result_oct29": "found: harsh hits at 3.62 kHz, bars 33 to 48 (not in control.wav)"
+    },
+    {
+      "file": "mixes/C.wav",
+      "bars": [49, 64],
+      "planted": "DRUMS group, EQ Eight bell 391 Hz +7.6 dB Q 0.71",
+      "measured": "Mix +4 to 4.5 dB from 360 to 720 Hz against control.wav",
+      "expect": [{ "kind": ["buildup", "masking", "clash"], "hz": [300, 800] }],
+      "result_oct29": "missed in every mode; with Name my tracks the control's Drums and Synth clash at 356 to 449 Hz went away instead"
+    }
+  ],
+  "control": {
+    "file": "mixes/control.wav",
+    "bars": [1, 16],
+    "findings_oct29": ["harsh hits 2.03 kHz", "Name my tracks: Drums and Bass clash 891 Hz to 1.1 kHz, Drums and Synth clash 356 to 449 Hz, Synth buried 1 to 4 kHz"]
+  },
+  "source": "Ian's own song, 165 BPM, bounced as mixes/full.wav. The audio stays local (gitignored).",
   "reference": null,
   "loops": []
 }
