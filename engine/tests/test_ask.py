@@ -149,9 +149,10 @@ def test_plugins_and_big_gain_jumps_are_dropped_with_a_reason():
     assert out["actions"] == [] and "Live's own devices" in out["problems"][0]
     loud = ask.interpret(msg(None, call("track_device", track="Bass", device="Utility", settings=[{"param": "Gain", "value": 12}])), ctx, "louder")
     assert loud["actions"] == [] and loud["dropped"] == 1
+    # A target and a move together: the target wins (Oct 30), still inside the limits
     both = ask.interpret(msg(None, call("track_device", track="Bass", device="Utility",
                                         settings=[{"param": "Gain", "value": 2, "change": 1}])), ctx, "x")
-    assert both["actions"] == []
+    assert both["actions"][0]["args"]["settings"] == [{"param": "Gain", "value": 2.0}]
 
 
 def test_muse_sees_every_stock_device_and_its_knobs():
@@ -341,3 +342,32 @@ def test_add_means_a_new_device_and_a_move_means_the_one_there():
                                                  settings=[{"param": "Threshold", "change": 2}])), tracks, "raise the threshold")
     assert move["actions"][0]["args"]["mode"] == "change"
     assert ask.sidechain_steps({"track": "Vocal", "from_track": "Kick"}, ["Vocal", "Kick"])[0]["args"]["mode"] == "add"
+
+
+def test_exact_capitals_tell_two_tracks_apart():
+    """Ian, Oct 30: "vOCAL" and "VOCAL" in one set; asking for "vOCAL" means that one."""
+    assert ask.match_track("vOCAL", ["vOCAL", "VOCAL", "VOCAL (matched)"]) == "vOCAL"
+    assert ask.match_track("VOCAL", ["vOCAL", "VOCAL"]) == "VOCAL"
+    assert ask.match_track("vocal", ["vOCAL", "VOCAL"]) is None       # neither written that way: still ask
+
+
+def test_knob_values_written_as_text_are_read():
+    assert ask._setting({"param": "Dry/Wet", "value": "40%"}) == {"param": "Dry/Wet", "value": 40.0}
+    assert ask._setting({"param": "Output", "change": "-2 dB"}) == {"param": "Output", "change": -2.0}
+    assert ask._setting({"param": "Dry/Wet", "value": 30, "change": 5}) == {"param": "Dry/Wet", "value": 30.0}
+
+
+def test_each_devices_units_decide_its_limits():
+    """Drum Buss Drive is a percentage; Saturator Drive is dB (the refused Drum Buss change, Oct 30)."""
+    assert ask._setting({"param": "Drive", "value": 20}, "Drum Buss") == {"param": "Drive", "value": 20.0}
+    assert ask._setting({"param": "Drive", "value": 20}, "Saturator") is None
+    assert ask._setting({"param": "Stereo Width", "value": 150}, "Utility") == {"param": "Stereo Width", "value": 150.0}
+
+
+def test_utility_mono_only_when_asked():
+    ctx = {"tracks": ["Bass"]}
+    out = ask.interpret(msg(None, call("track_device", track="Bass", device="Utility", settings=[{"param": "Mono", "option": "On"}, {"param": "Bass Mono", "option": "On"}])), ctx, "tighten the low end")
+    assert out["actions"][0]["args"]["settings"] == [{"param": "Bass Mono", "option": "On"}] and "Mono off" in out["problems"][0]
+    asked = ask.interpret(msg(None, call("track_device", track="Bass", device="Utility", settings=[{"param": "Mono", "option": "On"}])), ctx, "make the bass mono")
+    assert asked["actions"][0]["args"]["settings"] == [{"param": "Mono", "option": "On"}]
+    assert "Dry/Wet" in ask.why_dropped("track_device", {"track": "BASS", "device": "Drum Buss", "settings": [{"param": "Dry/Wet", "value": 140}]}, ["BASS"])

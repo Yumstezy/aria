@@ -50,6 +50,18 @@ STOCK = {
     "Channel EQ": "Highpass On (On/Off), Low Gain (dB), Mid Gain (dB), Mid Freq (Hz), High Gain (dB), Output (dB)",
 }
 GAIN_KNOB = re.compile(r"gain|output|volume|makeup|ceiling|drive", re.I)
+
+
+def _units(device):
+    """Each knob of a stock device and its unit text, from STOCK ("Drive (%)" -> {"drive": "%"})"""
+    return {_key(m.group(1)): m.group(2).strip() for m in re.finditer(r"([A-Za-z][^,(]*?)\s*\(([^()]*)\)", STOCK.get(device, ""))}
+
+
+def _unit(device, param):
+    """The unit Aria's list gives for this knob on this device ("%", "dB", ...), or None when it doesn't say"""
+    units, k = _units(device), _key(param)
+    text = units.get(k) or next((u for n, u in units.items() if n and (n in k or k in n)), None)
+    return text
 PERCENT_KNOB = re.compile(r"dry.?wet|mix|amount", re.I)
 
 # One EQ Eight band, shared by eq_band and track_eq
@@ -209,7 +221,9 @@ Everyday starting points when they give no numbers (say what you used):
 - reverb, space, spacey: Reverb Decay Time 2500 ms (4000 ms for big or spacey), Predelay 20 ms, Dry/Wet 20%
 - delay or echo: the Delay device (not Echo, unless they name the Echo device): L 16th 3, R 16th 4, Feedback 30%, Dry/Wet 15%
 - warmth, saturation, grit: Saturator Drive 4 dB, Type Analog Clip, Dry/Wet 50%
-- wider: Utility Stereo Width 130%. Mono the bass: Utility Bass Mono On, Bass Freq 120 Hz
+- wider: Utility Stereo Width 130%. Mono the bass, tighter low end: Utility Bass Mono On, Bass Freq 120 Hz
+- Utility's Mono switch makes the whole track mono: only when they ask for mono. Never add a Utility just to switch it on.
+- punchier drums or bass: Drum Buss Drive 20%, Transients 0.3, Boom Amt 0% unless they want more low end, Dry/Wet 50%
 - limit Main: Limiter Ceiling -1 dB
 "Raise it by .4 dB" or "a bit more" on a knob of a device already on that track: change that knob with change.
 change moves a knob from where it is now, so use it only when context.tracks shows that device on that track.
@@ -307,8 +321,12 @@ def match_track(name, tracks):
     if not want:
         return None
     exact = [t for t in tracks if norm(t) == want]
+    if len(exact) > 1:
+        # "vOCAL" and "VOCAL" (Ian, Oct 30): the one written exactly as asked, capitals and all, is the one meant
+        same = [t for t in exact if " ".join(str(t).split()) == " ".join(str(name).split())]
+        return same[0] if len(same) == 1 else None
     if exact:
-        return exact[0] if len(exact) == 1 else None
+        return exact[0]
     words = lambda s: re.findall(r"[a-z0-9]+", s)
     def inside(small, big):
         w, b = words(small), words(big)
@@ -375,22 +393,33 @@ def mentioned_plugins(request, names, limit=12):
     return bare[:limit]
 
 
-def _setting(st):
-    """One knob setting, cleaned, or None."""
+def _setting(st, device=None):
+    """One knob setting, cleaned, or None. With a stock device, the knob's unit comes from Aria's list: Drum Buss's
+    Drive is a percentage, Saturator's is in dB (Ian, Oct 30: "Drive 20%" on a Drum Buss was refused as a gain jump)."""
     if not isinstance(st, dict) or not str(st.get("param", "")).strip():
         return None
     param = str(st["param"]).strip()[:40]
     given = [k for k in ("value", "option", "change") if st.get(k) is not None]
-    if len(given) != 1:
+    if not given:
         return None
-    k = given[0]
+    # Both a target and a move: the target says where it should end up, so it wins
+    k = "value" if "value" in given else given[0]
     if k == "option":
         return {"param": param, "option": str(st["option"]).strip()[:32]}
-    v = float(st[k])
+    raw = st[k]
+    if isinstance(raw, str):        # "50%", "-3 dB", "+2": the number in it
+        m = re.search(r"[-+]?\d+(?:\.\d+)?", raw)
+        if not m:
+            return None
+        raw = m.group(0)
+    v = float(raw)
+    unit = _unit(device, param) if device else None
+    percent = unit.startswith("%") if unit else bool(PERCENT_KNOB.search(param))
+    top = 400 if unit and "400" in unit else 100
     # Loudness knobs move a few dB at a time, like track_volume, and never far enough down to silence a track
-    if GAIN_KNOB.search(param) and (not -24 <= v <= 6 if k == "value" else abs(v) > 6):
+    if not percent and GAIN_KNOB.search(param) and (not -24 <= v <= 6 if k == "value" else abs(v) > 6):
         return None
-    if PERCENT_KNOB.search(param) and k == "value" and not 0 <= v <= 100:
+    if percent and k == "value" and not 0 <= v <= top:
         return None
     if re.search(r"time|decay|attack|release|freq|predelay", param, re.I) and k == "value" and v < 0:
         return None
@@ -445,7 +474,7 @@ def section_markers(args, markers):
 def why_dropped(name, args, tracks=(), plugins=()):
     """One plain sentence on why a call was dropped, for the producer."""
     asked = str((args or {}).get("track") or "") if isinstance(args, dict) else ""
-    if asked and sum(1 for t in tracks if " ".join(t.lower().split()) == " ".join(asked.lower().split())) > 1:
+    if asked and not match_track(asked, tracks) and sum(1 for t in tracks if " ".join(t.lower().split()) == " ".join(asked.lower().split())) > 1:
         return f'Two tracks are called "{asked}", so Aria can\'t tell which one. Rename one of them in Live.'
     if name == "track_plugin" and isinstance(args, dict) and not match_plugin(args.get("plugin"), plugins):
         return f'Aria can\'t find "{args.get("plugin")}" in Live\'s plugin list.'
@@ -455,6 +484,13 @@ def why_dropped(name, args, tracks=(), plugins=()):
             not _track(args.get("track"), tracks, main_ok=True):
         shown = ", ".join(f'"{t}"' for t in tracks[:8]) or "none"
         return f'No track called "{args.get("track")}" in this set. Tracks: {shown}.'
+    # Say which knob was the trouble (Ian, Oct 30: a Drum Buss change was skipped with no clue why)
+    if name in ("track_device", "track_plugin") and isinstance(args, dict) and isinstance(args.get("settings"), list):
+        bad = next((st for st in args["settings"] if _setting(st, args.get("device") if name == "track_device" else None) is None), None)
+        if bad is not None:
+            what = bad.get("param") if isinstance(bad, dict) else bad
+            got = next((f"{k} {bad[k]}" for k in ("value", "change", "option") if isinstance(bad, dict) and bad.get(k) is not None), "no value")
+            return f'Muse asked to set "{what}" on {args.get("device") or args.get("plugin")} ({got}), which is outside what Aria allows, so Aria skipped it. Try asking again with an amount.'
     return f"Muse asked for {name.replace('_', ' ')} with values outside Aria's limits, so Aria skipped it."
 
 
@@ -512,7 +548,7 @@ def check_action(name, args, tracks=(), plugins=()):
             raw = args.get("settings") or []
             if not isinstance(raw, list) or len(raw) > MAX_SETTINGS:
                 return None
-            settings = [_setting(st) for st in raw]
+            settings = [_setting(st, args["device"]) for st in raw]
             if any(st is None for st in settings) or (args["device"] == "EQ Eight" and settings):
                 return None
             # A move (change) is always on a device that's there; otherwise "add" unless Muse said "change"
@@ -610,6 +646,7 @@ def _one_call(name, args, context, request, tracks, plugins, actions, suggestion
     if cleaned is None:
         dropped += 1
         problems.append(why_dropped(name, args, tracks, plugins))
+        print(f"ask: dropped {name} {json.dumps(args)[:600]}", flush=True)   # in engine.log, to see what Muse sent
         return dropped
     # "Raise the threshold by 2 dB" moves a knob from where it is: only on a device that's already there.
     # A fresh one starts at Live's default (a Compressor at 0 dB), where the move means nothing.
@@ -618,6 +655,15 @@ def _one_call(name, args, context, request, tracks, plugins, actions, suggestion
         if known is not None and not any(_key(cleaned["device"]) in _key(d) for d in known["devices"] or []):
             problems.append(f'There\'s no {cleaned["device"]} on "{cleaned["track"]}" yet to change. Ask Aria to add one with settings.')
             return dropped + 1
+    # Utility's Mono sums the whole track to mono: only when they asked for mono (Ian, Oct 30: "don't just slap on mono").
+    # Tightening the low end is Bass Mono.
+    if name == "track_device" and cleaned["device"] == "Utility" and "mono" not in (request or "").lower():
+        keep = [st for st in cleaned["settings"] if not (_key(st["param"]) == "mono" and str(st.get("option", st.get("value", ""))).lower() in ("on", "1", "1.0", "true"))]
+        if len(keep) < len(cleaned["settings"]):
+            problems.append("Aria left Utility's Mono off: it makes the whole track mono. Ask for mono if you want it.")
+            if not keep and cleaned["mode"] == "add":
+                return dropped + 1
+            cleaned = {**cleaned, "settings": keep}
     actions.append({"type": name, "args": cleaned})
     return dropped
 

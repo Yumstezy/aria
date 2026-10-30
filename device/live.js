@@ -666,7 +666,11 @@ function knob(params, want) {
   const alias = { mix: "drywet", wet: "drywet", amount: "drywet" }[k];
   const exact = params.filter(function (p) { return p.k === k; })[0] || (alias && params.filter(function (p) { return p.k === alias; })[0]);
   if (exact) return exact;
-  const near = params.filter(function (p) { return p.k && (p.k.indexOf(k) >= 0 || k.indexOf(p.k) >= 0); });
+  // A knob whose name holds what was asked ("width" finds "Stereo Width"), or what was asked plus only a unit
+  // ("threshold db" finds "Threshold"). Never one that drops a word: "mono bass" must not find "Mono" (Ian, Oct 30:
+  // asking for Bass Mono switched the whole track to mono).
+  const unitOnly = function (rest) { return /^(db|hz|khz|ms|s|sec|percent|pct|amount|amt|level|value)?$/.test(rest); };
+  const near = params.filter(function (p) { return p.k && (p.k.indexOf(k) >= 0 || (k.indexOf(p.k) >= 0 && unitOnly(k.replace(p.k, "")))); });
   near.sort(function (a, b) { return a.k.length - b.k.length; });
   return near[0] || null;
 }

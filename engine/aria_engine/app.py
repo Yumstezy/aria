@@ -12,7 +12,7 @@ import pyloudnorm as pyln
 from pydantic import BaseModel
 import soundfile as sf
 
-from aria_engine import __version__, analysis, ask, clarity, groove, muse, reference, sections, split, stems, voice
+from aria_engine import __version__, analysis, ask, clarity, groove, muse, reference, sections, split, stems, vocal, voice
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 # When the code this engine runs was last changed. The bridge compares it with the files on disk
@@ -357,6 +357,27 @@ def groove_match(req: GrooveRequest):
     try:
         return groove.match(Path(req.moving_path).expanduser(), req.anchor, req.tempo, req.strength, req.nudge_ms,
                             req.beat1_sec, req.out_dir or GROOVE_DIR)
+    except (ValueError, RuntimeError, sf.LibsndfileError) as e:
+        raise HTTPException(400, str(e))
+
+
+class VocalRequest(BaseModel):
+    path: str
+    song_tempo: float
+    tempo: float | None = None          # the producer's own reading, when Aria's was wrong
+    beat_shift: int = 0                 # move beat 1 by whole beats, when Aria's was wrong
+
+
+@app.post("/groove/vocal")
+def groove_vocal(req: VocalRequest):
+    """Vocal sync (Oct 30): the vocal's tempo and beat 1, and the warp markers that put it on the song's grid."""
+    p = Path(req.path).expanduser()
+    if not p.is_file():
+        raise HTTPException(400, f"No file at {req.path}.")
+    if not (40 <= req.song_tempo <= 300) or (req.tempo is not None and not (40 <= req.tempo <= 300)) or abs(req.beat_shift) > 16:
+        raise HTTPException(400, "Tempo 40 to 300, beat shift -16 to 16.")
+    try:
+        return vocal.analyze(p, req.song_tempo, tempo=req.tempo, beat_shift=req.beat_shift)
     except (ValueError, RuntimeError, sf.LibsndfileError) as e:
         raise HTTPException(400, str(e))
 
