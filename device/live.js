@@ -157,6 +157,11 @@ function play() {
 let pendingStart = null;
 
 // Replies jump_done when it's finished, so the next change never overlaps the temporary marker steps
+// Arrangement: Live stops once Aria has heard the whole song
+function stop_song() {
+  if (ensureSong() && one(song, "is_playing") === 1) song.call("stop_playing");
+}
+
 function jump(bar) {
   if (!ensureSong()) { send("jump_done", { ok: false, text: "Live isn't ready yet." }); return; }
   const beats = (bar - 1) * beatsPerBar();

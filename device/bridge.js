@@ -426,13 +426,16 @@ async function checkMix() {
     toUI("progress", { step: "analyze", text: keyTracks ? `Comparing ${Object.keys(tracks).length} tracks and asking Muse Spark`
       : referenceNow() ? `Comparing with ${referenceNow().name} and asking Muse Spark` : "Splitting your mix and asking Muse Spark" });
     const ref = referenceNow();
+    // With the song's parts known, compare with the reference's part of the same name, not the whole reference
+    const parts = partsFor(startBar, BARS);
+    const refPart = ref && parts.theirs ? { reference_window: [parts.theirs.start_sec, parts.theirs.end_sec], reference_part: parts.theirs.name } : {};
     const res = await request("POST", "/mix/analyze",
       { mix_path: file, start_beat: live.song_beat, tempo: live.tempo, bars: BARS, beats_per_bar: live.beats_per_bar,
-        ...(keyTracks ? { tracks } : {}), ...(ref ? { reference_path: ref.path, reference_name: ref.name } : {}) }, ANALYZE_TIMEOUT_MS);
+        ...(keyTracks ? { tracks } : {}), ...(ref ? { reference_path: ref.path, reference_name: ref.name, ...refPart } : {}) }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
     }
-    lastResult = { ...res.json, start_bar: startBar, chain: live.chain,
+    lastResult = { ...res.json, start_bar: startBar, chain: live.chain, ...(parts.mine && parts.mine.name ? { part: parts.mine.name } : {}),
                    ...(songEndBar && startBar + BARS - 1 > songEndBar ? { song_end_bar: songEndBar } : {}) };
     toUI("mix_result", lastResult);
     pushSession();
@@ -445,11 +448,117 @@ async function checkMix() {
   }
 }
 
+// ---------- Arrangement (build step 8b): the song's parts ----------
+// "Hear the whole song" (only on the Arrangement tab, Ian): Live plays from bar 1 to the song's end once and Main is
+// recorded, the engine finds the parts and Muse names them. The reference's parts come from its file. Kept for
+// this Live session; every Check mix after that compares your part with the reference's part of the same name.
+
+let arrangement = null;   // { mine, ref, at }
+let hearing = null;       // { cancel } while the song is being heard
+
+Max.addHandler("hear_song", () => serial(hearSong));
+Max.addHandler("stop_hearing", () => { if (hearing) hearing.cancel = true; });
+
+async function hearSong() {
+  if (busy) return;
+  busy = true;
+  hearing = { cancel: false };
+  try {
+    await ensureEngine();
+    let live = await askLive("state", "live_state");
+    if (!(live.song_end > 0)) throw new UserError("Aria couldn't find where your song ends. Put your clips in the Arrangement and try again.");
+    toUI("arrangement_progress", { step: "start", text: "Going to bar 1" });
+    await askLive("jump", "jump_done", 1);
+    live = await askLive("state", "live_state");
+    if (!live.playing) {
+      const started = waitForPlaying(LIVE_TIMEOUT_MS);
+      toLive("play");
+      await started;
+      live = await askLive("state", "live_state");
+    }
+    const startBeat = live.song_beat, endBeat = live.song_end;
+    const ms = Math.round((endBeat - startBeat) * 60000 / live.tempo) + 500;
+    const lastBar = Math.ceil(endBeat / live.beats_per_bar);
+    Max.post(`hear_song: tempo ${live.tempo}, from beat ${startBeat} to ${endBeat} (${Math.round(ms / 1000)} s)`);
+    fs.mkdirSync(REC_DIR, { recursive: true });
+    const file = path.join(REC_DIR, `song-${Date.now()}.aif`);
+    recording = { stopped: false };
+    toRec("samptype", "float32");
+    toRec("open", file);
+    toRec("record", ms);
+    const started = Date.now();
+    while (Date.now() - started < ms) {
+      if (hearing.cancel || recording.stopped) {
+        toRec(0);
+        recording = null;
+        if (hearing.cancel) toLive("stop_song");
+        throw new UserError(hearing.cancel ? "Stopped. Nothing in your song changed." : "Playback stopped before the end of the song. Press Hear the whole song to try again.");
+      }
+      const done = Date.now() - started;
+      const bar = Math.min(lastBar, Math.floor((startBeat + (done / 60000) * live.tempo) / live.beats_per_bar) + 1);
+      toUI("arrangement_progress", { step: "record", text: `Listening to bar ${bar} of ${lastBar}`, done, total: ms, bar, last_bar: lastBar });
+      await sleep(250);
+    }
+    await sleep(FILE_SETTLE_MS);
+    recording = null;
+    toLive("stop_song");
+    if (!fs.existsSync(file) || fs.statSync(file).size < 1024) throw new UserError("The recording came out empty. Is Aria on the Main track?");
+
+    toUI("arrangement_progress", { step: "analyze", text: "Finding the parts and asking Muse Spark to name them" });
+    const res = await request("POST", "/sections", { wav_path: file, tempo: live.tempo, start_beat: startBeat, beats_per_bar: live.beats_per_bar }, ANALYZE_TIMEOUT_MS);
+    if (res.status !== 200) throw new UserError((res.json && res.json.detail) || `The engine couldn't find the parts (HTTP ${res.status}).`);
+    arrangement = { mine: res.json, ref: await referenceSections(), at: Date.now() };
+    toUI("arrangement", arrangement);
+  } catch (e) {
+    toUI("arrangement_progress", { step: "error", text: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
+  } finally {
+    hearing = null;
+    busy = false;
+  }
+}
+
+// The reference's parts, from its own file (cached by the engine). Null without a reference or when it fails.
+async function referenceSections() {
+  const ref = referenceNow();
+  if (!ref) return null;
+  try {
+    const res = await request("POST", "/sections", { wav_path: ref.path }, ANALYZE_TIMEOUT_MS);
+    return res.status === 200 ? { ...res.json, song: ref.name } : null;
+  } catch (e) { return null; }
+}
+
+// "Add markers to Live": each part's name at its first bar. The producer pressed the button, so that's the yes;
+// each marker is its own Undo.
+Max.addHandler("arrangement_markers", () => serial(async () => {
+  const parts = arrangement && arrangement.mine ? arrangement.mine.sections : [];
+  let added = 0;
+  for (const p of parts) {
+    try {
+      const done = await askLive("marker", "marker_done", p.start_bar, p.name || `Part ${p.label}`);
+      if (done.ok !== false) { added++; changeStack.push({ at: null, kind: "d", k: 0 }); }
+    } catch (e) { /* the rest still go in */ }
+  }
+  sendUndoNext();
+  toUI("notice", { text: added ? `Added ${added} marker${added === 1 ? "" : "s"} to Live. Undo takes them back one at a time.` : "Live didn't take the markers." });
+}));
+
+// Which part of the song a check heard (most of its bars), and the reference's part with the same name
+function partsFor(startBar, bars) {
+  if (!arrangement || !arrangement.mine) return {};
+  const overlap = (s) => Math.max(0, Math.min(s.start_bar + s.bars, startBar + bars) - Math.max(s.start_bar, startBar));
+  const mine = arrangement.mine.sections.reduce((best, s) => (overlap(s) > (best ? overlap(best) : 0) ? s : best), null);
+  if (!mine || !mine.name) return { mine };
+  const theirs = arrangement.ref && arrangement.ref.sections.filter((s) => s.name === mine.name)
+    .sort((a, b) => b.energy_db - a.energy_db)[0];   // their loudest part of that name: the one producers compare
+  return { mine, theirs };
+}
+
 // ---------- messages from the UI ----------
 
 Max.addHandler("ready", async () => {
   toUI("engine", engineState);
   if (lastResult) toUI("mix_result", lastResult);
+  if (arrangement) toUI("arrangement", arrangement);
   toUI("ask_log", askLog);
   sendUndoNext();
   pushSession();
@@ -488,8 +597,13 @@ Max.addHandler("set_reference", (s) => {
   const { path: p, name } = decode(s);
   savePrefs({ ...loadWindowPrefs(), reference: p ? { path: p, name: name || path.basename(p) } : null });
   pushSession();
+  if (arrangement) referenceSections().then((ref) => { arrangement = { ...arrangement, ref }; toUI("arrangement", arrangement); });
 });
-Max.addHandler("clear_reference", () => { savePrefs({ ...loadWindowPrefs(), reference: null }); pushSession(); });
+Max.addHandler("clear_reference", () => {
+  savePrefs({ ...loadWindowPrefs(), reference: null });
+  pushSession();
+  if (arrangement) { arrangement = { ...arrangement, ref: null }; toUI("arrangement", arrangement); }
+});
 
 Max.addHandler("check_mix", () => serial(checkMix));
 // The mic: the page sends the words to the engine itself, so make sure it's running

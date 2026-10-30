@@ -3,7 +3,7 @@ import threading
 from contextlib import asynccontextmanager
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -81,6 +81,9 @@ class MixRequest(BaseModel):
     beats_per_bar: Optional[float] = None
     reference_path: Optional[str] = None
     reference_name: Optional[str] = None   # the song's own file name (the engine stores it under another)
+    # Arrangement (build step 8b): only this stretch of the reference, in seconds: its part matching the checked one
+    reference_window: Optional[List[float]] = None
+    reference_part: Optional[str] = None
     # Key tracks mode (Aria Ear, build step 4): {track name: wav path}, recorded at the same moment as mix_path
     tracks: Optional[Dict[str, str]] = None
 
@@ -171,7 +174,7 @@ async def reference_keep(request: Request, name: str = "reference.wav"):
     return {"path": str(path), "name": Path(name).name, "seconds": seconds}
 
 
-def compare_with(ref_path, audio, rate, bars, name=None):
+def compare_with(ref_path, audio, rate, bars, name=None, window=None, part=None):
     """The reference block of a result, and its findings for the problem list."""
     path = Path(ref_path).expanduser()
     if not path.is_file():
@@ -180,11 +183,19 @@ def compare_with(ref_path, audio, rate, bars, name=None):
         ref_audio, ref_rate = reference.read(path)
     except (RuntimeError, sf.LibsndfileError) as e:
         raise HTTPException(400, f"Can't read the reference {path.name}: {e}")
+    if window and len(window) == 2 and window[1] > window[0]:
+        a, b = int(window[0] * ref_rate), int(window[1] * ref_rate)
+        if b - a >= ref_rate * 2:   # at least two seconds of it, or compare with the whole song
+            ref_audio = ref_audio[a:b]
+        else:
+            part = None
+    else:
+        part = None
     out = reference.compare(audio, rate, ref_audio, ref_rate)
     for f in out["findings"]:
         if bars:
             f["bars"] = bars
-    return {"name": name or path.name, "path": str(path), **out}
+    return {"name": name or path.name, "path": str(path), "part": part, **out}
 
 
 @app.post("/mix/analyze")
@@ -203,7 +214,8 @@ def mix_analyze(req: MixRequest):
         found = find_clarity(audio, rate, req.tempo, req.start_beat, req.beats_per_bar or 4.0)
 
     # With a reference, what stands out against it leads the list: the producer asked for that comparison
-    ref = compare_with(req.reference_path, audio, rate, found.get("bars"), req.reference_name) if req.reference_path else None
+    ref = compare_with(req.reference_path, audio, rate, found.get("bars"), req.reference_name,
+                       req.reference_window, req.reference_part) if req.reference_path else None
     if ref and ref["findings"]:
         found["findings"] = (ref["findings"] + found["findings"])[:SPLIT_TOP_N + 1]
 
@@ -218,7 +230,7 @@ def mix_analyze(req: MixRequest):
 
     return {
         "recording": {"path": str(path), "start_beat": req.start_beat, "tempo": req.tempo, "bars": req.bars},
-        "reference": ref and {k: ref[k] for k in ("name", "path", "bands", "curve", "error")},
+        "reference": ref and {k: ref[k] for k in ("name", "path", "part", "bands", "curve", "error")},
         "measured": measured,
         "clarity": found,
         "advice": advice,

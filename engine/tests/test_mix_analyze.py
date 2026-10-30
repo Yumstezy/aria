@@ -87,3 +87,14 @@ def test_split_mode_puts_stem_findings_first(tmp_path, monkeypatch):
     assert body["clarity"]["findings"][0]["masked"] == "vocals"
     assert set(body["clarity"]["stems"]) == {"vocals", "drums", "bass", "other"}
     assert body["clarity"]["space"]["vocals"]["presence"]["vs_rest_db"] < 0
+
+
+def test_a_reference_window_compares_with_just_that_part(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODEL_API_KEY", "")
+    path = write(tmp_path / "mix.wav", sine(1000, 0.5), sine(1000, 0.5))
+    ref = write(tmp_path / "ref.wav", np.concatenate([sine(200, 0.5), sine(1000, 0.5)]), np.concatenate([sine(200, 0.5), sine(1000, 0.5)]))
+    whole = client.post("/mix/analyze", json={"mix_path": path, "reference_path": ref}).json()["reference"]
+    part = client.post("/mix/analyze", json={"mix_path": path, "reference_path": ref, "reference_window": [3.0, 6.0], "reference_part": "Drop"}).json()["reference"]
+    assert part["part"] == "Drop" and whole["part"] is None
+    mids = lambda r: next(b["diff_db"] for b in r["bands"] if b["name"] == "Mids")
+    assert abs(mids(part)) < abs(mids(whole))   # the matching stretch is the same tone, the whole song isn't
