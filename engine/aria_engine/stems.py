@@ -111,7 +111,11 @@ def masking(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, releva
         own_level = 10 * np.log10(np.mean(10 ** (levels_total[victim][loud] / 10)) + 1e-12)
         if not _present(victim, sounds[victim], own_level, mix_level, relative, playing):
             continue  # not in this part of the song (or only bleed from other sounds)
-        typical = {r: np.median(levels[victim][r][loud]) for r in RANGES}
+        # Where the sound lives, from the moments it plays: a vocal that sings in half the bars has silence as its
+        # median everywhere, and every range looked like home to it (Ian, Oct 30: "vOCAL buried, 30 Hz to 1 kHz")
+        tot = levels_total[victim]
+        sounding = loud & (tot >= tot[loud].max() - ACTIVE_DB)
+        typical = {r: np.median(levels[victim][r][sounding if sounding.any() else loud]) for r in RANGES}
         strongest = max(typical.values())
         for r, (lo, hi) in RANGES.items():
             if relevant is not None and r not in relevant.get(victim, set()):

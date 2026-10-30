@@ -306,8 +306,9 @@ const Home = memo(function Home({ narrow, onOpen, go }: { narrow: boolean; onOpe
 /* ---------- Arrangement (build step 8b) ---------- */
 
 // One color per kind of part, the same in both songs, so your drop and their drop match at a glance
+// Each kind of part its own color (Ian, Oct 30: "use some different colors to represent different things"); drops gold
 const PART_COLOR: Record<string, string> = {
-  Intro: "var(--ink-faint)", Outro: "var(--ink-faint)", Break: "var(--track)", Bridge: "var(--trk-4)", Build: "var(--cool)", Drop: "var(--trk-0)",
+  Intro: "var(--trk-5)", Build: "var(--trk-4)", Drop: "var(--trk-0)", Break: "var(--trk-1)", Bridge: "var(--trk-2)", Outro: "var(--trk-3)",
 };
 const LABEL_COLOR = ["var(--trk-1)", "var(--trk-0)", "var(--trk-2)", "var(--trk-3)", "var(--trk-4)", "var(--trk-5)"];
 const partColor_ = (p: Part) => (p.name ? PART_COLOR[p.name] : LABEL_COLOR[(p.label.charCodeAt(0) - 65) % LABEL_COLOR.length]);
