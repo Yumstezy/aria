@@ -486,47 +486,75 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
   );
 });
 
-function Stat({ label, value, unit, why }: { label: string; value: number | null | undefined; unit: string; why?: string }) {
+/** One measured number as a bar on a fixed scale, with the number beside it. Missing: "Not measured", no bar. */
+function Meter({ label, value, unit, lo, hi, color = "var(--ink-muted)", why, mark, dot }: {
+  label: string; value: number | null | undefined; unit: string; lo: number; hi: number; color?: string; why?: string; mark?: number; dot?: string;
+}) {
   const missing = value === null || value === undefined;
+  const at = (v: number) => `${Math.min(1, Math.max(0, (v - lo) / (hi - lo))) * 100}%`;
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="cp-cap">{label}</span>
-      {missing ? <span className="cp-meta" style={{ lineHeight: "28px" }} title={why}>Not measured</span>
-        : <span className="cp-figure-sm">{value}<small>{unit}</small></span>}
+    <div className="grid items-center gap-3" style={{ gridTemplateColumns: "minmax(0, 7.5rem) minmax(0, 1fr) 5.5rem" }} title={missing ? why : undefined}>
+      <span className="flex min-w-0 items-center gap-2 text-[13px] text-ink-muted">{dot && <span className="ae-dot" style={{ color: dot }} />}<span className="truncate">{label}</span></span>
+      <span className="relative h-1.5 rounded-full bg-well">
+        {!missing && <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: at(value), background: color }} />}
+        {mark !== undefined && <span className="absolute -inset-y-1 w-px bg-track" style={{ left: at(mark) }} />}
+      </span>
+      <span className="ae-mono text-right">{missing ? "Not measured" : `${value} ${unit}`}</span>
     </div>
   );
 }
 
+/** Mix check, Detailed (Ember): the measured numbers as pictures. Loudness and peak first as two stat cards,
+    then the balance, width and each part as bars, then everything Muse said. Explanations are hover titles. */
 const Detailed = memo(function Detailed({ r, narrow }: { r: Result; narrow: boolean }) {
   const m = r.measured, why = m.unmeasured;
   const f1 = (x: number | null | undefined) => (x === null || x === undefined ? null : Number(x.toFixed(1)));
+  const pct = (x: number | null | undefined) => (x === null || x === undefined ? null : Math.round(x * 100));
+  const loud = f1(m.integrated_lufs), peak = f1(m.true_peak_dbtp);
+  const BANDS3 = [["bass", "Bass"], ["mids", "Mids"], ["treble", "Treble"]] as const;
+  const stems = r.clarity.stems ? Object.entries(r.clarity.stems) : [];
+  const forReference = "Here for reference. Aria's advice is about clarity.";
   return (
     <div className="cp-bento">
-      <section className={cn("cp-tile cp-card", span(narrow, 7))} style={{ gap: 12 }}>
-        <span className="cp-cap">The numbers</span>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-x-4 gap-y-3">
-          <Stat label="Loudness" value={f1(m.integrated_lufs)} unit="LUFS" why={why.integrated_lufs || why.all} />
-          <Stat label="True peak" value={f1(m.true_peak_dbtp)} unit="dBTP" why={why.all} />
-          {["bass", "mids", "treble"].map((b) => <Stat key={b} label={b} value={f1(m.bands_db[b])} unit="dB" why={why[`bands_db.${b}`] || why.all} />)}
-          {["bass", "mids", "treble"].map((b) => <Stat key={"w" + b} label={`Width ${b}`} value={m.width[b] === null || m.width[b] === undefined ? null : Math.round(m.width[b]! * 100)} unit="%" why={why[`width.${b}`] || why.all} />)}
-        </div>
-        <p className="cp-meta">Loudness and peak are here for reference. Aria's advice is about clarity.</p>
-        <p className="cp-meta">Found by Aria's measurement rules (version 1). The mix model we're training on rated mixes joins in once it beats its baselines.</p>
+      <section className={cn("cp-tile cp-card", narrow ? "span-6" : "span-3")} style={{ gap: 2 }} title={forReference}>
+        <span className="cp-cap">Loudness</span>
+        {loud === null ? <span className="cp-meta" title={why.integrated_lufs || why.all}>Not measured</span>
+          : <span className="ae-big">{loud}<span className="ml-1.5 font-mono text-[13px] text-ink-muted">LUFS</span></span>}
       </section>
-      {r.clarity.stems && (
-        <section className={cn("cp-tile cp-card", span(narrow, 5))} style={{ gap: 12 }}>
-          <span className="cp-cap">Each part against the mix</span>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            {Object.entries(r.clarity.stems).map(([k, v]) => <Stat key={k} label={soundName(k)} value={f1(v)} unit="dB vs mix" />)}
+      <section className={cn("cp-tile cp-card", narrow ? "span-6" : "span-3")} style={{ gap: 2 }} title={forReference}>
+        <span className="cp-cap">True peak</span>
+        {peak === null ? <span className="cp-meta" title={why.all}>Not measured</span> : (
+          <>
+            <span className="ae-big" style={peak > 0 ? { color: "var(--hot)" } : undefined}>{peak}<span className="ml-1.5 font-mono text-[13px] text-ink-muted">dBTP</span></span>
+            {peak > 0 && <span className="ae-mono" style={{ color: "var(--hot)" }}>over 0, clips on export</span>}
+          </>
+        )}
+      </section>
+      <section className={cn("cp-tile cp-card", span(narrow, 6))} style={{ gap: 12 }}>
+        <span className="cp-cap">Balance</span>
+        {BANDS3.map(([k, name]) => <Meter key={k} label={name} value={f1(m.bands_db[k])} unit="dB" lo={-40} hi={0} color="var(--ink)" why={why[`bands_db.${k}`] || why.all} />)}
+      </section>
+      <section className={cn("cp-tile cp-card", span(narrow, 6))} style={{ gap: 12 }}>
+        <span className="cp-cap" title="How wide each range is in stereo: 0% is mono.">Width</span>
+        {BANDS3.map(([k, name]) => <Meter key={k} label={name} value={pct(m.width[k])} unit="%" lo={0} hi={100} color="var(--cool)" why={why[`width.${k}`] || why.all} />)}
+      </section>
+      {stems.length > 0 && (
+        <section className={cn("cp-tile cp-card", span(narrow, 6))} style={{ gap: 12 }}>
+          <div className="cp-spread">
+            <span className="cp-cap" title="Each part's level against the whole mix. The line is 20 dB under: past it, a part counts as not playing.">Each part against the mix</span>
+            <span className="font-mono text-[11px] text-ink-faint">split by {r.clarity.split_by?.startsWith("Demucs") ? "Demucs (Meta AI)" : r.clarity.split_by ?? "Demucs (Meta AI)"}</span>
           </div>
-          <p className="cp-meta">Split by {r.clarity.split_by ?? "Demucs"}. A sound more than 20 dB under the mix counts as not playing.</p>
+          {stems.map(([k, v], i) => <Meter key={k} label={soundName(k)} value={f1(v)} unit="dB" lo={-30} hi={0} mark={-20} color={partColor(k, i)} dot={partColor(k, i)} />)}
         </section>
       )}
-      <section className="cp-tile cp-card span-12" style={{ gap: 8 }}>
-        <span className="cp-cap">Everything Muse Spark said</span>
-        <ul className="cp-body m-0 grid gap-1.5 pl-[18px]">
-          {r.advice ? r.advice.notes.map((note, i) => <li key={i}>{note.text}</li>) : <li style={{ color: "var(--ink-muted)" }}>{r.advice_error ?? "No advice."}</li>}
-        </ul>
+      <section className={cn("cp-tile cp-card", span(narrow, stems.length ? 12 : 6))} style={{ gap: 0, paddingTop: 12, paddingBottom: 6 }}>
+        <span className="cp-cap pb-1" title="Found by Aria's measurement rules (version 1). The mix model we're training on rated mixes joins in once it beats its baselines.">Everything Muse Spark said</span>
+        {r.advice ? r.advice.notes.map((note, i) => (
+          <div key={i} className="grid items-start gap-3 border-t border-hairline py-2.5 first-of-type:border-t-0" style={{ gridTemplateColumns: "26px minmax(0, 1fr)" }}>
+            <span className="ae-pin">{i + 1}</span>
+            <span className="text-[13.5px] leading-[20px] text-ink">{note.text}</span>
+          </div>
+        )) : <p className="cp-meta py-2">{r.advice_error ?? "No advice."}</p>}
       </section>
     </div>
   );
@@ -570,16 +598,17 @@ function Compact() {
         {!result ? <p className="cp-meta">{progress ? progress.text : "No Mix check yet. Play the busiest part of your song and press Check mix."}</p> : (
           <>
             <div className="cp-row" style={{ alignItems: "flex-end" }}>
-              <span className="cp-figure"><CountUp value={list.length} /><small>{list.length === 1 ? "thing to fix" : list.length ? "things to fix" : "Nothing sticks out"}</small></span>
+              <span className="cp-figure"><CountUp value={list.length} /><small>{list.length ? "to fix" : "Nothing sticks out"}</small></span>
               {result.clarity.spectra && <div className="ml-auto h-10 w-[150px]"><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode !== "master"} /></div>}
             </div>
             <div className="flex min-h-0 flex-col overflow-y-auto">
               {list.map((p, i) => (
                 <button key={i} onClick={() => jumpTo(p.bar)} title={`${p.short} Tap to hear it in Live.`}
-                        className={cn("flex h-[38px] shrink-0 items-center gap-2.5 text-left text-ink", i > 0 && "border-t border-hairline")}>
-                  <span className="flex-1 truncate text-[13px] font-semibold">{p.name}</span>
-                  <span className="cp-tag cp-tag-hot">{statusWord(p)}</span>
-                  <span className="cp-meta whitespace-nowrap text-right" style={{ fontFamily: "var(--font-mono)" }}>{barsOf(p)}</span>
+                        className={cn("flex h-[42px] shrink-0 items-center gap-2.5 text-left text-ink", i > 0 && "border-t border-hairline")}>
+                  <span className="ae-kind" style={{ width: 26, height: 26 }}>{iconFor(p)}</span>
+                  <span className="flex-1 truncate text-[13px] font-medium">{p.name}</span>
+                  <span className="ae-mono whitespace-nowrap" style={{ color: "var(--hot)" }}>{amountText(p)}</span>
+                  <span className="ae-mono whitespace-nowrap text-right text-ink-faint">{barsOf(p)}</span>
                 </button>
               ))}
             </div>
