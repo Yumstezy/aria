@@ -149,7 +149,12 @@ export interface GrooveResult { before: GrooveTiming; after: GrooveTiming; in_ti
   grid?: { step_sec: number; beat1_sec: number; steps_per_bar: number };
   follow: string; strength: number; nudge_ms: number }
 export interface GrooveState { moving: GrooveClip | null; anchor: GrooveClip | null; placed: { track_id: number; orig_id: number; playing: "before" | "after" } | null;
-  result: GrooveResult | null; error: string | null; busy: string | null }
+  result: GrooveResult | null; error: string | null; busy: string | null;
+  vocal: GrooveClip | null; vocal_sync: VocalSync | null; vocal_applied: boolean }
+/** Vocal sync (Oct 30): the vocal's tempo and beat 1 from POST /groove/vocal */
+export interface VocalSync { tempo: number; tempo_source: "file name" | "measured" | "you"; beats_tempo: number; song_tempo: number; beat_shift: number;
+  first_beat_sec: number; first_sound_sec: number; seconds: number; picture: { start_sec: number; step_sec: number; levels_db: number[] };
+  warp: { markers: { beat_time: number; sample_time: number }[]; start_marker: number; end_marker: number; bars_before: number } }
 
 export type Theme = "sky" | "night";
 /** About the set, from Live: shown in headers and the Get started steps */
@@ -169,7 +174,7 @@ let state: State = {
   ask: { open: typeof location !== "undefined" && new URLSearchParams(location.search).get("ask") === "1", pending: null, log: [] },
   engine: { state: "starting", text: "Starting Aria" },
   progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null }, undoNext: null, layout: null, arrangement: null, hearing: null, beforeAfter: null, rechecking: null,
-  groove: { moving: null, anchor: null, placed: null, result: null, error: null, busy: null },
+  groove: { moving: null, anchor: null, placed: null, result: null, error: null, busy: null, vocal: null, vocal_sync: null, vocal_applied: false },
   fixes: {},
 };
 
@@ -309,6 +314,7 @@ export function connect() {
     on<{ text: string }>("groove_progress", (p) => set({ groove: { ...state.groove, busy: p.text, error: null } }));
     on<Partial<GrooveState> & { undone?: boolean }>("groove_state", (g) => set({ groove: {
       moving: g.moving ?? null, anchor: g.anchor ?? null, placed: g.placed ?? null, busy: null, error: g.error ?? null,
+      vocal: g.vocal ?? null, vocal_sync: g.vocal_sync ?? null, vocal_applied: !!g.vocal_applied,
       // A new loop to fix starts fresh; Undo takes the matched loop away; otherwise the last result stays
       result: g.result ?? (g.undone || (g.moving?.path !== state.groove.moving?.path) ? null : state.groove.result) } }));
     on<BeforeAfter>("before_after", (b) => set({ beforeAfter: b, rechecking: null, fixes: fixesHeard(b) }));
@@ -375,7 +381,13 @@ export function onAnalyzer(fn: (frame: number[]) => void) {
 export const addArrangementMarkers = () => send("arrangement_markers");
 
 // ---------- Groove match (build step 9) ----------
-export function groovePick(role: "moving" | "anchor") {
+export function vocalAnalyze(tempo: number | null, beat_shift: number) {
+  if (send("vocal_analyze", { tempo, beat_shift })) set({ groove: { ...state.groove, busy: "Finding the vocal's tempo and beat 1", error: null } });
+}
+export function vocalApply() {
+  if (send("vocal_apply")) set({ groove: { ...state.groove, busy: "Setting Live's warp markers", error: null } });
+}
+export function groovePick(role: "moving" | "anchor" | "vocal") {
   if (!send("groove_pick", { role })) notice("Groove match needs Aria inside Live.");
 }
 export function grooveRun(follow: "straight" | "loop", strength: number, nudge_ms: number) {

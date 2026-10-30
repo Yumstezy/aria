@@ -766,6 +766,14 @@ function undo() {
   } else if (u.kind === "tempo") {
     song.set("tempo", u.value);
     send("undo_done", { ok: true, text: "Tempo back to " + u.value + " BPM." });
+  } else if (u.kind === "vocal") {
+    const clip = vocalClip(u);
+    if (clip) {
+      setWarp(clip, u.before.markers);
+      clip.set("warping", u.before.warping);
+      try { clip.set("warp_mode", u.before.warp_mode); clip.set("end_marker", u.before.end_marker); clip.set("start_marker", u.before.start_marker); } catch (e) { }
+    }
+    send("undo_done", { ok: !!clip, text: clip ? "Put \"" + u.name + "\" back how it was." : "The vocal's clip isn't there any more." });
   } else if (u.kind === "groove") {
     const at = ids(song.get("tracks")).indexOf(u.track_id);
     if (at >= 0) song.call("delete_track", at);
@@ -949,4 +957,60 @@ function groove_ab(encoded) {
   new LiveAPI("id " + q.orig_id).set("mute", q.play === "before" ? 0 : 1);
   new LiveAPI("id " + q.track_id).set("mute", q.play === "before" ? 1 : 0);
   send("groove_ab_done", { ok: true, play: q.play });
+}
+
+// ---------- Vocal sync (Groove match, Oct 30) ----------
+
+// The vocal's Arrangement clip: on its track, starting at start_beat, playing this file
+function vocalClip(q) {
+  const t = new LiveAPI("id " + q.track_id);
+  if (!t.id || Number(t.id) === 0) return null;
+  const id = ids(t.get("arrangement_clips")).filter(function (cid) {
+    const c = new LiveAPI("id " + cid);
+    return Math.abs(one(c, "start_time") - q.start_beat) < 0.001 && String(one(c, "file_path")) === q.path;
+  })[0];
+  return id ? new LiveAPI("id " + id) : null;
+}
+
+function warpMarkers(clip) {
+  try {
+    const raw = clip.get("warp_markers");
+    const d = JSON.parse(Array.isArray(raw) ? raw.join(" ") : String(raw));
+    return (d.warp_markers || []).map(function (m) { return { beat_time: m.beat_time, sample_time: m.sample_time }; });
+  } catch (e) { return []; }
+}
+
+// Live takes the new marker as a dictionary; older versions want it spelled out
+function addWarp(clip, m) {
+  try { clip.call("add_warp_marker", { beat_time: m.beat_time, sample_time: m.sample_time }); return true; }
+  catch (e) { try { clip.call("add_warp_marker", "beat_time", m.beat_time, "sample_time", m.sample_time); return true; } catch (e2) { return false; } }
+}
+
+function setWarp(clip, markers) {
+  warpMarkers(clip).forEach(function (m) { try { clip.call("remove_warp_marker", m.beat_time); } catch (e) { } });
+  var ok = true;
+  markers.forEach(function (m) { if (!addWarp(clip, m)) ok = false; });
+  return ok;
+}
+
+// Put the vocal on the song's grid with Live's own warping: Complex Pro, Aria's two warp markers (beat 1 on a bar
+// line, the vocal's tempo), the clip from beat 0. Undo puts the old markers and settings back.
+// q = URI-encoded {track_id, start_beat, path, markers, start_marker, end_marker}
+function vocal_warp(encoded) {
+  const q = JSON.parse(decodeURIComponent(encoded));
+  const clip = vocalClip(q);
+  if (!clip) { send("vocal_done", { ok: false, text: "Aria can't find the vocal's clip any more. Pick it again." }); return; }
+  const before = { warping: one(clip, "warping"), warp_mode: one(clip, "warp_mode"), markers: warpMarkers(clip),
+                   start_marker: one(clip, "start_marker"), end_marker: one(clip, "end_marker") };
+  clip.set("warping", 1);
+  try { clip.set("warp_mode", 6); } catch (e) { }   // Complex Pro, for vocals
+  if (!setWarp(clip, q.markers)) {
+    setWarp(clip, before.markers);
+    clip.set("warping", before.warping);
+    send("vocal_done", { ok: false, text: "Live didn't take Aria's warp markers. Nothing was changed." });
+    return;
+  }
+  try { clip.set("end_marker", q.end_marker); clip.set("start_marker", q.start_marker); } catch (e) { }
+  undoStack.push({ kind: "vocal", track_id: q.track_id, start_beat: q.start_beat, path: q.path, before: before, name: String(one(clip, "name")) });
+  send("vocal_done", { ok: true, text: "Synced \"" + String(one(clip, "name")) + "\" to the song's grid." });
 }
