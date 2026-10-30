@@ -14,6 +14,7 @@ import { RefChart, RefLegend, THEIRS, YOURS } from "@/components/ref-chart";
 import { Plot, PlotGrid, dbTicksOf, plotX, tilt } from "@/components/plot";
 import { path } from "@/components/waves";
 import { ProblemThumb } from "@/components/problem-thumb";
+import { GrooveScreen } from "./Groove";
 import { KINDS, KindMark, findingIcon, rangeOf } from "@/components/problem-mark";
 import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
@@ -22,7 +23,7 @@ import { ANALYZER_HZ, addArrangementMarkers, barsLabel, checkMix, clearReference
          partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Part, type RefCompare, type Result, type SongParts } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
-type View = "home" | "mixcheck" | "arrangement" | "analyzer" | "reference";
+type View = "home" | "mixcheck" | "arrangement" | "analyzer" | "groove" | "reference";
 
 // Docked (a narrow panel beside Live) keeps the rail as icons and stacks the bento in one column.
 // Short as well as narrow means Ask Muse is popped out under it: show only what to fix.
@@ -68,8 +69,9 @@ export function AriaWindow() {
               <span className="flex items-center gap-2 text-[14px] text-ink-muted">
                 {view === "mixcheck" ? <MixIcon style={{ width: 16, height: 16 }} /> : view === "reference" ? <ReferenceIcon style={{ width: 16, height: 16 }} />
                   : view === "arrangement" ? <ArrangementIcon style={{ width: 16, height: 16 }} /> : view === "analyzer" ? <AnalyzerIcon style={{ width: 16, height: 16 }} />
+                  : view === "groove" ? <GrooveIcon style={{ width: 16, height: 16 }} />
                   : <HomeIcon style={{ width: 16, height: 16 }} />}
-                {view === "mixcheck" ? "Mix check" : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : view === "analyzer" ? "Live analyzer" : "Home"}</span>
+                {view === "mixcheck" ? "Mix check" : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : view === "analyzer" ? "Live analyzer" : view === "groove" ? "Groove match" : "Home"}</span>
               <div className="ml-auto flex items-center gap-2">
                 {!narrow && view === "mixcheck" && result && (
                   <div className="cp-seg" role="group" aria-label="View">
@@ -88,7 +90,7 @@ export function AriaWindow() {
               </div>
             </div>
             {view !== "home" && <h1 className="cp-title" style={{ fontSize: narrow ? 28 : 34, lineHeight: narrow ? "34px" : "40px" }}>
-              {view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : view === "analyzer" ? "Live analyzer" : "Home"}
+              {view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : view === "analyzer" ? "Live analyzer" : view === "groove" ? "Groove match" : "Home"}
               <span className="text-ink-faint">{view === "mixcheck" ? (result ? `${result.part ? ` ${result.part}` : ""}${result.recording.tempo ? ` ${Math.round(result.recording.tempo)} BPM` : ""}` : "")
                 : view === "reference" || view === "arrangement" || view === "analyzer" ? "" : session ? ` ${Math.round(session.tempo)} BPM` : ""}</span>
             </h1>}
@@ -112,6 +114,7 @@ export function AriaWindow() {
           {view === "home" ? <Home narrow={narrow} onOpen={openMixCheck} go={setView} />
             : view === "arrangement" ? <ArrangementScreen narrow={narrow} onReference={() => setView("reference")} />
             : view === "analyzer" ? <LiveAnalyzer narrow={narrow} />
+            : view === "groove" ? <GrooveScreen narrow={narrow} />
             : view === "reference" ? <ReferenceScreen narrow={narrow} onOpen={openMixCheck} />
             : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />
@@ -205,7 +208,7 @@ const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView
         {item("mixcheck", "Mix check", <MixIcon />, list.length ? <span className="ae-count">{list.length}</span> : null)}
         {item("arrangement", "Arrangement", <ArrangementIcon />)}
         {item("analyzer", "Live analyzer", <AnalyzerIcon />)}
-        {item(null, "Groove match", <GrooveIcon />)}
+        {item("groove", "Groove match", <GrooveIcon />)}
         {item("reference", "Reference", <ReferenceIcon />)}
       </nav>
       {!narrow && names.length > 0 && (

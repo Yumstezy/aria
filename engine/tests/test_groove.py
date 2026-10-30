@@ -35,6 +35,7 @@ def test_straight_grid_puts_every_hit_in_time(tmp_path):
     assert out["before"]["max_ms"] > 15
     assert out["after"]["max_ms"] <= 5 and out["in_time"]
     assert out["hits_moved"] == len(LATE)
+    assert len(out["after"]["hits"]) == len(out["before"]["hits"]) and all(abs(h["offset_ms"]) <= 5 for h in out["after"]["hits"])
     audio, rate = sf.read(out["out_path"])
     assert rate == RATE and len(audio) == int(BARS_SEC * RATE)
     assert sf.read(path)[0].shape == audio.shape    # the original stays as it was, next to the new file

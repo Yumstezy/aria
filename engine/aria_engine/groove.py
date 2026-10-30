@@ -148,7 +148,7 @@ def match(moving_path, anchor, tempo, strength=1.0, nudge_ms=0.0, beat1_sec=None
         after_targets.append((near, g + nudge))
     after = _offsets([a for a, _ in after_targets], [g for _, g in after_targets])
     before = _offsets(times, targets)
-    return {"before": before, "after": {k: after[k] for k in ("avg_ms", "max_ms")},
+    return {"before": before, "after": after,
             "in_time": after["max_ms"] is not None and after["max_ms"] <= IN_TIME_MS,
             "hits": len(times), "hits_moved": sum(1 for t, g in zip(times, targets) if g is not None and abs(g - t) * 1000 > 1.0),
             "out_path": str(out_path)}
