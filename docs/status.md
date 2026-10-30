@@ -2,6 +2,30 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
+## Pick up here (end of Oct 29)
+
+**Blocker: Aria's device on Main shows a blank "jweb" box in Live (since about 18:40, Oct 29).** Not solved yet. Next step: Ian restarts the Mac, checks System Settings, Privacy & Security, Files and Folders, Ableton Live, Desktop Folder is on, then drags `device/Aria.amxd` onto Main.
+
+What we know:
+- It isn't the UI swap. The page build that worked at 18:17 (from 738515e) fails the same way, and `device/` (Aria.amxd, bridge.js, live.js) is unchanged since it last worked (`git diff 738515e -- device/` is empty).
+- Live's web view works: a probe device with only a jweb and a `data:` page drew it.
+- Node for Max works: probe devices posted hello, including Aria's full patch running a hello script, and a copy of bridge.js in a plain patch.
+- Aria's bridge loads inside Live (seen with the Node inspector: `bridge.js` in the module cache, `loaded: true`), and `Max.post` from it reaches the Max log, and Live answered a `state` request without a "not ready" warning.
+- But Aria's jweb never shows any page, not the strip file and not a `data:` page sent from the bridge. Live's browser had no renderer process.
+- Not the cause: missing files, the watch flag (`Aria test.amxd` without `@watch` failed too), stale Node for Max sockets (cleared with Live closed), disk space (16 GB free).
+- Around the time it started, Claude's headless Chrome test browsers (42 processes) were left running and polling the engine; they were closed at 18:43. No link proven.
+
+If a restart doesn't fix it: compare a jweb that loads a `file://` page from `~/Desktop` (probe) against the `data:` probe, to test file access from Live's browser.
+
+Test files to delete once it works (not committed): `device/Aria test.amxd`, `device/Probe A.amxd`, `device/hello-test.js`, and `~/Desktop/n4m-test/`.
+
+**Then continue the polish (Ian, Oct 29: "lets move on to other features ui/ux and polishing everything else up"):**
+- The Ember look is in for Mix check, Simple (commit 89558f3, `DESIGN.md` "Ember direction"). Ian hasn't seen it in Live yet because of the blocker; he liked the mockup and said "the glow may be too much", so it has no glow.
+- Next screens in the Ember style: Home, Ask Muse, Detailed, the empty state before a first check, the compact view.
+- Small known fixes: don't put an Ear on a silent track (Ian's "vOCAL"); the bird on the Lamp device; say plainly when a check ran past the end of the song.
+- Then "Prove the fix" (re-check the same bars after Fix it, loudness-matched before and after), then the demo script.
+- Checkpoint (Step 7) is parked until the model: 1 of 3, see below.
+
 ## Where we are (Oct 29, evening)
 
 Feature freeze end of day Nov 2. Submit by noon PT Nov 4. "Built" means it passes its tests here; "Live" means Ian has checked it in Live.
@@ -21,6 +45,7 @@ Feature freeze end of day Nov 2. Submit by noon PT Nov 4. "Built" means it passe
 | Model | Good, mid and bad mixes in one genre; says what pulls a mix down | Raghav invited; the rated mixes are sorted in a shared Drive (Oct 28). Next: extract features, three tiers, first numbers by Oct 31 |
 
 What changed most recently:
+- **Ember look for Mix check (Oct 29, Ian's reference).** Neutral near-black, hairline cards, monospace details, no glows. To fix (with an icon per kind), Fix first (with the clashing parts' real curves), Listening to, then the chart beside a numbered list that opens to Muse's words. The side menu lists the tracks Aria heard with their problem counts; Groove match and Live analyzer are off it, Reference says soon. Frequencies are written one way everywhere (890 Hz to 1.1 kHz).
 - **Checkpoint run (Oct 29), 1 of 3.** Ian planted three problems in his own 165 BPM song, each in its own 16 bars, with a clean control (`test-pack/answer-key.json`; the audio stays local in `test-pack/mixes/`). The synth spike (+4.9 dB at 3.6 kHz in the mix) was found as harsh hits at 3.62 kHz. The bass (+3.3 dB at 180 Hz) and drums (+4 dB from 360 to 720 Hz) boosts were missed in every mode. Aria finds sharp problems and parts fighting at one level; it can't call a broad range "too much" without something to compare with. The fix is a comparison built from the good-rated mixes (the model track). Ian: come back to it once the model is done.
 - **The window vanished after a check that found a clash (fixed Oct 29).** The chart read a size every clash lacks, the page threw, and the see-through window drew nothing; reopening replayed the result. Both pages now sit in an error boundary that shows a card and logs `ui_error` to the Max log.
 - **The device on Main looks like a Live device (Oct 28, Ian picked "Lamp" of four mockups).** A status light with one word, Check and Ask side by side, Open window below, in Live's greys and amber. The page never scrolls, so it doesn't slide with the mouse. 150 x 169. Results live in the window.
