@@ -213,6 +213,26 @@ const SHOTS = [
   ["device.png", "The Aria device on the Main track"],
 ] as const;
 
+/** Each card of the app on its own, transparent around its corners, for the editor to animate one at a time */
+const PARTS = [
+  ["detailed-1-loudness--87lufs.png", "Loudness"],
+  ["detailed-2-true-peak-05dbtp.png", "True peak"],
+  ["detailed-3-balance-bass--116.png", "Balance"],
+  ["detailed-4-width-bass-0.png", "Width"],
+  ["detailed-5-each-part-against.png", "Each part against the mix"],
+  ["detailed-6-everything-muse-spark.png", "Everything Muse Spark said"],
+  ["mixcheck-1-to-fix-1.png", "How many to fix"],
+  ["mixcheck-2-fix-first-harsh.png", "Fix first, with Muse's EQ cut"],
+  ["mixcheck-3-split-into-3parts.png", "The parts Aria heard"],
+  ["mixcheck-4-where-the-problems.png", "Where the problems are"],
+  ["mixcheck-5-1-harsh-hits.png", "A problem, opened"],
+  ["reference-1-to-fix-2.png", "How many to fix, with a reference"],
+  ["reference-2-fix-first-mids.png", "Fix first: fuller than the reference"],
+  ["reference-3-split-into-2parts.png", "The parts Aria heard"],
+  ["reference-4-against-your-reference.png", "Against your reference"],
+  ["reference-5-1-mids-fuller.png", "A reference problem, opened"],
+] as const;
+
 export default function App() {
   return (
     <div className="min-h-screen">
@@ -412,11 +432,38 @@ export default function App() {
             <h3 className="text-[22px] font-medium tracking-[-0.02em]">Logo</h3>
             <span className="ml-auto"><Btn href="/aria-logos.zip" primary>{Icon.download(16)}Download all</Btn></span>
           </div>
-          <div className="mt-5 mb-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {([["aria-logo-white.png", "The bird and the name", "h-12"], ["aria-wordmark-white.png", "Just the name", "h-12"], ["aria-mark-white.png", "Just the bird", "h-20"], ["aria-app-icon-dark.png", "App icon", "h-24"]] as const).map(([f, label, h]) => (
-              <a key={f} href={`/brand/${f}`} download className="group">
-                <div className="grid aspect-[4/3] place-items-center rounded-[12px] border border-edge bg-card"><img src={`/brand/${f}`} alt={label} className={cn("w-auto transition-transform duration-500 group-hover:scale-[1.04]", h)} /></div>
-                <p className="mt-2 text-[13px] text-muted">{label}. White and black, transparent PNG.</p>
+          {/* Each version on dark (white) and on light (black), centered at one size, so they compare at a glance */}
+          <div className="mt-5 mb-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {([
+              ["aria-logo", "The bird and the name", "max-h-9"],
+              ["aria-logo-lowercase", "The bird and the name, lowercase", "max-h-9"],
+              ["aria-wordmark", "Just the name", "max-h-9"],
+              ["aria-wordmark-lowercase", "Just the name, lowercase", "max-h-9"],
+              ["aria-mark", "Just the bird", "max-h-14"],
+              ["aria-app-icon", "App icon", "max-h-20"],
+            ] as const).map(([f, label, h]) => {
+              const dark = f === "aria-app-icon" ? `${f}-dark.png` : `${f}-white.png`, light = f === "aria-app-icon" ? `${f}-light.png` : `${f}-black.png`;
+              return (
+                <div key={f}>
+                  <div className="grid h-40 grid-cols-2 overflow-hidden rounded-[14px] border border-edge">
+                    <a href={`/brand/${dark}`} download className="flex items-center justify-center bg-ground p-4"><img src={`/brand/${dark}`} alt={`${label}, white`} className={cn("h-auto max-w-full", h)} /></a>
+                    <a href={`/brand/${light}`} download className="flex items-center justify-center bg-[#f4f4f5] p-4"><img src={`/brand/${light}`} alt={`${label}, black`} className={cn("h-auto max-w-full", h)} /></a>
+                  </div>
+                  <p className="mt-2 text-[13px] text-muted">{label}. Tap either side to download it.</p>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="text-[22px] font-medium tracking-[-0.02em]">Cards, one at a time</h3>
+            <span className="ml-auto"><Btn href="/aria-components.zip">{Icon.download(16)}Download all</Btn></span>
+          </div>
+          <p className="mt-2 max-w-[640px] text-[14.5px] text-muted">Every card of the app as its own image, with a see-through background, so each one can slide or zoom in on its own.</p>
+          <div className="mt-5 mb-14 columns-1 gap-3 sm:columns-2 lg:columns-3">
+            {PARTS.map(([f, label]) => (
+              <a key={f} href={`/parts/${f}`} download className="group mb-3 block break-inside-avoid rounded-[14px] border border-hairline bg-[linear-gradient(135deg,#1c1c20,#0a0a0b)] p-3">
+                <img src={`/parts/${f}`} alt={label} loading="lazy" className="mx-auto block max-h-56 w-auto max-w-full transition-transform duration-500 group-hover:scale-[1.02]" />
+                <p className="mt-2 text-[13px] text-muted">{label}</p>
               </a>
             ))}
           </div>
