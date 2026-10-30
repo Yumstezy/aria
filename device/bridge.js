@@ -557,12 +557,15 @@ async function referenceSections() {
 Max.addHandler("arrangement_markers", () => serial(async () => {
   const parts = arrangement && arrangement.mine ? arrangement.mine.sections : [];
   let added = 0;
+  toLive("markers_begin");   // stop once, place them all, put the playhead back once (live.js)
+  await sleep(150);
   for (const p of parts) {
     try {
       const done = await askLive("marker", "marker_done", p.start_bar, p.name || `Part ${p.label}`);
       if (done.ok !== false) { added++; changeStack.push({ at: null, kind: "d", k: 0 }); }
     } catch (e) { /* the rest still go in */ }
   }
+  toLive("markers_end");
   sendUndoNext();
   toUI("notice", { text: added ? `Added ${added} marker${added === 1 ? "" : "s"} to Live. Undo takes them back one at a time.` : "Live didn't take the markers." });
 }));

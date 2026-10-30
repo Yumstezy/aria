@@ -255,11 +255,26 @@ function nameMarker(cue) {
 
 // Add a marker named <name> at <bar>, or rename the one already there.
 // set_or_delete_cue toggles, so calling it on an existing marker would delete it.
+// Several markers in a row (Arrangement's "Add markers to Live"): stop once, place them all, then put the playhead
+// back and carry on once, instead of jumping back and forth for each marker.
+let markerBatch = null;
+function markers_begin() {
+  if (!ensureSong()) return;
+  markerBatch = { from: one(song, "current_song_time"), wasPlaying: one(song, "is_playing") === 1 };
+  if (markerBatch.wasPlaying) song.call("stop_playing");
+}
+function markers_end() {
+  const b = markerBatch;
+  markerBatch = null;
+  if (b && b.from !== null) song.set("current_song_time", b.from);
+  if (b && b.wasPlaying) song.call("continue_playing");
+}
+
 function marker(bar) {
   const name = Array.prototype.slice.call(arguments, 1).join(" ") || "Aria";
   if (!ensureSong()) { send("marker_done", { ok: false, text: "Live isn't ready yet." }); return; }
   const beats = (bar - 1) * beatsPerBar();
-  pendingMarker = { bar: bar, beats: beats, name: name, isNew: false, from: one(song, "current_song_time"), restoring: !!markerRestoring,
+  pendingMarker = { bar: bar, beats: beats, name: name, isNew: false, from: markerBatch ? null : one(song, "current_song_time"), restoring: !!markerRestoring,
                     wasPlaying: false, before: ids(song.get("cue_points")) };
   markerRestoring = false;
 
@@ -288,6 +303,21 @@ function onTime(args) {
 }
 
 function press_cue() {
+  // set_or_delete_cue toggles: pressed where a marker already is, it deletes it. Live applies playhead moves a
+  // moment late, so with markers added back to back a press could land on the last one's bar and delete it (Ian,
+  // Oct 30: only the first 2 of 12 stayed). Press only when Live says the playhead is on the target, and rename a
+  // marker that's already there instead of pressing.
+  if (pendingMarker) {
+    const m = pendingMarker;
+    if (Math.abs(one(song, "current_song_time") - m.beats) >= 0.01) {
+      timeObserver = new LiveAPI(onTime, "live_set");
+      timeObserver.property = "current_song_time";
+      song.set("current_song_time", m.beats);
+      return;
+    }
+    const there = cueAt(m.beats);
+    if (there) { if (cueObserver) cueObserver.property = ""; m.isNew = false; nameMarker(there); return; }
+  }
   song.call("set_or_delete_cue");
   if (pendingRemoval) {
     const r = pendingRemoval;
