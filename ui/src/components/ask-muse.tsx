@@ -106,7 +106,8 @@ export function AskThread({ className }: { className?: string }) {
     if (!el) return;
     const grew = ask.log.length > seen.current || ask.pending;
     const near = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
-    if (seen.current < 0) el.scrollTo({ top: 1e6 });
+    // The history can arrive just after the pop-up opens: the first time there's something, jump to the newest
+    if (seen.current <= 0) requestAnimationFrame(() => el.scrollTo({ top: 1e6 }));
     else if (grew && near) el.scrollTo({ top: 1e6, behavior: "smooth" });
     seen.current = ask.log.length;
   }, [ask.log.length, ask.pending]);
@@ -242,8 +243,10 @@ export function AskMuse({ narrow }: { narrow?: boolean }) {
   if (!open) return null;
   return (
     <section className="cp-ask-pop" role="dialog" aria-label="Ask Muse"
-             style={narrow ? { position: "fixed", left: 12, right: 12, bottom: 12, width: "auto", maxHeight: "calc(100vh - 80px)" }
-                           : { maxHeight: "calc(100% - 44px)" }}>
+             // A pop-up, not a page (Ian, Oct 30: after Fix it "the Muse chat takes up the whole screen"): about half
+             // the window at most, older messages scroll, and the screen behind stays in sight
+             style={narrow ? { position: "fixed", left: 12, right: 12, bottom: 12, width: "auto", maxHeight: "min(52vh, 480px)" }
+                           : { maxHeight: "min(560px, calc(100% - 44px))" }}>
       <Head onClose={() => setAskOpen(false)} />
       <AskThread />
       <AskInput autoFocus />
