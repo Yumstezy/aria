@@ -57,6 +57,37 @@ function TimingChart({ r, tempo, narrow }: { r: GrooveResult; tempo: number | nu
   );
 }
 
+/** The answer in one picture (Ian, Oct 30: the dot chart was "so hard to comprehend"): how far off the worst hit
+    was before and is after, as two bars on one scale, with the 5 ms mark under which nobody hears it. */
+function OffBars({ r }: { r: GrooveResult }) {
+  const top = Math.max(10, r.before.max_ms ?? 0, r.after.max_ms ?? 0) * 1.1;
+  const pct = (ms: number | null) => `${Math.max(0, Math.min(100, ((ms ?? 0) / top) * 100))}%`;
+  const row = (label: string, ms: number | null, color: string) => (
+    <div className="grid items-center gap-3" style={{ gridTemplateColumns: "3.6rem minmax(0, 1fr) 4rem" }}>
+      <span className="text-[13px] text-ink-muted">{label}</span>
+      <span className="relative h-3 rounded-full" style={{ background: "var(--well)" }}>
+        <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: ms ? `max(6px, ${pct(ms)})` : "6px", background: color }} />
+      </span>
+      <span className="ae-mono text-right">{ms === null ? "?" : `${ms} ms`}</span>
+    </div>
+  );
+  return (
+    <div className="grid gap-1.5">
+      <div className="relative grid gap-2.5">
+        {row("Before", r.before.max_ms, THEIRS)}
+        {row("After", r.after.max_ms, YOURS)}
+        {/* the 5 ms line: under it, nobody hears a flam */}
+        <div className="pointer-events-none absolute inset-y-[-4px]" style={{ left: "calc(3.6rem + 12px)", right: "calc(4rem + 12px)" }} aria-hidden="true">
+          <span className="absolute inset-y-0 border-l border-dashed" style={{ left: pct(5), borderColor: "var(--good)" }} />
+        </div>
+      </div>
+      <span className="text-[11.5px]" style={{ paddingLeft: "calc(3.6rem + 12px)", color: "var(--good)" }}>
+        <span style={{ marginLeft: pct(5), display: "inline-block", transform: "translateX(-50%)" }}>5 ms: can't hear it</span>
+      </span>
+    </div>
+  );
+}
+
 export function GrooveScreen({ narrow }: { narrow: boolean }) {
   const g = useAriaSel((s) => s.groove), tempo = useAriaSel((s) => s.session?.tempo ?? null);
   const [follow, setFollow] = useState<"straight" | "loop">("straight");
@@ -112,29 +143,34 @@ export function GrooveScreen({ narrow }: { narrow: boolean }) {
       </section>
 
       {r ? (
-        <section className="cp-tile cp-card" style={{ gap: 12 }}>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            {r.in_time
-              ? <span className="inline-flex items-center gap-2 text-[22px] font-medium" style={{ color: "var(--good)" }}><CheckIcon style={{ width: 20, height: 20 }} />In time</span>
-              : <span className="text-[22px] font-medium">{r.after.max_ms === null ? "Not measured" : `${r.after.max_ms} ms off at worst`}</span>}
-            <span className="ae-mono">before {r.before.avg_ms} ms off on average, {r.before.max_ms} at worst · after {r.after.avg_ms}, {r.after.max_ms} · {r.hits_moved} of {r.hits} hits moved
-              {r.after.missing ? ` · ${r.after.missing} not heard again` : ""}</span>
-            <div className="ml-auto flex min-w-0 flex-wrap gap-x-3.5 gap-y-1 text-[12.5px] text-ink-muted">
-              <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: THEIRS }} />Before</span>
-              <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: YOURS }} />After</span>
-            </div>
-          </div>
-          <TimingChart r={r} tempo={tempo} narrow={narrow} />
+        <section className="cp-tile cp-card" style={{ gap: 14 }}>
+          {r.in_time
+            ? <span className="inline-flex items-center gap-2 text-[24px] font-medium" style={{ color: "var(--good)" }}><CheckIcon style={{ width: 22, height: 22 }} />In time</span>
+            : <span className="text-[24px] font-medium">{r.after.max_ms === null ? "Couldn't measure it again" : `Still ${r.after.max_ms} ms off`}</span>}
+          <OffBars r={r} />
+          <span className="cp-meta">
+            {r.hits_moved} of {r.hits} hits moved {r.follow === "Straight" ? "onto the grid" : `to follow ${r.follow}`}{r.after.missing ? `. ${r.after.missing} couldn't be heard again` : ""}.
+          </span>
           {g.placed && (
             <div className="flex flex-wrap items-center gap-2">
               <div className="cp-seg" role="group" aria-label="Listen to">
                 <button aria-pressed={g.placed.playing === "before"} onClick={() => grooveAB("before")}>Original</button>
                 <button aria-pressed={g.placed.playing === "after"} onClick={() => grooveAB("after")}>Matched</button>
               </div>
-              <span className="cp-meta">New track under the original. The original is kept, muted.</span>
               <button className="cp-btn cp-btn-sm ml-auto" onClick={undoLast}>Undo</button>
             </div>
           )}
+          <details className="group">
+            <summary className="cursor-pointer select-none text-[12.5px] text-ink-muted">Every hit</summary>
+            <div className="grid gap-2 pt-2.5">
+              <div className="flex flex-wrap gap-x-3.5 gap-y-1 text-[12px] text-ink-muted">
+                <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: THEIRS }} />Before</span>
+                <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: YOURS }} />After</span>
+                <span>one column per 16th, every bar on top of each other</span>
+              </div>
+              <TimingChart r={r} tempo={tempo} narrow={narrow} />
+            </div>
+          </details>
         </section>
       ) : !g.moving && (
         <section className={cn("cp-tile cp-card items-center")} style={{ gap: 10, minHeight: 120, placeItems: "center" }}>
