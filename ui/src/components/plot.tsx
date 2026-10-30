@@ -2,7 +2,7 @@
 // along the bottom and the dB down the right, both inside the plot, and nothing under it. Charts draw their
 // curves into an SVG of width PLOT_W; this adds the grid lines (in the SVG) and the numbers (HTML over it, so
 // they keep their size when the window is docked).
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 export const PLOT_W = 640, PLOT_LO = 30, PLOT_HI = 16000;
 const LABELS = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
@@ -34,17 +34,39 @@ export function PlotGrid({ height, dbTicks }: { height: number; dbTicks: { y: nu
   );
 }
 
+export interface Pin { n: number; lo: number; hi: number; title?: string }
+
 /** The chart: its SVG (children) in a dark rounded plot, with the Hz along the bottom and the dB down the right.
-    pins: numbered badges at the top of each problem's stretch. */
+    pins: each problem's number over its stretch, with a thin strip under the numbers showing the stretch; pointing at
+    a number shades its stretch. Numbers that would touch are pushed apart, so they stay readable when docked. */
 export function Plot({ height, dbTicks, pins = [], onPin, children }: {
-  height: number; dbTicks: { y: number; label: string }[]; pins?: { n: number; f: number; title?: string }[]; onPin?: (n: number) => void; children: ReactNode;
+  height: number; dbTicks: { y: number; label: string }[]; pins?: Pin[]; onPin?: (n: number) => void; children: ReactNode;
 }) {
-  const at = (f: number) => `${(plotX(Math.min(PLOT_HI, Math.max(PLOT_LO, f))) / PLOT_W) * 100}%`;
+  const box = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(640);
+  const [hot, setHot] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current!;
+    const ro = new ResizeObserver(() => setWidth(el.offsetWidth || 640));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const frac = (f: number) => plotX(Math.min(PLOT_HI, Math.max(PLOT_LO, f))) / PLOT_W;
+  const at = (f: number) => `${frac(f) * 100}%`;
+  // Number positions in px, left to right, at least 22 px apart and inside the plot
+  const placed = [...pins].map((p) => ({ ...p, x: frac(Math.sqrt(p.lo * p.hi)) * width })).sort((a, b) => a.x - b.x);
+  placed.forEach((p, i) => { p.x = Math.max(p.x, 14, i ? placed[i - 1].x + 22 : 0); });
+  for (let i = placed.length - 1; i >= 0; i--) placed[i].x = Math.min(placed[i].x, width - 14 - (placed.length - 1 - i) * 22);
+  const shade = pins.find((p) => p.n === hot);
   return (
-    <div className="relative overflow-hidden rounded-[12px]" style={{ background: "color-mix(in srgb, var(--ground) 55%, transparent)", border: "1px solid var(--hairline)" }}>
+    <div ref={box} className="relative overflow-hidden rounded-[12px]" style={{ background: "color-mix(in srgb, var(--ground) 55%, transparent)", border: "1px solid var(--hairline)" }}>
       {children}
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        <span className="absolute left-2 top-1.5 font-mono text-[10px] leading-3 text-ink-faint" title="Drawn tipped up 4.5 dB per octave, like Pro-Q. The numbers stay as measured.">+{TILT_DB_PER_OCT} dB/oct</span>
+        {shade && <div className="absolute inset-y-0" style={{ left: at(shade.lo), width: `${(frac(shade.hi) - frac(shade.lo)) * 100}%`, background: "color-mix(in srgb, var(--hot) 10%, transparent)" }} />}
+        {pins.map((p) => <div key={p.n} className="absolute h-[3px] rounded-full" style={{ top: 28, left: at(p.lo), width: `max(5px, ${(frac(p.hi) - frac(p.lo)) * 100}%)`, background: "var(--hot)", opacity: hot === null || hot === p.n ? 0.85 : 0.35 }} />)}
+        {/* the tilt, in the top corner when there's room and no problem number there */}
+        {width >= 420 && !placed.some((p) => p.x < 100) &&
+          <span className="absolute left-2 top-1.5 font-mono text-[10px] leading-3 text-ink-faint" title="Drawn tipped up 4.5 dB per octave, like Pro-Q. The numbers stay as measured.">+{TILT_DB_PER_OCT} dB/oct</span>}
         {LABELS.map((f) => (
           <span key={f} className="absolute bottom-1 -translate-x-1/2 font-mono text-[10px] leading-3 text-ink-faint" style={{ left: at(f) }}>{hzLabel(f)}</span>
         ))}
@@ -53,9 +75,10 @@ export function Plot({ height, dbTicks, pins = [], onPin, children }: {
                 style={{ top: `${(t.y / height) * 100}%`, background: "color-mix(in srgb, var(--ground) 75%, transparent)" }}>{t.label}</span>
         ))}
       </div>
-      {pins.map((p) => (
+      {placed.map((p) => (
         <button key={p.n} className="ae-pin absolute top-1.5 -translate-x-1/2" title={p.title} onClick={() => onPin?.(p.n)}
-                style={{ left: at(p.f), width: 18, height: 18, fontSize: 10 }}>{p.n}</button>
+                onPointerEnter={() => setHot(p.n)} onPointerLeave={() => setHot(null)}
+                style={{ left: p.x, width: 18, height: 18, fontSize: 10 }}>{p.n}</button>
       ))}
     </div>
   );

@@ -111,17 +111,11 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
     const ticks = dbTicksOf(FLOOR_DB, 12, Y);
     return (
       <div className="flex flex-col gap-2">
-        <Plot height={H} dbTicks={ticks} pins={zones.map((z, i) => ({ n: i + 1, f: Math.sqrt(z.lo * z.hi), title: `${describe(z.f).name}, ${z.where}` }))}
+        <Plot height={H} dbTicks={ticks} pins={zones.map((z, i) => ({ n: i + 1, lo: z.lo, hi: z.hi, title: `${describe(z.f).name}, ${z.where}` }))}
               onPin={(n) => onZone(zones[n - 1].f)}>
           <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="Each part's frequency curve"
                onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
             <PlotGrid height={H} dbTicks={ticks} />
-            {zones.map((z, i) => (
-              <g key={i} className="group cursor-pointer" onClick={() => onZone(z.f)}>
-                <rect x={X(z.lo)} y={0} width={Math.max(6, X(z.hi) - X(z.lo))} height={H} fill="var(--hot)" className="opacity-0 transition-opacity group-hover:opacity-[0.1]" />
-                <rect x={X(z.lo)} y={PAD_T - 8} width={Math.max(6, X(z.hi) - X(z.lo))} height={3} rx={1.5} fill="var(--hot)" opacity={0.85} />
-              </g>
-            ))}
             {waves.map((wv, i) => (
               <motion.g key={wv.n} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: "easeOut", delay: i * 0.06 }}>
                 <path d={`${wv.line}L${W},${H}L0,${H}Z`} fill={color(wv.n)} opacity={wv.quiet ? 0.02 : 0.06} />

@@ -10,7 +10,7 @@ import { path, smoothValues } from "@/components/waves";
 import { PLOT_HI, PLOT_LO, PLOT_W as W, Plot, PlotGrid, dbTicksOf, plotX as X, tilt } from "@/components/plot";
 
 export const YOURS = "var(--trk-0)", THEIRS = "var(--cool)";
-const PAD_T = 30, PAD_B = 20, STEP_DB = 6;
+const PAD_T = 38, PAD_B = 20, STEP_DB = 6;   // room at the top for the problem numbers and their strips
 
 export interface Zone { n: number; lo: number; hi: number; where?: string }
 
@@ -54,7 +54,7 @@ export function RefChart({ r, height = 240, zones = [], onZone }: {
 
   return (
     <>
-      <Plot height={H} dbTicks={shape.ticks} pins={zones.map((z) => ({ n: z.n, f: Math.sqrt(z.lo * z.hi), title: z.where }))} onPin={onZone}>
+      <Plot height={H} dbTicks={shape.ticks} pins={zones.map((z) => ({ n: z.n, lo: z.lo, hi: z.hi, title: z.where }))} onPin={onZone}>
         <svg ref={svg} viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`Your mix and ${r.name}, at the same loudness`}
              onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
           <defs>
@@ -62,17 +62,6 @@ export function RefChart({ r, height = 240, zones = [], onZone }: {
             <clipPath id={`${id}-ar`}><path d={shape.aboveRef} /></clipPath>
           </defs>
           <PlotGrid height={H} dbTicks={shape.ticks} />
-          {/* Each problem: a thin strip along the top under its number; its full shade only while pointed at
-              (Ian: the shading covered half the chart when a problem spans whole bands) */}
-          {zones.map((z) => {
-            const x = X(Math.max(PLOT_LO, z.lo)), w = Math.max(5, X(Math.min(PLOT_HI, z.hi)) - x);
-            return (
-              <g key={z.n} className="group cursor-pointer" onClick={() => onZone?.(z.n)}>
-                <rect x={x} y={0} width={w} height={H} fill="var(--hot)" className="opacity-0 transition-opacity group-hover:opacity-[0.1]" />
-                <rect x={x} y={PAD_T - 6} width={w} height={3} rx={1.5} fill="var(--hot)" opacity={0.85} />
-              </g>
-            );
-          })}
           {/* The gap: blue where the reference is fuller (above your line), gold where yours is */}
           <path d={shape.between} fill={THEIRS} opacity={0.3} clipPath={`url(#${id}-am)`} />
           <path d={shape.between} fill={YOURS} opacity={0.3} clipPath={`url(#${id}-ar)`} />
