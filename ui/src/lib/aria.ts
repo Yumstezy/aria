@@ -6,7 +6,7 @@ import { startRecording, stopRecording, transcribe } from "@/lib/voice";
 
 export const ENGINE = "http://127.0.0.1:8765";
 
-export type Kind = "resonance" | "buildup" | "harsh" | "masking" | "bass_click" | "clash";
+export type Kind = "resonance" | "buildup" | "harsh" | "masking" | "bass_click" | "clash" | "reference";
 export interface Finding {
   kind: Kind;
   hz?: number;
@@ -24,12 +24,22 @@ export interface Finding {
   starts?: number;
   clicky_share?: number;
   bursts_per_bar?: number;
+  shape?: "stretch" | "band";   // reference: a stretch that stands out, or a whole band off
+  band?: string;
+  stands_out_db?: number;
+}
+/** The comparison with the producer's reference song (build step 8). diff_db is the mix minus the reference. */
+export interface RefCompare {
+  name: string; path: string; error: string | null;
+  bands: { name: string; lo: number; hi: number; diff_db: number | null }[];
+  curve: { hz: number[]; diff_db: number[] } | null;
 }
 export interface EqFix { type: "eq_band"; freq_hz: number; gain_db: number; q: number }
 export interface Note { finding: number; kind: Kind; short: string | null; text: string; fix: EqFix | null }
 export interface Spectra { hz: number[]; mix: number[]; parts: Record<string, number[] | null> }
 export interface Result {
   recording: { path: string; start_beat: number | null; tempo: number | null; bars: number | null };
+  reference?: RefCompare | null;
   measured: {
     integrated_lufs: number | null; true_peak_dbtp: number | null;
     bands_db: Record<string, number | null>; width: Record<string, number | null>;
@@ -104,6 +114,7 @@ interface State {
 export type Theme = "sky" | "night";
 /** About the set, from Live: shown in headers and the Get started steps */
 export interface Session { tempo: number; signature: [number, number]; markers: { bar: number; name: string }[]; chain: { on_main: boolean; after: string[] }; ears?: string[]; keyTracks?: boolean;
+  reference?: { path: string; name: string } | null;
   layout?: { mode: "full" | "left" | "right"; side: "left" | "right" } }
 
 declare global {
@@ -267,7 +278,7 @@ export async function checkMix() {
   set({ progress: { step: "analyze", text: "Splitting your mix and asking Muse Spark" }, error: null });
   try {
     const res = await fetch(ENGINE + "/mix/analyze", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mix_path: path }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mix_path: path, ...(devReference ? { reference_path: devReference.path } : {}) }),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.detail || `The engine could not analyze that file (HTTP ${res.status}).`);
@@ -276,6 +287,40 @@ export async function checkMix() {
     set({ error: e instanceof TypeError ? "The engine is not running." : (e as Error).message, progress: null });
   }
 }
+
+// ---------- Reference song (build step 8) ----------
+
+/** A song dropped on the window: the page sends the file to the engine (Live's web view can't see its path),
+    the engine keeps it on this Mac, and the bridge remembers its path for every check after. */
+export async function setReferenceFile(file: File) {
+  notice(`Reading ${file.name}`);
+  try {
+    if (inMax) send("ensure_engine");
+    // An engine started before this code (or still starting) isn't ready for it yet: the bridge restarts it,
+    // so try again for a few seconds before saying it isn't running
+    let res: Response | null = null;
+    for (let i = 0; i < 12; i++) {
+      try { res = await fetch(`${ENGINE}/reference?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file }); }
+      catch { res = null; }
+      if (res && res.status !== 404 && res.status !== 405) break;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    if (!res) throw new TypeError("engine");
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || `The engine couldn't keep that song (HTTP ${res.status}).`);
+    if (!send("set_reference", { path: body.path, name: body.name })) devReference = { path: body.path, name: body.name };
+    set({ session: state.session ? { ...state.session, reference: { path: body.path, name: body.name } } : state.session });
+    notice(`${body.name} is your reference. Check mix compares with it.`);
+  } catch (e) {
+    notice(e instanceof TypeError ? "The engine is not running." : (e as Error).message);
+  }
+}
+export function clearReference() {
+  if (!send("clear_reference")) devReference = null;
+  set({ session: state.session ? { ...state.session, reference: null } : state.session });
+}
+let devReference: { path: string; name: string } | null = null;   // development in a browser only
+export const referenceOf = (s: State) => s.session?.reference ?? (inMax ? null : devReference);
 
 // ---------- Ask Muse ----------
 
@@ -455,6 +500,15 @@ export function describe(f: Finding): { name: string; where: string; size: strin
       name, where: hzRange(f.hz_range), size: `${f.gap_db!.toFixed(1)} dB`,
       about: `${soundName(f.masked!)} sits ${Math.abs(f.gap_db!).toFixed(1)} dB under ${soundName(f.by!)} in ${hzRange(f.hz_range)}, ${Math.round(f.share! * 100)}% of the time it plays.`,
     };
+  }
+  if (f.kind === "reference") {
+    const more = (f.diff_db ?? 0) > 0, where = f.shape === "band" ? f.band! : hzRange(f.hz_range);
+    // The range by its everyday name (problems.ts BANDS), so the card says "Mids fuller than your reference"
+    const band = f.band ?? [["Sub", 60], ["Bass", 150], ["Low mids", 400], ["Mids", 1000], ["Upper mids", 4000], ["Highs", 10000], ["Air", 1e9]]
+      .find(([, top]) => (f.hz ?? 0) < (top as number))![0];
+    return { name: `${band} ${more ? "fuller" : "thinner"} than your reference`,
+      where, size: `${more ? "+" : "−"}${Math.abs(f.diff_db!).toFixed(1)} dB`,
+      about: `${where} is ${Math.abs(f.diff_db!).toFixed(1)} dB ${more ? "louder" : "quieter"} than in your reference, at the same loudness.` };
   }
   if (f.kind === "bass_click") {
     return { name: "Bass click", where: "Note starts", size: `+${Math.round(f.size_db!)} dB`,

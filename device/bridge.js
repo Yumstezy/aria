@@ -423,10 +423,12 @@ async function checkMix() {
     earFiles = null;
     const keyTracks = Object.keys(tracks).length >= 2;
 
-    toUI("progress", { step: "analyze", text: keyTracks ? `Comparing ${Object.keys(tracks).length} tracks and asking Muse Spark` : "Splitting your mix and asking Muse Spark" });
+    toUI("progress", { step: "analyze", text: keyTracks ? `Comparing ${Object.keys(tracks).length} tracks and asking Muse Spark`
+      : referenceNow() ? `Comparing with ${referenceNow().name} and asking Muse Spark` : "Splitting your mix and asking Muse Spark" });
+    const ref = referenceNow();
     const res = await request("POST", "/mix/analyze",
       { mix_path: file, start_beat: live.song_beat, tempo: live.tempo, bars: BARS, beats_per_bar: live.beats_per_bar,
-        ...(keyTracks ? { tracks } : {}) }, ANALYZE_TIMEOUT_MS);
+        ...(keyTracks ? { tracks } : {}), ...(ref ? { reference_path: ref.path } : {}) }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
     }
@@ -467,7 +469,7 @@ async function pushSession() {
     const live = await askLive("state", "live_state");
     toUI("session", { tempo: live.tempo, signature: live.signature, markers: live.markers,
                       chain: { on_main: live.chain.on_main, after: live.chain.after }, ears: earsOn(live.tracks),
-                      keyTracks: !!loadWindowPrefs().keyTracks, layout: layoutNow() });
+                      keyTracks: !!loadWindowPrefs().keyTracks, layout: layoutNow(), reference: referenceNow() });
   } catch (e) { /* Live didn't answer; the window says what it doesn't know */ }
 }
 
@@ -476,6 +478,19 @@ Max.addHandler("set_theme", (s) => {
   savePrefs({ ...loadWindowPrefs(), theme });
   toUI("theme", { theme });
 });
+// The reference song (build step 8): the page drops it, the engine keeps the file, the page tells us its path.
+// Saved in window.json, so it stays picked across Live sessions. Only kept while the file is still there.
+function referenceNow() {
+  const r = loadWindowPrefs().reference;
+  return r && r.path && fs.existsSync(r.path) ? { path: r.path, name: r.name } : null;
+}
+Max.addHandler("set_reference", (s) => {
+  const { path: p, name } = decode(s);
+  savePrefs({ ...loadWindowPrefs(), reference: p ? { path: p, name: name || path.basename(p) } : null });
+  pushSession();
+});
+Max.addHandler("clear_reference", () => { savePrefs({ ...loadWindowPrefs(), reference: null }); pushSession(); });
+
 Max.addHandler("check_mix", () => serial(checkMix));
 // The mic: the page sends the words to the engine itself, so make sure it's running
 Max.addHandler("ensure_engine", async () => { try { await ensureEngine(); } catch (e) { setEngine("error", e.message); } });

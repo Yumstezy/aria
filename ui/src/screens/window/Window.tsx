@@ -13,11 +13,11 @@ import { ProblemThumb } from "@/components/problem-thumb";
 import { AnalyzerIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
-import { barsLabel, checkMix, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode, stopListening,
-         partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Result } from "@/lib/aria";
+import { barsLabel, checkMix, clearReference, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
+         partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type RefCompare, type Result } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
-type View = "home" | "mixcheck";
+type View = "home" | "mixcheck" | "reference";
 
 // Docked (a narrow panel beside Live) keeps the rail as icons and stacks the bento in one column.
 // Short as well as narrow means Ask Muse is popped out under it: show only what to fix.
@@ -40,6 +40,7 @@ export function AriaWindow() {
   const resultPath = result?.recording.path;
   useEffect(() => { if (resultPath) { setView("mixcheck"); setOpen(0); } }, [resultPath]);
   const openMixCheck = useCallback(() => setView("mixcheck"), []);
+  const dropping = useSongDrop();
 
   if (width < TAB_PX) return <MinTab />;
   if (compact) return <Compact />;
@@ -60,7 +61,9 @@ export function AriaWindow() {
         <main className="cp-main overflow-y-auto" style={narrow ? { padding: 14 } : undefined}>
           <header className="grid gap-2">
             <div className="flex items-center gap-2.5" style={{ minHeight: 32 }}>
-              <span className="flex items-center gap-2 text-[14px] text-ink-muted">{view === "mixcheck" ? <MixIcon style={{ width: 16, height: 16 }} /> : <HomeIcon style={{ width: 16, height: 16 }} />}{view === "mixcheck" ? "Mix check" : "Home"}</span>
+              <span className="flex items-center gap-2 text-[14px] text-ink-muted">
+                {view === "mixcheck" ? <MixIcon style={{ width: 16, height: 16 }} /> : view === "reference" ? <ReferenceIcon style={{ width: 16, height: 16 }} /> : <HomeIcon style={{ width: 16, height: 16 }} />}
+                {view === "mixcheck" ? "Mix check" : view === "reference" ? "Reference" : "Home"}</span>
               <div className="ml-auto flex items-center gap-2">
                 {!narrow && view === "mixcheck" && result && (
                   <div className="cp-seg" role="group" aria-label="View">
@@ -79,8 +82,8 @@ export function AriaWindow() {
               </div>
             </div>
             <h1 className="cp-title" style={{ fontSize: narrow ? 28 : 34, lineHeight: narrow ? "34px" : "40px" }}>
-              {view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : "Home"}
-              <span className="text-ink-faint">{view === "mixcheck" ? (result?.recording.tempo ? ` ${Math.round(result.recording.tempo)} BPM` : "") : session ? ` ${Math.round(session.tempo)} BPM` : ""}</span>
+              {view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : view === "reference" ? "Reference" : "Home"}
+              <span className="text-ink-faint">{view === "mixcheck" ? (result?.recording.tempo ? ` ${Math.round(result.recording.tempo)} BPM` : "") : view === "reference" ? "" : session ? ` ${Math.round(session.tempo)} BPM` : ""}</span>
             </h1>
             {narrow && view === "mixcheck" && result && (
               <div className="cp-seg justify-self-start" role="group" aria-label="View">
@@ -98,16 +101,49 @@ export function AriaWindow() {
             </div>
           )}
 
-          <KeyTracks />
+          {view !== "reference" && <KeyTracks />}
           {view === "home" ? <Home narrow={narrow} onOpen={openMixCheck} />
+            : view === "reference" ? <ReferenceScreen narrow={narrow} onOpen={openMixCheck} />
             : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />
             : <Simple r={result} open={open} setOpen={setOpen} narrow={narrow} />}
         </main>
         <AskMuse narrow={narrow} />
+        {dropping && (
+          <div className="pointer-events-none absolute inset-0 z-[990] grid place-items-center rounded-[18px]" style={{ background: "color-mix(in srgb, var(--ground) 80%, transparent)" }}>
+            <div className="grid place-items-center gap-3 rounded-2xl border-2 border-dashed px-10 py-8 text-center" style={{ borderColor: "var(--ink-muted)" }}>
+              <ReferenceIcon style={{ width: 30, height: 30 }} />
+              <b className="text-[17px] font-medium">Drop to compare with this song</b>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+const SONG_FILE = /\.(wav|aiff?|flac|mp3|ogg)$/i;
+/** Files dragged over the window: true while one is over it. A song dropped anywhere becomes the reference. */
+function useSongDrop() {
+  const [over, setOver] = useState(false);
+  useEffect(() => {
+    let depth = 0;
+    const files = (e: DragEvent) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes("Files");
+    const enter = (e: DragEvent) => { if (files(e)) { e.preventDefault(); depth++; setOver(true); } };
+    const overIt = (e: DragEvent) => { if (files(e)) { e.preventDefault(); e.dataTransfer!.dropEffect = "copy"; } };
+    const leave = (e: DragEvent) => { if (files(e) && --depth <= 0) { depth = 0; setOver(false); } };
+    const drop = (e: DragEvent) => {
+      if (!files(e)) return;
+      e.preventDefault(); depth = 0; setOver(false);
+      const song = Array.from(e.dataTransfer!.files).find((f) => SONG_FILE.test(f.name));
+      if (song) setReferenceFile(song); else notice("Drop a wav, aiff, flac, mp3 or ogg file.");
+    };
+    window.addEventListener("dragenter", enter); window.addEventListener("dragover", overIt);
+    window.addEventListener("dragleave", leave); window.addEventListener("drop", drop);
+    return () => { window.removeEventListener("dragenter", enter); window.removeEventListener("dragover", overIt);
+                   window.removeEventListener("dragleave", leave); window.removeEventListener("drop", drop); };
+  }, []);
+  return over;
 }
 
 function IconButton({ label, onClick, children, pressed }: { label: string; onClick: () => void; children: ReactNode; pressed?: boolean }) {
@@ -192,7 +228,7 @@ const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView
         {item("mixcheck", "Mix check", <MixIcon />, list.length ? <span className="ae-count">{list.length}</span> : null)}
         {item(null, "Live analyzer", <AnalyzerIcon />)}
         {item(null, "Groove match", <GrooveIcon />)}
-        {item(null, "Reference", <ReferenceIcon />)}
+        {item("reference", "Reference", <ReferenceIcon />)}
       </nav>
       {!narrow && names.length > 0 && (
         <>
@@ -268,6 +304,87 @@ const Home = memo(function Home({ narrow, onOpen }: { narrow: boolean; onOpen: (
   );
 });
 
+/** Each band against the reference: a bar up where the mix is louder, down where it's quieter, at the same
+    loudness. Orange and blue once a band is 2 dB off; the exact number is under each bar. */
+function RefBands({ r, height = 76 }: { r: RefCompare; height?: number }) {
+  const top = Math.max(4, ...r.bands.map((b) => Math.abs(b.diff_db ?? 0)));
+  return (
+    <div className="grid" style={{ gridTemplateColumns: `repeat(${r.bands.length}, minmax(0, 1fr))`, gap: 6 }}>
+      {r.bands.map((b) => {
+        const d = b.diff_db, off = d !== null && Math.abs(d) >= 2;
+        const color = d === null ? "transparent" : off ? (d > 0 ? "var(--hot)" : "var(--cool)") : "var(--ink-faint)";
+        const h = d === null ? 0 : (Math.abs(d) / top) * (height / 2 - 2);
+        return (
+          <div key={b.name} className="flex min-w-0 flex-col items-center gap-1.5" title={`${b.name}, ${hz(b.lo)} to ${hz(b.hi)}`}>
+            <div className="relative w-full" style={{ height }}>
+              <span className="absolute inset-x-0 top-1/2 h-px bg-hairline" />
+              <span className="absolute left-1/2 w-2.5 -translate-x-1/2 rounded-full" style={{ background: color, height: Math.max(2, h), ...(d !== null && d < 0 ? { top: "50%" } : { bottom: "50%" }) }} />
+            </div>
+            <span className="truncate text-[10.5px] text-ink-faint">{b.name}</span>
+            <span className="ae-mono text-[11px]" style={{ color: off ? color : undefined }}>{d === null ? "none" : `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d).toFixed(1)}`}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Reference (build step 8, Ian: compare first, dropped on the window). Before one is picked: a drop zone and
+    a button. After: the song, Change and Remove, and how the last check compares, band by band. */
+const ReferenceScreen = memo(function ReferenceScreen({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
+  const ref = useAriaSel(referenceOf), result = useAriaSel((s) => s.result), progress = useAriaSel((s) => !!s.progress);
+  const picker = useRef<HTMLInputElement>(null);
+  const compared = result?.reference && ref && result.reference.path === ref.path ? result.reference : null;
+  const choose = (
+    <input ref={picker} type="file" accept=".wav,.aif,.aiff,.flac,.mp3,.ogg,audio/*" className="hidden"
+           onChange={(e) => { const f = e.target.files?.[0]; if (f) setReferenceFile(f); e.target.value = ""; }} />
+  );
+  if (!ref) {
+    return (
+      <div className="cp-bento">
+        <section className={cn("cp-tile cp-card", span(narrow, 12))}>
+          {choose}
+          <button className="grid w-full place-items-center gap-3 rounded-[14px] border-2 border-dashed py-14 text-center"
+                  style={{ borderColor: "var(--track)", background: "transparent", color: "var(--ink)", cursor: "pointer" }} onClick={() => picker.current?.click()}>
+            <span className="ae-kind is-idle" style={{ width: 44, height: 44, borderRadius: 13 }}><ReferenceIcon style={{ width: 22, height: 22 }} /></span>
+            <b className="text-[17px] font-medium">Drop a song you want yours to sound like</b>
+            <span className="cp-btn cp-btn-primary cp-btn-sm">Choose a song</span>
+          </button>
+        </section>
+      </div>
+    );
+  }
+  return (
+    <div className="cp-bento">
+      <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 14 }}>
+        {choose}
+        <span className="ae-kind" style={{ width: 40, height: 40, borderRadius: 12, color: "var(--ink)" }}><ReferenceIcon style={{ width: 20, height: 20 }} /></span>
+        <div className="grid min-w-0 flex-1 gap-0.5">
+          <span className="cp-cap">Your reference</span>
+          <span className="truncate text-[17px] font-medium" title={ref.path}>{ref.name}</span>
+        </div>
+        <button className="cp-btn cp-btn-sm" onClick={() => picker.current?.click()}>Change</button>
+        <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={clearReference}>Remove</button>
+      </section>
+      <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 12 }}>
+        <div className="cp-spread">
+          <span className="cp-cap" title="Both at the same loudness. Up is louder than the reference, down is quieter.">{compared ? `${result ? barsLabel(result) : "Your mix"} against ${ref.name}` : "Against your reference"}</span>
+          {compared && <span className="font-mono text-[11px] text-ink-faint">same loudness</span>}
+        </div>
+        {compared ? (compared.error ? <p className="cp-meta">{compared.error}</p> : <RefBands r={compared} height={110} />) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="cp-meta">{result ? "Your last check was before this song was picked." : "Not checked yet."}</span>
+            <button className="cp-btn cp-btn-primary cp-btn-sm" disabled={progress} onClick={checkMix}>{progress ? "Checking" : "Check mix"}</button>
+          </div>
+        )}
+        {compared && !compared.error && result && problemsOf(result).some((p) => p.findings[0].kind === "reference") && (
+          <div><button className="cp-btn cp-btn-light cp-btn-sm" onClick={onOpen}>See what to fix</button></div>
+        )}
+      </section>
+    </div>
+  );
+});
+
 /** Where in the mix each problem is, low to high. Before a check: the same bands, greyed out. */
 function WhereItHappens({ r, narrow, onPick }: { r: Result | null; narrow: boolean; onPick?: (p: Problem) => void }) {
   const list = r ? problemsOf(r) : [];
@@ -322,7 +439,8 @@ const KINDS: { kind: Kind; name: string; icon: ReactNode }[] = [
   { kind: "clash", name: "Clashing tracks", icon: <ClashIcon /> },
 ];
 // Mud is measured as synths buried in the low mids, so it gets the mud icon, not the buried one
-const iconFor = (p: Problem) => KINDS.find((x) => x.kind === (p.name === "Mud" ? "buildup" : p.findings[0].kind))!.icon;
+const iconFor = (p: Problem) => p.findings[0].kind === "reference" ? <ReferenceIcon />
+  : KINDS.find((x) => x.kind === (p.name === "Mud" ? "buildup" : p.findings[0].kind))!.icon;
 
 /** Before the first check: the Simple view's layout greyed out. Its shapes say what will appear; no sentences. */
 const EmptyCheck = memo(function EmptyCheck({ narrow }: { narrow: boolean }) {
@@ -431,6 +549,18 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
           </Rise>
         )}
       </div>
+
+      {r.reference && !r.reference.error && (
+        <Rise i={3}>
+          <section className="cp-tile cp-card" style={{ gap: 10 }}>
+            <div className="cp-spread">
+              <span className="text-[14px] font-medium text-ink" title="Both at the same loudness. Up is louder than your reference, down is quieter.">Against {r.reference.name}</span>
+              <span className="font-mono text-[11px] text-ink-faint">same loudness</span>
+            </div>
+            <RefBands r={r.reference} height={narrow ? 56 : 64} />
+          </section>
+        </Rise>
+      )}
 
       <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 1fr)" : "minmax(0, 1.55fr) minmax(0, 1fr)", alignItems: "start" }}>
         <Rise i={3}>

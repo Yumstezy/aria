@@ -49,7 +49,8 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
   const zones = findings.map((f) => {
     const point = f.kind === "resonance" || f.kind === "harsh";
     const lo = point ? f.hz! * 0.92 : f.hz_range[0], hi = point ? f.hz! * 1.08 : f.hz_range[1];
-    const amount = f.kind === "masking" ? `${f.gap_db!.toFixed(0)} dB` : f.kind === "bass_click" ? "clicks" : f.kind === "clash" ? "" : `+${f.size_db!.toFixed(0)} dB`;
+    const amount = f.kind === "masking" ? `${f.gap_db!.toFixed(0)} dB` : f.kind === "bass_click" ? "clicks" : f.kind === "clash" ? ""
+      : f.kind === "reference" ? `${f.diff_db! > 0 ? "+" : "−"}${Math.abs(f.diff_db!).toFixed(0)} dB vs ref` : `+${f.size_db!.toFixed(0)} dB`;
     const zlo = Math.max(LO, lo), zhi = Math.min(HI, hi);
     return { f, lo: zlo, hi: zhi, pin: (X(zlo) + X(zhi)) / 2, where: point ? hz(f.hz!) : hzRange(f.hz_range), amount };
   });
