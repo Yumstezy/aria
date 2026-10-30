@@ -12,7 +12,7 @@ import pyloudnorm as pyln
 from pydantic import BaseModel
 import soundfile as sf
 
-from aria_engine import __version__, analysis, ask, clarity, muse, reference, sections, split, stems, voice
+from aria_engine import __version__, analysis, ask, clarity, groove, muse, reference, sections, split, stems, voice
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 # When the code this engine runs was last changed. The bridge compares it with the files on disk
@@ -329,6 +329,36 @@ def before_after(req: BeforeAfterRequest):
     lufs = lambda x: round(float(meter.integrated_loudness(x)), 1)
     return {"curve": out["curve"], "bands": out["bands"], "problems": problems, "seconds": round(n / br, 1),
             "lufs": {"before": lufs(bx), "after": lufs(ax)}}
+
+
+class GrooveRequest(BaseModel):
+    moving_path: str
+    anchor: dict
+    tempo: float
+    strength: float = 1.0
+    nudge_ms: float = 0.0
+    beat1_sec: dict = {}
+    out_dir: str | None = None
+
+
+GROOVE_DIR = Path.home() / "Library" / "Application Support" / "Aria" / "groove"
+
+
+@app.post("/groove/match")
+def groove_match(req: GrooveRequest):
+    """Groove match (build step 9): the moving loop's hits onto a straight grid or another loop, written as a new file
+    (the original is untouched) and measured again. in_time only when every hit is within 5 ms."""
+    paths = [req.moving_path] + ([req.anchor["path"]] if req.anchor.get("kind") == "loop" and req.anchor.get("path") else [])
+    for p in paths:
+        if not Path(p).expanduser().is_file():
+            raise HTTPException(400, f"No file at {p}.")
+    if not (40 <= req.tempo <= 300) or not (0 <= req.strength <= 1) or abs(req.nudge_ms) > 20:
+        raise HTTPException(400, "Tempo 40 to 300, strength 0 to 1, nudge -20 to 20 ms.")
+    try:
+        return groove.match(Path(req.moving_path).expanduser(), req.anchor, req.tempo, req.strength, req.nudge_ms,
+                            req.beat1_sec, req.out_dir or GROOVE_DIR)
+    except (ValueError, RuntimeError, sf.LibsndfileError) as e:
+        raise HTTPException(400, str(e))
 
 
 class AskRequest(BaseModel):
