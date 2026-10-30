@@ -1,4 +1,4 @@
-"""Muse Spark as a second rater: show it real rated examples, ask it to rate held-out mixes.
+"""Muse Spark as a second rater: show it real rated examples, ask it to rate held-out mixes as good, mid or bad.
 
 Same data and same song-grouped split as ml/train.py, so the two numbers compare fairly.
 Only real rated mixes go in the prompt (docs/ml-plan.md: no made-up examples).
@@ -20,18 +20,20 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from sklearn.metrics import balanced_accuracy_score, confusion_matrix
 
-from common import FEATURES, LABELS, check_enough, load, song_folds
+from common import FEATURES, TIERS, check_enough, load, song_folds, tier_index
 
 ROOT = Path(__file__).resolve().parent
-EXAMPLES_PER_LABEL = 15   # about 30 rated examples per prompt
+EXAMPLES_PER_LABEL = 10   # 10 per tier, about 30 rated examples per prompt
 WORKERS = 4
 
 PROMPT = """You rate EDM mixes from measurements only. You never hear the audio.
 Each mix is the loudest 60 s of a song, measured as:
 integrated_lufs, true_peak_dbtp, crest_db (peak to RMS), short_term_spread_lu (how much loudness moves),
-bass_db, mids_db, treble_db (band levels), tilt_db (treble minus bass), width_bass, width_mids, width_treble (0 mono, 1 all side).
-Below are real mixes that producers rated "good" or "needs-work". Learn what separates them, then rate the new mix.
-Answer with JSON only: {"label": "good" | "needs-work", "confidence": 0 to 1, "reason": "one short sentence naming the measurements that decided it"}"""
+bass_rel_db, mids_rel_db, treble_rel_db (each band's level relative to the whole mix), tilt_db (treble minus bass),
+width_bass, width_mids, width_treble (0 mono, 1 all side).
+Below are real mixes that were rated "good", "mid" or "bad". The tiers are ordered: bad < mid < good.
+Learn what separates them, then rate the new mix.
+Answer with JSON only: {"label": "good" | "mid" | "bad", "confidence": 0 to 1, "reason": "one short sentence naming the measurements that decided it"}"""
 
 
 def describe(r):
@@ -41,7 +43,7 @@ def describe(r):
 def examples(train_rows, seed):
     rng = random.Random(seed)
     picked = []
-    for lab in LABELS:
+    for lab in TIERS:
         pool = [r for r in train_rows if r["label"] == lab]
         picked += rng.sample(pool, min(EXAMPLES_PER_LABEL, len(pool)))
     rng.shuffle(picked)
@@ -55,7 +57,7 @@ def rate(client, model, shots, row):
                   {"role": "user", "content": json.dumps(describe(row))}])
     try:
         out = json.loads(res.choices[0].message.content or "")
-        return out if out.get("label") in LABELS else None
+        return out if out.get("label") in TIERS else None
     except json.JSONDecodeError:
         return None
 
@@ -80,16 +82,17 @@ def main(csv_path):
         print(f"fold {i + 1}/{len(folds)} done")
 
     answered = [j for j, a in enumerate(answers) if a]
-    y = np.array([1 if rows[j]["label"] == "good" else 0 for j in answered])
-    p = np.array([1 if answers[j]["label"] == "good" else 0 for j in answered])
+    y = np.array([tier_index(rows[j]["label"]) for j in answered])
+    p = np.array([tier_index(answers[j]["label"]) for j in answered])
     acc = balanced_accuracy_score(y, p) if len(set(y)) > 1 else float("nan")
     lines = [
         f"# Muse Spark rater report ({date.today()})", "",
-        f"- Model: {model}, about {2 * EXAMPLES_PER_LABEL} real rated examples per prompt, none from the song being rated.",
+        f"- Model: {model}, {EXAMPLES_PER_LABEL} real rated examples per tier in each prompt, none from the song being rated.",
         f"- Data: {len(rows)} mixes, {dropped} dropped for unmeasured features. Same song-grouped {len(folds)}-fold split as ml/train.py.",
         f"- Muse gave a valid answer for {len(answered)} of {len(rows)} mixes. The rest count as no answer, not as a guess.", "",
-        f"**Balanced accuracy on held-out songs: {acc:.2f}** (0.5 is a coin toss). Compare with ml/results/train-report.md.", "",
-        f"Confusion [good, needs-work], rows = truth: {confusion_matrix(y, p, labels=[1, 0]).tolist()}", "",
+        f"**Balanced accuracy on held-out songs: {acc:.2f}** (with three tiers, 0.33 is a coin toss). Compare with ml/results/train-report.md.", "",
+        f"- Tiers off on average: {np.mean(np.abs(p - y)):.2f}. Two off (good called bad, or bad called good): {int(np.sum(np.abs(p - y) == 2))}.",
+        f"- Confusion, rows = truth [good, mid, bad]: {confusion_matrix(y, p, labels=[2, 1, 0]).tolist()}", "",
         "Sample reasons:", "",
     ]
     lines += [f"- {rows[j]['file']} ({rows[j]['label']}): {answers[j]['label']}, {answers[j].get('reason', '')}" for j in answered[:8]]
