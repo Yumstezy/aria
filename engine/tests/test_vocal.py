@@ -71,3 +71,32 @@ def test_endpoint(tmp_path):
     body = client.post("/groove/vocal", json={"path": path, "song_tempo": 150}).json()
     assert body["tempo"] == 128 and body["warp"]["markers"]
     assert client.post("/groove/vocal", json={"path": str(tmp_path / "none.wav"), "song_tempo": 150}).status_code == 400
+
+
+def test_key_from_the_notes(tmp_path):
+    """A phrase sung on A minor's notes (A C E, then D F, G E) reads as A minor."""
+    rate = RATE
+    t = np.arange(int(0.4 * rate)) / rate
+    hz = {"A": 220.0, "C": 261.63, "D": 293.66, "E": 329.63, "F": 349.23, "G": 392.0, "B": 246.94}
+    notes = "A C E A E C A D F A G E A C E A".split()
+    tone = lambda f: sum(np.sin(2 * np.pi * f * h * t) / h for h in (1, 2, 3)) * np.minimum(1, t / 0.02) * np.exp(-t / 0.5) * 0.2
+    x = np.concatenate([tone(hz[n]) for n in notes])
+    path = write(tmp_path / "Hook.wav", x)
+    assert vocal.key_of(*__import__("soundfile").read(path)) ["key"] == "A minor"
+
+
+def test_beat_one_lands_on_the_kick(tmp_path):
+    """The kick in the song sits 12 ms after Live's grid (its sample starts late): beat 1 goes on the kick, not the grid."""
+    from tones import hits
+    tempo, late = 128.0, 0.012
+    beat = 60 / tempo
+    kick = write(tmp_path / "Kick.wav", hits([k * beat + late for k in range(16)], 16 * beat + 0.2))
+    times, accents = phrase(128, 0.47)
+    path = write(tmp_path / "Vox 128bpm.wav", syllables(times, 18, accents=accents))
+    # Kick clip at bar 9 (beat 32), the vocal clip at beat 31.5 (half a beat before bar 9)
+    out = vocal.analyze(path, 128, kick={"path": kick, "start_beat": 32.0, "start_marker": 0.0}, place={"start_beat": 31.5, "beats_per_bar": 4})
+    m = out["warp"]["markers"][0]
+    song_beat = 31.5 + m["beat_time"]              # where the vocal's beat 1 plays in the song
+    assert out["sync"]["kick_found"] and abs(out["sync"]["kick_offset_ms"] - 12) < 2
+    assert abs((song_beat - round(song_beat)) * beat * 1000 - 12) < 2    # on the kick, 12 ms after the bar line
+    assert round(song_beat) % 4 == 0                                      # at a bar line

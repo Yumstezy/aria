@@ -366,6 +366,8 @@ class VocalRequest(BaseModel):
     song_tempo: float
     tempo: float | None = None          # the producer's own reading, when Aria's was wrong
     beat_shift: int = 0                 # move beat 1 by whole beats, when Aria's was wrong
+    kick: dict | None = None            # the kick's clip {path, start_beat, start_marker}: beat 1 goes on the kick
+    place: dict | None = None           # where the vocal's clip sits {start_beat, beats_per_bar}
 
 
 @app.post("/groove/vocal")
@@ -377,7 +379,9 @@ def groove_vocal(req: VocalRequest):
     if not (40 <= req.song_tempo <= 300) or (req.tempo is not None and not (40 <= req.tempo <= 300)) or abs(req.beat_shift) > 16:
         raise HTTPException(400, "Tempo 40 to 300, beat shift -16 to 16.")
     try:
-        return vocal.analyze(p, req.song_tempo, tempo=req.tempo, beat_shift=req.beat_shift)
+        if req.kick and not Path(str(req.kick.get("path", ""))).expanduser().is_file():
+            raise HTTPException(400, f"No file at {req.kick.get('path')}.")
+        return vocal.analyze(p, req.song_tempo, tempo=req.tempo, beat_shift=req.beat_shift, kick=req.kick, place=req.place)
     except (ValueError, RuntimeError, sf.LibsndfileError) as e:
         raise HTTPException(400, str(e))
 

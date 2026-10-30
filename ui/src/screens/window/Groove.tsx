@@ -88,63 +88,79 @@ function OffBars({ r }: { r: GrooveResult }) {
   );
 }
 
-/** The start of the vocal as a level picture with the beats on it (Ian, Oct 30): beat 1 in gold, bar lines stronger,
-    so the producer sees whether Aria's beat 1 is where the phrase starts and moves it by a beat if not. */
+/** The start of the vocal as a level picture (Ian, Oct 30): beat 1 in gold, and the kick's hits as ticks along the
+    bottom where they'll land once synced (or the bar's beats, with no kick), so the producer sees whether the words sit
+    on the kicks and moves beat 1 by a beat if not. */
 function VocalPicture({ v }: { v: VocalSync }) {
   const W = 640, H = 120, p = v.picture, n = p.levels_db.length;
-  const len = n * p.step_sec, X = (t: number) => ((t - p.start_sec) / len) * W, Y = (db: number) => H - 6 - ((Math.max(-48, db) + 48) / 48) * (H - 14);
+  const len = n * p.step_sec, X = (t: number) => ((t - p.start_sec) / len) * W, Y = (db: number) => H - 14 - ((Math.max(-48, db) + 48) / 48) * (H - 22);
+  const inside = (t: number) => t >= p.start_sec && t <= p.start_sec + len;
   const top = p.levels_db.map((d, i) => `${i ? "L" : "M"}${((i / n) * W).toFixed(1)},${Y(d).toFixed(1)}`).join("");
   const spb = 60 / v.beats_tempo;
-  const beats = [];
-  for (let k = -16; k <= 32; k++) { const t = v.first_beat_sec + k * spb; if (t >= p.start_sec && t <= p.start_sec + len) beats.push({ t, k }); }
+  const beats: number[] = [];
+  for (let k = -16; k <= 32; k++) if (inside(v.first_beat_sec + k * spb)) beats.push(k);
+  const kicks = v.sync.kicks_sec.filter(inside);
   return (
     <div className="relative overflow-hidden rounded-[12px]" style={{ background: "color-mix(in srgb, var(--ground) 55%, transparent)", border: "1px solid var(--hairline)" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="The start of the vocal with the beats on it">
-        {beats.map(({ t, k }) => <line key={k} x1={X(t)} x2={X(t)} y1={0} y2={H} stroke={k === 0 ? YOURS : "var(--track)"} strokeWidth={k === 0 ? 2 : 1} strokeOpacity={k === 0 ? 1 : k % 4 === 0 ? 0.8 : 0.3} />)}
+      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="The start of the vocal, with beat 1 and the kicks">
+        {beats.map((k) => <line key={k} x1={X(v.first_beat_sec + k * spb)} x2={X(v.first_beat_sec + k * spb)} y1={0} y2={H} stroke="var(--track)" strokeOpacity={k % 4 === 0 ? 0.7 : 0.25} />)}
         <path d={`${top}L${W},${H}L0,${H}Z`} fill="var(--ink)" opacity={0.12} />
         <path d={top} fill="none" stroke="var(--ink-muted)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" />
+        {kicks.map((t, i) => <rect key={i} x={X(t) - 2} y={H - 10} width={4} height={8} rx={1.5} fill="var(--hot)" />)}
+        <line x1={X(v.first_beat_sec)} x2={X(v.first_beat_sec)} y1={0} y2={H} stroke={YOURS} strokeWidth={2} />
       </svg>
       <div className="pointer-events-none absolute inset-0 font-mono text-[10px] leading-3" aria-hidden="true">
-        {beats.filter(({ k }) => k % 4 === 0 && k >= 0).map(({ t, k }) => (
-          <span key={k} className="absolute top-1.5" style={{ left: `calc(${(X(t) / W) * 100}% + 4px)`, color: k === 0 ? YOURS : "var(--ink-faint)" }}>{k === 0 ? "beat 1" : `bar ${k / 4 + 1}`}</span>
-        ))}
+        <span className="absolute top-1.5" style={{ left: `calc(${(X(v.first_beat_sec) / W) * 100}% + 4px)`, color: YOURS }}>beat 1</span>
       </div>
     </div>
   );
 }
 
-/** Vocal sync (Oct 30): the vocal's tempo (from its file name, measured, or typed in) and beat 1, then Live's own
-    warping puts beat 1 on a bar line and stretches the vocal to the song's tempo. The clip changes in place, with Undo. */
-function VocalPanel() {
+/** Vocal sync (Oct 30, redone after Ian's try: "unwarp it and find the original key and BPM, then sync it to the
+    kick"): the vocal is read from its file as it was recorded, its original tempo and key shown, and Sync puts its
+    beat 1 on the kick at the nearest bar and stretches it so its beats land on the kicks after (Live's own warping,
+    Live's earlier markers cleared). Without a kick clip, Live's grid. The clip changes in place, with Undo. */
+function VocalPanel({ narrow }: { narrow: boolean }) {
   const g = useAriaSel((s) => s.groove);
   const v = g.vocal_sync, busy = !!g.busy;
   const [tempoText, setTempoText] = useState("");
+  const [askTempo, setAskTempo] = useState(false);
   const typed = Number(tempoText) >= 40 && Number(tempoText) <= 300 ? Number(tempoText) : null;
   const ours = v && v.tempo_source === "you" ? v.tempo : null;
   const fmt = (t: number) => (Number.isInteger(t) ? `${t}` : t.toFixed(1));
+  const kickNote = !g.kick ? "No kick picked: Live's grid" : v?.sync.kick_found ? `Beat 1 on the kick at bar ${v.sync.bar}${v.sync.kick_offset_ms ? `, ${Math.abs(v.sync.kick_offset_ms)} ms ${v.sync.kick_offset_ms > 0 ? "after" : "before"} Live's grid` : ""}`
+    : v ? `No kick near bar ${v.sync.bar}: Live's grid` : "";
   return (
     <div className="grid gap-3">
-      <ClipCard label="Vocal" clip={g.vocal} onPick={() => groovePick("vocal")} busy={busy} />
+      <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 1fr)" : "minmax(0, 1fr) minmax(0, 1fr)" }}>
+        <ClipCard label="Vocal" clip={g.vocal} onPick={() => groovePick("vocal")} busy={busy} />
+        <ClipCard label="Sync to the kick" clip={g.kick} onPick={() => groovePick("kick")} busy={busy} />
+      </div>
       {v && g.vocal && (
         <section className="cp-tile cp-card" style={{ gap: 12 }}>
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-[24px] font-medium">{fmt(v.tempo)} BPM</span>
-            <span className="text-[17px] text-ink-muted">to {fmt(v.song_tempo)}</span>
-            <span className="cp-meta">{v.tempo_source === "file name" ? "from the file name" : v.tempo_source === "you" ? "as you set it" : "measured"}{v.beats_tempo !== v.tempo ? `, counted as ${fmt(v.beats_tempo)}` : ""}</span>
+          <div className="grid gap-0.5">
+            <span className="cp-cap">Original</span>
+            <span className="text-[24px] font-medium">{fmt(v.tempo)} BPM{v.key ? ` · ${v.key}` : ""}</span>
+            <span className="cp-meta">tempo {v.tempo_source === "file name" ? "from the file name" : v.tempo_source === "you" ? "as you set it" : "measured"}{v.beats_tempo !== v.tempo ? `, counted as ${fmt(v.beats_tempo)}` : ""} · plays at {fmt(v.song_tempo)} once synced</span>
           </div>
           <VocalPicture v={v} />
+          <span className="cp-meta">{kickNote}</span>
           <div className="flex flex-wrap items-center gap-2">
             <button className="cp-btn cp-btn-sm" disabled={busy} onClick={() => vocalAnalyze(ours, v.beat_shift - 1)}>Beat 1 earlier</button>
             <button className="cp-btn cp-btn-sm" disabled={busy} onClick={() => vocalAnalyze(ours, v.beat_shift + 1)}>Beat 1 later</button>
-            <span className="mx-1 h-5 w-px bg-hairline" />
-            <input className="cp-input h-8 w-[76px] rounded-[9px] border border-hairline bg-transparent px-2 font-mono text-[12.5px]" inputMode="decimal" placeholder={fmt(v.tempo)}
-                   value={tempoText} onChange={(e) => setTempoText(e.target.value)} aria-label="The vocal's tempo, if Aria's is wrong" />
-            <button className="cp-btn cp-btn-sm" disabled={busy || !typed} onClick={() => vocalAnalyze(typed, v.beat_shift)}>Use this tempo</button>
-            <button className="cp-btn cp-btn-primary ml-auto" disabled={busy || g.vocal_applied} onClick={vocalApply}>{g.vocal_applied ? "Synced" : "Sync it"}</button>
+            <button className="text-[12.5px] text-ink-muted underline-offset-2 hover:underline" onClick={() => setAskTempo(!askTempo)}>Wrong tempo?</button>
+            <button className="cp-btn cp-btn-primary ml-auto" disabled={busy} onClick={vocalApply}>{g.vocal_applied ? "Sync again" : g.kick ? "Sync to the kick" : "Sync to the grid"}</button>
           </div>
+          {askTempo && (
+            <div className="flex flex-wrap items-center gap-2">
+              <input className="h-8 w-[84px] rounded-[9px] border border-hairline bg-transparent px-2 font-mono text-[12.5px]" inputMode="decimal" placeholder={fmt(v.tempo)}
+                     value={tempoText} onChange={(e) => setTempoText(e.target.value)} aria-label="The vocal's original tempo" />
+              <button className="cp-btn cp-btn-sm" disabled={busy || !typed} onClick={() => vocalAnalyze(typed, v.beat_shift)}>Use this tempo</button>
+            </div>
+          )}
           {g.vocal_applied && (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 text-[14px]" style={{ color: "var(--good)" }}><CheckIcon style={{ width: 16, height: 16 }} />On the grid: beat 1 on a bar, playing at {fmt(v.song_tempo)} BPM</span>
+              <span className="inline-flex items-center gap-2 text-[14px]" style={{ color: "var(--good)" }}><CheckIcon style={{ width: 16, height: 16 }} />{g.kick && v.sync.kick_found ? "On the kick" : "On the grid"}, playing at {fmt(v.song_tempo)} BPM</span>
               <button className="cp-btn cp-btn-sm ml-auto" onClick={undoLast}>Undo</button>
             </div>
           )}
@@ -154,7 +170,7 @@ function VocalPanel() {
       {!g.vocal && (
         <section className="cp-tile cp-card" style={{ gap: 10, minHeight: 120, placeItems: "center" }}>
           <GrooveIcon style={{ width: 28, height: 28, opacity: 0.5 }} />
-          <span className="cp-meta">A vocal off the beat? Click its clip in Live and pick it.</span>
+          <span className="cp-meta">A vocal off the beat? Click its clip in Live and pick it, then your kick.</span>
         </section>
       )}
     </div>
@@ -169,7 +185,7 @@ export function GrooveScreen({ narrow }: { narrow: boolean }) {
         <button aria-pressed={mode === "loops"} onClick={() => setMode("loops")}>Loops</button>
         <button aria-pressed={mode === "vocal"} onClick={() => setMode("vocal")}>Vocal</button>
       </div>
-      {mode === "vocal" ? <VocalPanel /> : <LoopsPanel narrow={narrow} />}
+      {mode === "vocal" ? <VocalPanel narrow={narrow} /> : <LoopsPanel narrow={narrow} />}
     </div>
   );
 }

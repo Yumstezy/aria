@@ -665,25 +665,26 @@ async function recheck() {
 // ---------- Groove match (build step 9) ----------
 // Pick the loop to fix and, optionally, the loop to follow, from the clip selected in Live. The engine moves the
 // hits; the matched loop goes on a new track under the original (muted, kept), and a new try replaces the last one.
-let groove = { moving: null, anchor: null, placed: null, vocal: null, vocalSync: null, vocalApplied: false };
+let groove = { moving: null, anchor: null, placed: null, vocal: null, kick: null, vocalSync: null, vocalApplied: false, vocalFix: {} };
 const GROOVE_TEMPO_SLACK = 0.03;   // a warped loop's file must be within 3% of whole bars at the song's tempo
 
 function grooveState(extra) {
   toUI("groove_state", { moving: groove.moving, anchor: groove.anchor, placed: groove.placed,
-                         vocal: groove.vocal, vocal_sync: groove.vocalSync, vocal_applied: groove.vocalApplied, ...extra });
+                         vocal: groove.vocal, kick: groove.kick, vocal_sync: groove.vocalSync, vocal_applied: groove.vocalApplied, ...extra });
 }
 
 Max.addHandler("groove_pick", (s) => serial(async () => {
   const { role } = decode(s);
   try {
-    const c = await askLive("selected_clip", "selected_clip", role === "anchor" || role === "vocal" ? role : "moving");
+    const c = await askLive("selected_clip", "selected_clip", ["anchor", "vocal", "kick"].includes(role) ? role : "moving");
     if (c.error) throw new UserError(c.error);
     if (!c.path || !fs.existsSync(c.path)) throw new UserError("Aria can't find that clip's file. Consolidate it in Live (Cmd+J) and pick it again.");
     if (role !== "anchor" && !c.arrangement) throw new UserError("Groove match works in the Arrangement. Drag the clip there, click it, and pick it again.");
     // A vocal from another song is at its own tempo: that's what vocal sync is for
-    if (role === "vocal") {
-      groove.vocal = c; groove.vocalApplied = false;
-      await vocalAnalyze({});
+    if (role === "vocal" || role === "kick") {
+      groove[role] = c; groove.vocalApplied = false;
+      if (role === "vocal") groove.vocalFix = {};
+      if (groove.vocal) await vocalAnalyze(groove.vocalFix); else grooveState();
       return;
     }
     // A warped loop plays at the song's tempo whatever its file is; the grid is only right when the file is too
@@ -728,13 +729,17 @@ Max.addHandler("groove_run", (s) => serial(async () => {
 }));
 
 // Vocal sync: the vocal's tempo and beat 1 from the engine (with the producer's corrections), then Live's warping
+// (Ian, Oct 30): read unwarped from the file, then beat 1 on the kick at the nearest bar line when a kick clip is picked
 async function vocalAnalyze({ tempo = null, beat_shift = 0 }) {
-  const v = groove.vocal;
+  const v = groove.vocal, k = groove.kick;
   if (!v) throw new UserError("Pick the vocal first.");
+  groove.vocalFix = { tempo, beat_shift };
   await ensureEngine();
-  toUI("groove_progress", { text: "Finding the vocal's tempo and beat 1" });
+  toUI("groove_progress", { text: k ? "Finding the vocal's tempo, key and beat 1, and your kick" : "Finding the vocal's tempo, key and beat 1" });
   const live = await askLive("state", "live_state");
-  const res = await request("POST", "/groove/vocal", { path: v.path, song_tempo: live.tempo, tempo, beat_shift }, ANALYZE_TIMEOUT_MS);
+  const res = await request("POST", "/groove/vocal", { path: v.path, song_tempo: live.tempo, tempo, beat_shift,
+    kick: k ? { path: k.path, start_beat: k.start_beat, start_marker: k.start_marker || 0 } : null,
+    place: { start_beat: v.start_beat, beats_per_bar: live.beats_per_bar } }, ANALYZE_TIMEOUT_MS);
   if (res.status !== 200) throw new UserError((res.json && res.json.detail) || `The engine couldn't read the vocal (HTTP ${res.status}).`);
   groove.vocalSync = res.json;
   grooveState();
