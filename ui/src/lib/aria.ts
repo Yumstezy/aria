@@ -6,7 +6,7 @@ import { startRecording, stopRecording, transcribe } from "@/lib/voice";
 
 export const ENGINE = "http://127.0.0.1:8765";
 
-export type Kind = "resonance" | "buildup" | "harsh" | "masking" | "bass_click" | "clash" | "reference";
+export type Kind = "resonance" | "buildup" | "harsh" | "masking" | "bass_click" | "clash" | "reference" | "typical";
 export interface Finding {
   kind: Kind;
   hz?: number;
@@ -25,6 +25,7 @@ export interface Finding {
   clicky_share?: number;
   bursts_per_bar?: number;
   shape?: "stretch" | "band";   // reference: a stretch that stands out, or a whole band off
+  value_db?: number; median_db?: number; range_db?: [number, number]; outside_db?: number; mixes?: number;   // typical
   band?: string;
   stands_out_db?: number;
 }
@@ -48,6 +49,8 @@ export interface Spectra { hz: number[]; mix: number[]; parts: Record<string, nu
 export interface Result {
   recording: { path: string; start_beat: number | null; tempo: number | null; bars: number | null };
   reference?: RefCompare | null;
+  /** Without a reference song: each band against the good-rated mixes (ml/data), where 8 in 10 of them sit */
+  typical?: { mixes: number; error: string | null; bands: { name: string; lo: number; hi: number; value_db: number; median_db: number; range_db: [number, number]; outside: boolean }[] } | null;
   measured: {
     integrated_lufs: number | null; true_peak_dbtp: number | null;
     bands_db: Record<string, number | null>; width: Record<string, number | null>;
@@ -525,6 +528,11 @@ export function describe(f: Finding): { name: string; where: string; size: strin
       name, where: hzRange(f.hz_range), size: `${f.gap_db!.toFixed(1)} dB`,
       about: `${soundName(f.masked!)} sits ${Math.abs(f.gap_db!).toFixed(1)} dB under ${soundName(f.by!)} in ${hzRange(f.hz_range)}, ${Math.round(f.share! * 100)}% of the time it plays.`,
     };
+  }
+  if (f.kind === "typical") {
+    const more = (f.outside_db ?? 0) > 0, past = Math.abs(f.outside_db!).toFixed(1);
+    return { name: `${f.band} ${more ? "fuller" : "thinner"} than most good mixes`, where: hzRange(f.hz_range), size: `${more ? "+" : "−"}${past} dB`,
+      about: `${f.band} is ${past} dB ${more ? "above" : "below"} where 8 in 10 of ${f.mixes} good-rated mixes keep it.` };
   }
   if (f.kind === "reference") {
     const more = (f.diff_db ?? 0) > 0, where = f.shape === "band" ? f.band! : hzRange(f.hz_range);

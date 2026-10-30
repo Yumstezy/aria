@@ -11,7 +11,7 @@ import numpy as np
 from pydantic import BaseModel
 import soundfile as sf
 
-from aria_engine import __version__, analysis, ask, clarity, muse, reference, sections, split, stems, voice
+from aria_engine import __version__, analysis, ask, clarity, muse, reference, sections, split, stems, typical, voice
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 # When the code this engine runs was last changed. The bridge compares it with the files on disk
@@ -221,6 +221,10 @@ def mix_analyze(req: MixRequest):
                        req.reference_window, req.reference_part) if req.reference_path else None
     if ref and ref["findings"]:
         found["findings"] = (ref["findings"] + found["findings"])[:SPLIT_TOP_N + 1]
+    # Without one, the good-rated mixes are the comparison (Oct 30): a band outside where 8 in 10 of them sit
+    good = None if ref else typical.compare(audio, rate, found.get("bars"))
+    if good and good["findings"]:
+        found["findings"] = (found["findings"][:SPLIT_TOP_N - 1] + good["findings"])[:SPLIT_TOP_N + 1]
 
     context = {k: v for k, v in {"bars": req.bars, "tempo": req.tempo}.items() if v is not None}
     if "all" in measured["unmeasured"]:
@@ -234,6 +238,7 @@ def mix_analyze(req: MixRequest):
     return {
         "recording": {"path": str(path), "start_beat": req.start_beat, "tempo": req.tempo, "bars": req.bars},
         "reference": ref and {k: ref[k] for k in ("name", "path", "part", "bands", "curve", "error")},
+        "typical": good and {k: good[k] for k in ("mixes", "bands", "error")},
         "measured": measured,
         "clarity": found,
         "advice": advice,

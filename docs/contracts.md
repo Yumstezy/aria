@@ -84,6 +84,10 @@ With no reference, the engine compares nothing. It returns what it measured and 
 - `tracks_playing` (key tracks mode, Oct 29): `{track name: true | false | null}`, Live's word on whether each track had unmuted clips in the checked bars (null: no Arrangement clips at all, so Live can't say). For the producer's own tracks, silent means `false` here or, when null, near-digital silence (under -60 dBFS); a quiet track is still drawn and checked for being buried. The 20 dB-under-the-mix rule stays for split mode, where it filters Demucs bleed.
 - `reference_path` (build step 8, as built Oct 29): see "With a reference" below.
 
+### Against good mixes (Oct 30)
+
+Without `reference_path`, the result has `typical: {mixes, bands: [{name, lo, hi, value_db, median_db, range_db: [p10, p90], outside}], error}`: each of 8 bands' share of the mix (30 Hz to 16 kHz, measured exactly as `ml/detail.py` does) against the mixes people rated good in `ml/data/features.csv`. A band more than 0.5 dB outside where 8 in 10 of them sit becomes a finding `{kind: "typical", band, hz, hz_range, value_db, median_db, range_db, diff_db, outside_db, mixes, bars}`, at most 2, fuller ones first. Muse says "more (or less) than most good mixes" and may cut a fuller one. With a reference, `typical` is null.
+
 ### With a reference (build step 8, as built Oct 29)
 
 The producer chooses a song from Finder on the Reference screen (Live's web view takes no dropped files; Ian, Oct 29). The page sends the file itself (an exception to "paths, not audio": the page can't see the chosen file's path) as the raw body of `POST /reference?name=<file name>`. The engine keeps it once per song (by content) in `~/Library/Application Support/Aria/references/` and returns `{path, name, seconds}`. wav, aiff, flac, mp3 and ogg; anything else is a 400. The page sends `set_reference {path, name}` to the bridge, which saves it in `window.json` and adds `reference_path` to every `/mix/analyze` until `clear_reference`.
