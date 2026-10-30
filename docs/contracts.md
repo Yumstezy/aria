@@ -252,6 +252,10 @@ Advice is now about the findings:
 
 Built Oct 30 (`engine/aria_engine/groove.py`): `anchor.kind` is `straight` (the nearest 16th) or `loop` (the other loop's hit at the same place in the loop; both repeat). `reference` isn't built yet and returns 400. Hits are found where the level jumps 9 dB or more in 10 ms and pinned to where the attack starts; a hit is paired only with a target under about half a 16th away. Each hit's slice is cut 3 ms before it and moved (2 ms fades), so nothing is stretched. `out_dir` defaults to `~/Library/Application Support/Aria/groove/`. The result also has `hits` (how many were found), and `before.hits` and `after.hits` are `[{sec, offset_ms}]` (target time, how late), for the timing chart. `grid` is `{step_sec, beat1_sec, steps_per_bar}` so the chart can fold every bar into one. After the move, each hit's own first 30 ms (from the original) is found again in the new file by cross-correlation within 20 ms of where it was put; one that doesn't match (under 0.6) is counted in `after.missing`, and `in_time` needs `missing` to be 0. Hit starts use the loudest sample of the last 10 ms, so a low drum's cycles don't make it read late. Known limit: quiet hits under a louder one's tail (hats under a kick) aren't found, so they move with the hit before them; a loop of one kind of sound works best.
 
+## Vocal sync (Groove match, Oct 30)
+
+`POST /groove/vocal` `{path, song_tempo, tempo?, beat_shift?}` returns `{tempo, tempo_source: "file name" | "measured" | "you", beats_tempo, song_tempo, beat_shift, first_beat_sec, first_sound_sec, seconds, picture: {start_sec, step_sec, levels_db}, warp: {markers: [{beat_time, sample_time}] (2), start_marker, end_marker, bars_before}}`. `beats_tempo` is the tempo counted at the song's scale (half or double). The device sets the markers on the vocal's Arrangement clip with warping on in Complex Pro (live.js `vocal_warp`), with Undo; bridge messages `groove_pick {role: "vocal"}`, `vocal_analyze {tempo, beat_shift}`, `vocal_apply`, reply `vocal_done`.
+
 ## Muse Spark actions
 
 Muse Spark answers in JSON only:
