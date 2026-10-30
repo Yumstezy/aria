@@ -10,7 +10,7 @@ import { path, smoothValues } from "@/components/waves";
 import { PLOT_HI, PLOT_LO, PLOT_W as W, Plot, PlotGrid, dbTicksOf, plotX as X, tilt } from "@/components/plot";
 
 export const YOURS = "var(--trk-0)", THEIRS = "var(--cool)";
-const PAD_T = 38, PAD_B = 20, STEP_DB = 6;   // room at the top for the problem numbers and their strips
+const PAD_T = 14, PAD_B = 20, STEP_DB = 6;   // the problem numbers have their own row above the drawing (plot.tsx)
 
 export interface Zone { n: number; lo: number; hi: number; where?: string }
 

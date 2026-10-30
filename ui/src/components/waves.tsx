@@ -13,7 +13,7 @@ import { Plot, PlotGrid, dbTicksOf, tilt } from "@/components/plot";
 // Short names for the tooltip, so it stays small
 const SHORT: Record<string, string> = { vocals: "Vocal", other: "Synths", bass: "Bass", drums: "Drums", mix: "Mix" };
 
-const W = 640, H = 270, PAD_B = 24, PAD_T = 34, LO = 30, HI = 16000, FLOOR_DB = -60, PIN_GAP = 24;
+const W = 640, H = 270, PAD_B = 24, PAD_T = 16, LO = 30, HI = 16000, FLOOR_DB = -60, PIN_GAP = 24;
 const TICKS = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
 
 const X = (hz: number) => ((Math.log10(hz) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO))) * W;
