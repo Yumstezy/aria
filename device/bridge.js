@@ -428,7 +428,7 @@ async function checkMix() {
     const ref = referenceNow();
     const res = await request("POST", "/mix/analyze",
       { mix_path: file, start_beat: live.song_beat, tempo: live.tempo, bars: BARS, beats_per_bar: live.beats_per_bar,
-        ...(keyTracks ? { tracks } : {}), ...(ref ? { reference_path: ref.path } : {}) }, ANALYZE_TIMEOUT_MS);
+        ...(keyTracks ? { tracks } : {}), ...(ref ? { reference_path: ref.path, reference_name: ref.name } : {}) }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
     }

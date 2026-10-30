@@ -42,6 +42,12 @@ def test_each_planted_boost_stands_out_against_the_reference(name, lo, hi):
 
 
 @needs_mixes
+def test_both_curves_come_back_for_the_picture():
+    curve = compare("C")["curve"]
+    assert len(curve["hz"]) == len(curve["mine"]) == len(curve["ref"]) > 40
+
+
+@needs_mixes
 def test_section_changes_alone_are_not_flagged():
     # A's sub is about 3 dB under the intro's: a real difference between sections, not a problem to fix
     assert not [f for f in compare("A")["findings"] if f["hz"] < 100]

@@ -82,18 +82,19 @@ With no reference, the engine compares nothing. It returns what it measured and 
 
 ### With a reference (build step 8, as built Oct 29)
 
-The producer drops a song on the window. The page sends the file itself (the one exception to "paths, not audio": Live's web view can't see a dropped file's path) as the raw body of `POST /reference?name=<file name>`. The engine keeps it once per song (by content) in `~/Library/Application Support/Aria/references/` and returns `{path, name, seconds}`. wav, aiff, flac, mp3 and ogg; anything else is a 400. The page sends `set_reference {path, name}` to the bridge, which saves it in `window.json` and adds `reference_path` to every `/mix/analyze` until `clear_reference`.
+The producer chooses a song from Finder on the Reference screen (Live's web view takes no dropped files; Ian, Oct 29). The page sends the file itself (an exception to "paths, not audio": the page can't see the chosen file's path) as the raw body of `POST /reference?name=<file name>`. The engine keeps it once per song (by content) in `~/Library/Application Support/Aria/references/` and returns `{path, name, seconds}`. wav, aiff, flac, mp3 and ogg; anything else is a 400. The page sends `set_reference {path, name}` to the bridge, which saves it in `window.json` and adds `reference_path` to every `/mix/analyze` until `clear_reference`.
 
 With `reference_path`, the result's `reference` is:
 
 ```json
 { "name": "control.wav", "path": "...", "error": null,
   "bands": [ { "name": "Mids", "lo": 400, "hi": 1000, "diff_db": 3.1 } ],
-  "curve": { "hz": [32, 40, "... third octaves to 16000"], "diff_db": [-0.5, -0.4, "..."] } }
+  "curve": { "hz": [32, 35, "... sixth octaves to 16000"], "mine": [-38.2, "..."], "ref": [-37.9, "..."] } }
 ```
 
-- Both songs are loudness matched (integrated LUFS) and compared in third octaves over the moments each plays. `diff_db` is the mix minus the reference.
-- What stands out becomes a finding, first in `clarity.findings`: `{kind: "reference", shape: "stretch" | "band", hz, hz_range, diff_db, stands_out_db (stretch), band (band), bars}`. A stretch stands at least 2 dB apart from the difference curve around it and 1.5 dB from the reference (a dip 3 dB); a whole band is 3 dB off. Frequencies are rounded to two significant figures.
+- Both songs are loudness matched (integrated LUFS) and compared in third octaves over the moments each plays. `diff_db` is the mix minus the reference. `curve` is both songs at sixth octaves, dB against their own loudness, for the picture (yours gold, the reference blue).
+- The bridge sends `reference_name` (the song's own file name) with `reference_path`, since the engine stores it under another name.
+- What stands out becomes a finding, first in `clarity.findings`: `{kind: "reference", shape: "stretch" | "band", hz, hz_range, diff_db, stands_out_db (stretch), band (band), bars}`. A stretch is louder than the reference: at least 2 dB above the difference curve around it and 1.5 dB above the reference. Something missing counts only as a whole band 3 dB off (a pro track's deeper sub isn't a stretch to fix). At most 2, louder ones first. Frequencies are rounded to two significant figures.
 - Muse gets `reference: {name, bands}` and may compare with the song by name. It may give an `eq_band` cut for a stretch that's louder than the reference, never for a quieter one.
 - `error` says why nothing was compared (a silent reference). A reference that's gone from disk is a 400 that says to drop it again.
 

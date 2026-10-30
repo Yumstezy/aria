@@ -20,12 +20,12 @@ const Y = (db: number) => PAD_T + (1 - (Math.max(db, FLOOR_DB) - FLOOR_DB) / -FL
 
 const hzShort = (v: number) => (v >= 1000 ? `${v / 1000}k` : `${v}`);
 
-function smoothValues(v: number[]) {
+export function smoothValues(v: number[]) {
   return v.map((x, i) => ((v[i - 1] ?? x) + 2 * x + (v[i + 1] ?? x)) / 4);
 }
 
 // Catmull-Rom through the points, as cubic Beziers
-function path(pts: [number, number][]) {
+export function path(pts: [number, number][]) {
   let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
   for (let i = 0; i < pts.length - 1; i++) {
     const p0 = pts[i - 1] ?? pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] ?? p2;

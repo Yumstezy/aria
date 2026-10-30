@@ -146,11 +146,11 @@ Pass: 3 of 3 test mixes pass, Step 6 passes, and the decision is written in `doc
 
 Compare first (Ian, Oct 29: "we can test using a reference"). Sections in both songs, editable lanes and "Add markers to Live" come after, if there's time.
 
-- The producer drops a song on the Aria window (Ian picked this over a track named Reference). The page sends the file to the engine, which keeps it on this Mac.
-- Every Mix check after that compares the 16 bars with the reference, loudness matched: each of the seven bands against it, and anything that stands out (a boosted instrument, a whole band off) as a problem with Fix it.
+- The producer chooses a song in the Aria window (Live's web view takes no dropped files). The page sends the file to the engine, which keeps it on this Mac.
+- Every Mix check after that compares the 16 bars with the reference, loudness matched: both curves on one picture (yours gold, theirs blue, the gap shaded by whichever is fuller), and anything that stands out (a boosted instrument, a whole band off) as a problem with Fix it.
 - Muse compares with the song by name: "Your mids are fuller than <song>", then the numbers.
 
-Pass: with `test-pack/mixes/control.wav` as the reference, the planted boosts in A (around 200 Hz), B (around 3.2 kHz) and C (350 to 710 Hz) each come out as "more than the reference" with a cut inside the range, and control against itself finds nothing (`engine/tests/test_reference.py`). In Live: dropping a song on the window sets the reference, and the next Check mix shows the comparison and Muse's words about it, three times in a row.
+Pass: with `test-pack/mixes/control.wav` as the reference, the planted boosts in A (around 200 Hz), B (around 3.2 kHz) and C (350 to 710 Hz) each come out as "more than the reference" with a cut inside the range, and control against itself finds nothing (`engine/tests/test_reference.py`). In Live: choosing a song sets the reference, and the next Check mix shows the comparison and Muse's words about it, three times in a row.
 
 ## Step 9. Groove match (Nov 2, freeze at end of day)
 

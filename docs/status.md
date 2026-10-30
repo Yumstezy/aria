@@ -23,7 +23,7 @@ Test files from the debug, not committed, still to delete (Ian to OK): `device/A
 - Check mix advice has no em or en dashes (a dash between numbers becomes "to"). Ask Muse replies already had this.
 - The bird is on the device on Main, between the light and "Aria".
 
-**Step 8, Reference compare (Oct 29 night): built, to check in Live.** Engine passes its test (`engine/tests/test_reference.py`: against `control.wav`, A, B and C each come out "fuller than the reference" in the planted range with a cut; control against itself finds nothing). The window: drop a song anywhere on it, or Reference, Choose a song. Mix check then shows "Against <song>" (seven bars, up is louder than the reference) and puts what stands out first, with Fix it. Muse compares with the song by name.
+**Step 8, Reference compare (Oct 29 night): runs in Live (Ian, 21:34, THE WEEKEND.wav, Choose a song; dropping doesn't work in Live's web view, so it's gone). Redone after his look: both curves on one picture (yours gold, the reference blue, the gap shaded by whichever is fuller), the song's real name, at most 2 reference problems with louder ones first, and a missing range only as a whole band.** Earlier notes: Engine passes its test (`engine/tests/test_reference.py`: against `control.wav`, A, B and C each come out "fuller than the reference" in the planted range with a cut; control against itself finds nothing). The window: drop a song anywhere on it, or Reference, Choose a song. Mix check then shows "Against <song>" (seven bars, up is louder than the reference) and puts what stands out first, with Fix it. Muse compares with the song by name.
 
 Manual check for Ian:
 1. Remove and re-add Aria on Main (new bridge and live.js; the engine restarts itself with the new code).

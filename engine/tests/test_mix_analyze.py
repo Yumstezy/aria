@@ -57,8 +57,8 @@ def test_non_audio_path_is_refused():
 def test_a_reference_is_compared_not_ignored(tmp_path, monkeypatch):
     monkeypatch.setenv("MODEL_API_KEY", "")
     path = write(tmp_path / "mix.wav", sine(1000, 0.5), sine(1000, 0.5))
-    body = client.post("/mix/analyze", json={"mix_path": path, "reference_path": path}).json()
-    assert body["reference"]["name"] == "mix.wav"
+    body = client.post("/mix/analyze", json={"mix_path": path, "reference_path": path, "reference_name": "My Song.wav"}).json()
+    assert body["reference"]["name"] == "My Song.wav"
     assert all(abs(b["diff_db"]) < 0.1 for b in body["reference"]["bands"] if b["diff_db"] is not None)
 
 

@@ -32,7 +32,8 @@ export interface Finding {
 export interface RefCompare {
   name: string; path: string; error: string | null;
   bands: { name: string; lo: number; hi: number; diff_db: number | null }[];
-  curve: { hz: number[]; diff_db: number[] } | null;
+  /** Both songs at the same loudness, sixth octaves, dB: the picture of where each is fuller */
+  curve: { hz: number[]; mine: number[]; ref: number[] } | null;
 }
 export interface EqFix { type: "eq_band"; freq_hz: number; gain_db: number; q: number }
 export interface Note { finding: number; kind: Kind; short: string | null; text: string; fix: EqFix | null }
@@ -278,7 +279,7 @@ export async function checkMix() {
   set({ progress: { step: "analyze", text: "Splitting your mix and asking Muse Spark" }, error: null });
   try {
     const res = await fetch(ENGINE + "/mix/analyze", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mix_path: path, ...(devReference ? { reference_path: devReference.path } : {}) }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mix_path: path, ...(devReference ? { reference_path: devReference.path, reference_name: devReference.name } : {}) }),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.detail || `The engine could not analyze that file (HTTP ${res.status}).`);

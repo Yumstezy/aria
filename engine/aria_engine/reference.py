@@ -3,9 +3,9 @@
 Both are loudness matched (integrated LUFS, which already skips quiet parts), then compared in third
 octaves over the moments each one is playing. Two kinds of difference count:
 
-- a stretch that stands out from the difference curve around it, like a bass boosted at 180 Hz or a
-  synth at 4 kHz: at least BUMP_DB above its surroundings and BUMP_MIN_DB above the reference
-- a whole named band above or below the reference: at least BAND_DB
+- a stretch that stands out louder than the difference curve around it, like a bass boosted at 180 Hz or
+  a synth at 4 kHz: at least BUMP_DB above its surroundings and BUMP_MIN_DB above the reference
+- a whole named band above or below the reference: at least BAND_DB (the only way a missing range counts)
 
 Differences smaller than that are normal between two songs, or two parts of one song, and aren't
 flagged (on Ian's song the intro has about 3 dB more sub than the next 16 bars). Numbers only; Muse
@@ -23,39 +23,49 @@ from scipy.signal import stft
 STORE = Path(os.path.expanduser("~/Library/Application Support/Aria/references"))
 EXTENSIONS = {".wav", ".aif", ".aiff", ".flac", ".mp3", ".ogg"}
 
-CENTRES = 1000 * 2 ** (np.arange(-15, 13) / 3)   # third octaves, 31.5 Hz to 16 kHz
+CENTRES = 1000 * 2 ** (np.arange(-15, 13) / 3)   # third octaves, 31.5 Hz to 16 kHz: what's compared
+FINE = 1000 * 2 ** (np.arange(-30, 25) / 6)      # sixth octaves, 31.5 Hz to 16 kHz: the two curves for the picture
 N_FFT, HOP = 8192, 2048
 PLAYING_DB = 15        # frames within this of the loudest count as playing
-BUMP_DB = 2.0          # a stretch this far above (or below, see DIP_DB) the curve around it
+BUMP_DB = 2.0          # a stretch this far above the curve around it
 BUMP_MIN_DB = 1.5      # and at least this far from the reference itself
-DIP_DB = -3.0          # a missing stretch must stand out more: a dip is rarely the problem
 BAND_DB = 3.0          # a whole band this far from the reference
-MAX_FINDINGS = 3
+MAX_FINDINGS = 2       # the comparison leads the list, it shouldn't fill it (Ian, Oct 29)
 
 # The window's seven ranges (ui/src/lib/problems.ts BANDS), so words and pictures agree
 BANDS = [("Sub", 20, 60), ("Bass", 60, 150), ("Low mids", 150, 400), ("Mids", 400, 1000),
          ("Upper mids", 1000, 4000), ("Highs", 4000, 10000), ("Air", 10000, 20000)]
 
 
-def profile(audio, rate):
-    """Third-octave levels in dB relative to the song's loudness, over the moments it plays.
-    None when the audio is silent or too short to measure."""
-    meter = pyln.Meter(rate)
+def _spectrum(audio, rate):
+    """(freqs, mean power over the moments it plays, integrated LUFS), or None when silent or too short."""
     if len(audio) < rate * 0.5:
         return None
-    lufs = meter.integrated_loudness(audio)
+    lufs = pyln.Meter(rate).integrated_loudness(audio)
     if not np.isfinite(lufs):
         return None
     freqs, _, z = stft(audio.mean(axis=1), fs=rate, nperseg=N_FFT, noverlap=N_FFT - HOP, boundary=None, padded=False)
     power = np.abs(z) ** 2
     level = 10 * np.log10(power.sum(axis=0) + 1e-12)
-    mean = power[:, level >= level.max() - PLAYING_DB].mean(axis=1)
-    half = 2 ** (1 / 6)
+    return freqs, power[:, level >= level.max() - PLAYING_DB].mean(axis=1), lufs
+
+
+def _levels(spectrum, centres, per_octave, rate):
+    """Each band's level in dB relative to the song's loudness (bands per_octave wide around centres)."""
+    freqs, mean, lufs = spectrum
+    half = 2 ** (0.5 / per_octave)
     out = []
-    for c in CENTRES:
+    for c in centres:
         idx = (freqs >= c / half) & (freqs < c * half)
-        out.append(10 * np.log10(mean[idx].sum() + 1e-12) if idx.any() and c < rate / 2 else np.nan)
-    return np.array(out) - lufs
+        out.append(10 * np.log10(mean[idx].sum() + 1e-12) - lufs if idx.any() and c < rate / 2 else np.nan)
+    return np.array(out)
+
+
+def profile(audio, rate):
+    """Third-octave levels in dB relative to the song's loudness, over the moments it plays.
+    None when the audio is silent or too short to measure."""
+    spec = _spectrum(audio, rate)
+    return None if spec is None else _levels(spec, CENTRES, 3, rate)
 
 
 def _surroundings(d):
@@ -85,9 +95,9 @@ def _bumps(d):
         s, v = stand[i], d[i]
         if i in used or not np.isfinite(s):
             continue
-        up = s >= BUMP_DB and v >= BUMP_MIN_DB
-        down = s <= DIP_DB and v <= -BUMP_MIN_DB
-        if not (up or down):
+        # Only what's louder than the reference counts as a stretch: a pro track's deeper sub or extra air
+        # isn't a problem in the producer's mix. Something missing shows up only as a whole band (below).
+        if not (s >= BUMP_DB and v >= BUMP_MIN_DB):
             continue
         # The stretch: neighbours that stand out the same way by at least half as much
         lo = hi = i
@@ -105,12 +115,13 @@ def _bumps(d):
 
 
 def compare(audio, rate, ref_audio, ref_rate):
-    """The mix against the reference: each band's difference, the third-octave curve, and what stands out."""
-    mine, theirs = profile(audio, rate), profile(ref_audio, ref_rate)
-    if theirs is None:
+    """The mix against the reference: each band's difference, both songs' curves, and what stands out."""
+    spec_mine, spec_ref = _spectrum(audio, rate), _spectrum(ref_audio, ref_rate)
+    if spec_ref is None:
         return {"bands": [], "curve": None, "findings": [], "error": "The reference is silent or too short to compare."}
-    if mine is None:
+    if spec_mine is None:
         return {"bands": [], "curve": None, "findings": [], "error": "The recording is silent, so there's nothing to compare."}
+    mine, theirs = _levels(spec_mine, CENTRES, 3, rate), _levels(spec_ref, CENTRES, 3, ref_rate)
     d = mine - theirs
 
     bands = []
@@ -124,9 +135,11 @@ def compare(audio, rate, ref_audio, ref_rate):
         if b["diff_db"] is not None and abs(b["diff_db"]) >= BAND_DB and not idx & used:
             findings.append({"kind": "reference", "shape": "band", "band": b["name"], "hz": _nice(np.sqrt(b["lo"] * min(b["hi"], 16000))),
                              "hz_range": [b["lo"], b["hi"]], "diff_db": b["diff_db"]})
-    findings.sort(key=lambda f: -abs(f["diff_db"]))
-    keep = np.isfinite(d)
-    return {"bands": bands, "curve": {"hz": [round(float(c)) for c in CENTRES[keep]], "diff_db": [round(float(x), 1) for x in d[keep]]},
+    findings.sort(key=lambda f: (f["diff_db"] < 0, -abs(f["diff_db"])))   # louder than the reference first
+    fine_mine, fine_ref = _levels(spec_mine, FINE, 6, rate), _levels(spec_ref, FINE, 6, ref_rate)
+    keep = np.isfinite(fine_mine) & np.isfinite(fine_ref)
+    return {"bands": bands, "curve": {"hz": [round(float(c)) for c in FINE[keep]],
+                                      "mine": [round(float(x), 1) for x in fine_mine[keep]], "ref": [round(float(x), 1) for x in fine_ref[keep]]},
             "findings": findings[:MAX_FINDINGS], "error": None}
 
 

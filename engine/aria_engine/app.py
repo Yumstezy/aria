@@ -80,6 +80,7 @@ class MixRequest(BaseModel):
     bars: Optional[int] = None
     beats_per_bar: Optional[float] = None
     reference_path: Optional[str] = None
+    reference_name: Optional[str] = None   # the song's own file name (the engine stores it under another)
     # Key tracks mode (Aria Ear, build step 4): {track name: wav path}, recorded at the same moment as mix_path
     tracks: Optional[Dict[str, str]] = None
 
@@ -170,7 +171,7 @@ async def reference_keep(request: Request, name: str = "reference.wav"):
     return {"path": str(path), "name": Path(name).name, "seconds": seconds}
 
 
-def compare_with(ref_path, audio, rate, bars):
+def compare_with(ref_path, audio, rate, bars, name=None):
     """The reference block of a result, and its findings for the problem list."""
     path = Path(ref_path).expanduser()
     if not path.is_file():
@@ -183,7 +184,7 @@ def compare_with(ref_path, audio, rate, bars):
     for f in out["findings"]:
         if bars:
             f["bars"] = bars
-    return {"name": path.name, "path": str(path), **out}
+    return {"name": name or path.name, "path": str(path), **out}
 
 
 @app.post("/mix/analyze")
@@ -202,7 +203,7 @@ def mix_analyze(req: MixRequest):
         found = find_clarity(audio, rate, req.tempo, req.start_beat, req.beats_per_bar or 4.0)
 
     # With a reference, what stands out against it leads the list: the producer asked for that comparison
-    ref = compare_with(req.reference_path, audio, rate, found.get("bars")) if req.reference_path else None
+    ref = compare_with(req.reference_path, audio, rate, found.get("bars"), req.reference_name) if req.reference_path else None
     if ref and ref["findings"]:
         found["findings"] = (ref["findings"] + found["findings"])[:SPLIT_TOP_N + 1]
 
