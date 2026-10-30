@@ -23,6 +23,12 @@ Test files from the debug, not committed, still to delete (Ian to OK): `device/A
 - Check mix advice has no em or en dashes (a dash between numbers becomes "to"). Ask Muse replies already had this.
 - The bird is on the device on Main, between the light and "Aria".
 
+**Built Oct 30 morning, for Ian to test in Live** (remove and re-add Aria on Main: the device itself changed, for the analyzer):
+1. Arrangement editing: each part's name is a menu, and -4 / +4 moves where it starts (the part before grows or shrinks). The header says "edited by you". Add markers to Live uses the edited names and bars.
+2. Before and after: after a check, Fix it, then "Check bars N to N+15 again" in Mix check. Live plays the same bars again; the card shows before (blue) and after (gold) at the same loudness and how much each problem's range changed (green when less). Tested with Ian's mix B as before and the control as after: harsh hits -6.9 dB, presence -2.3 dB.
+3. Live analyzer (side menu): press play; the gold line is Main right now, the grey line holds peaks, the dashed blue is the reference (or the typical good mix) matched to your level. If it stays empty, tell Claude: the device's new filter bank (fffb~) is the part not testable from here.
+4. Markers: all of them should land now (each press checks the playhead first).
+
 **Checked in Live by Ian (Oct 30, 00:50):** Home (the website look), the charts (tilt, strips, docked), and a quiet track no longer called silent. Still to check: Against good mixes (a check with no reference), the Intro/Outro rule. Raghav has the directions to run the EQ curves and Audiobox on the 99 mixes: https://github.com/Yumstezy/aria/blob/main/ml/RUN-AUDIOBOX.md. Next: Arrangement editing (rename, move an edge by 4 bars), then Before and after.
 
 **The mix model, and "against good mixes" (Oct 30).** The model PR is merged (99 rated mixes, three tiers). Official result: best 0.49 against loudness-only 0.45, wins 66% of rounds, shuffle p = 0.70, so no classifier ships (its own rule). What does ship: the good-rated mixes as a comparison when no reference song is picked. Each band's share of the mix against where 8 in 10 good mixes sit; outside by more than 0.5 dB is a problem with Muse's words and a cut. On Ian's planted mixes it catches what the checkpoint missed: A low mids +1.9 dB past the good range (control +0.8), B presence +3.4, C low mids +1.6. Permission for the mixes: given or free-download releases (Ian, Oct 30). Manual check: with no reference, Check mix shows "Against good mixes" with a row per band.

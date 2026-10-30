@@ -27,6 +27,7 @@ OUT = Path(__file__).resolve().parent.parent / "Aria.amxd"
 STRIP_W, STRIP_H = 150.0, 169.0   # just the buttons, glassy and muted like Live's devices (Ian, Oct 28)
 WINDOW_W, WINDOW_H = 1200.0, 860.0
 CHAT_W, CHAT_H = 400.0, 620.0
+AN_BANDS = 31   # Live analyzer: third octaves from 31.25 Hz (31.25 x 1.2599^k)
 
 # The page the strip starts on, built into the device. The bridge swaps in the real strip about
 # 0.15 s after load, but its message goes through Max's queue, and that queue stops when Live's
@@ -101,7 +102,7 @@ def build():
         window,
         chat,
         obj("bridge", "node.script bridge.js @autostart 1 @watch 1", [8.0, 300.0, 230.0, 22.0], 1, 2),
-        obj("route-out", "route jweb window chat live rec ears", [8.0, 340.0, 220.0, 22.0], 1, 7),
+        obj("route-out", "route jweb window chat live rec ears an", [8.0, 340.0, 240.0, 22.0], 1, 8),
         # Key tracks mode: broadcast "record" to every Aria Ear, and hear back which track each one is
         obj("ears-send", "send aria_ear", [240.0, 380.0, 85.0, 22.0], 1, 0),
         obj("ears-back", "receive aria_ear_back", [240.0, 260.0, 130.0, 22.0], 0, 1),
@@ -114,6 +115,17 @@ def build():
         obj("in", "plugin~", [400.0, 200.0, 53.0, 20.0], 2, 2, ["signal", "signal"]),
         obj("out", "plugout~", [400.0, 460.0, 53.0, 20.0], 2, 2, ["signal", "signal"]),
         obj("rec", "sfrecord~ 2", [480.0, 380.0, 75.0, 22.0], 2, 1, ["signal"]),
+        # Live analyzer (Oct 30): Main in mono through 31 third-octave filters from 31 Hz, each band's RMS read 20
+        # times a second while the window's analyzer is open (the bridge turns the metro on and off), to the bridge
+        obj("an-sum", "+~", [600.0, 220.0, 40.0, 22.0], 2, 1, ["signal"]),
+        obj("an-half", "*~ 0.5", [600.0, 250.0, 50.0, 22.0], 2, 1, ["signal"]),
+        obj("an-bank", f"fffb~ {AN_BANDS} 31.25 1.2599 4.3", [600.0, 280.0, 160.0, 22.0], 1, AN_BANDS, ["signal"] * AN_BANDS),
+        obj("an-metro", "metro 50", [800.0, 280.0, 60.0, 22.0], 2, 1, ["bang"]),
+        obj("an-order", "t b b", [800.0, 310.0, 40.0, 22.0], 1, 2, ["bang", "bang"]),
+        *[obj(f"an-rms-{k}", "average~ 2048 rms", [600.0 + k * 36, 330.0, 34.0, 22.0], 1, 1, ["signal"]) for k in range(AN_BANDS)],
+        *[obj(f"an-snap-{k}", "snapshot~", [600.0 + k * 36, 360.0, 34.0, 22.0], 2, 1, [""]) for k in range(AN_BANDS)],
+        obj("an-pack", "pack " + " ".join(["0."] * AN_BANDS), [600.0, 400.0, 400.0, 22.0], AN_BANDS, 1),
+        obj("an-prepend", "prepend analyzer_frame", [600.0, 430.0, 130.0, 22.0], 1, 1),
     ]
 
     lines = [
@@ -143,6 +155,15 @@ def build():
         # audio: pass through, and record
         wire("in", "out", 0, 0), wire("in", "out", 1, 1),
         wire("in", "rec", 0, 0), wire("in", "rec", 1, 1),
+        # Live analyzer: sum, filter, RMS; the metro bangs the snapshots, the leftmost (pack's hot inlet) last
+        wire("in", "an-sum", 0, 0), wire("in", "an-sum", 1, 1), wire("an-sum", "an-half"), wire("an-half", "an-bank"),
+        *[wire("an-bank", f"an-rms-{k}", k, 0) for k in range(AN_BANDS)],
+        *[wire(f"an-rms-{k}", f"an-snap-{k}") for k in range(AN_BANDS)],
+        *[wire("an-order", f"an-snap-{k}", 1, 0) for k in range(1, AN_BANDS)],
+        wire("an-order", "an-snap-0", 0, 0),
+        *[wire(f"an-snap-{k}", "an-pack", 0, k) for k in range(AN_BANDS)],
+        wire("route-out", "an-metro", 6, 0), wire("an-metro", "an-order"),
+        wire("an-pack", "an-prepend"), wire("an-prepend", "bridge"),
     ]
 
     p = patch["patcher"]

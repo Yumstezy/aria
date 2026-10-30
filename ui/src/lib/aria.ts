@@ -33,6 +33,11 @@ export interface Finding {
 export interface Part { name: string | null; label: string; start_bar: number; bars: number; start_sec: number; end_sec: number; energy_db: number; rise_db_per_bar: number; confidence: number }
 export interface SongParts { tempo: number | null; bars: number; sections: Part[]; names_by: string | null; names_error: string | null; error: string | null; song?: string }
 export interface Arrangement { mine: SongParts; ref: SongParts | null; at: number }
+export interface BeforeAfter {
+  start_bar: number; seconds: number; lufs: { before: number; after: number };
+  curve: { hz: number[]; mine: number[]; ref: number[] };   // mine: after, ref: before (both at the same loudness)
+  problems: { index: number; kind: Kind; hz_range: [number, number]; change_db: number | null }[];
+}
 
 /** The comparison with the producer's reference song (build step 8). diff_db is the mix minus the reference. */
 export interface RefCompare {
@@ -125,6 +130,9 @@ interface State {
   /** The song's parts (Arrangement), and how hearing the whole song is going */
   arrangement: Arrangement | null;
   hearing: Progress | null;
+  /** Before and after (Oct 30): the same bars heard again after a fix, and how it's going */
+  beforeAfter: BeforeAfter | null;
+  rechecking: Progress | null;
   /** Where the window is, as the bridge placed it */
   layout: { mode: "full" | "left" | "right"; side: "left" | "right" } | null;
 }
@@ -146,7 +154,7 @@ export const inMax = typeof window !== "undefined" && !!window.max?.outlet;
 let state: State = {
   ask: { open: typeof location !== "undefined" && new URLSearchParams(location.search).get("ask") === "1", pending: null, log: [] },
   engine: { state: "starting", text: "Starting Aria" },
-  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null }, undoNext: null, layout: null, arrangement: null, hearing: null,
+  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null }, undoNext: null, layout: null, arrangement: null, hearing: null, beforeAfter: null, rechecking: null,
 };
 
 // Dark (Night) unless the producer picked Light. Inside Live the bridge saves the choice and puts it in
@@ -255,7 +263,7 @@ export function connect() {
     on<{ state: EngineState; text: string }>("engine", (e) => set({ engine: e, ...(e.state === "error" ? { error: e.text }
       : e.state === "up" && state.engine.state === "error" && state.error === state.engine.text ? { error: null } : {}) }));
     on<Progress>("progress", (p) => set({ progress: p, error: null }));
-    on<Result>("mix_result", (r) => set({ result: r, progress: null, error: null }));
+    on<Result>("mix_result", (r) => set({ result: r, progress: null, error: null, beforeAfter: null }));   // a new check: a new "before"
     on<{ text: string }>("error", (e) => set({ error: e?.text || "Something went wrong.", progress: null }));
     on<{ bar: number; name: string }>("marker_done", (m) => set({ marker: m }));
     on<{ request: string | null }>("ask_pending", (p) => {
@@ -280,6 +288,9 @@ export function connect() {
     on<{ busy: boolean; text: string }>("ears", (e) => set({ ears: e }));
     on<Arrangement>("arrangement", (a) => set({ arrangement: a, hearing: null }));
     on<Progress>("arrangement_progress", (p) => set({ hearing: p }));
+    on<BeforeAfter>("before_after", (b) => set({ beforeAfter: b, rechecking: null }));
+    on<Progress>("before_after_progress", (p) => set({ rechecking: p }));
+    on<number[]>("analyzer", (frame) => analyzerListeners.forEach((l) => l(frame)));
     // The mapped key: hold to talk, let go to send. Only the popped-out chat listens, so it records once.
     if (new URLSearchParams(location.search).get("view") === "chat") on<{ down: boolean }>("voice_key", (k) => voiceKey(k.down));
     if (new URLSearchParams(location.search).get("view") === "chat") on("focus_ask", () => { arrive(); set({ askFocus: state.askFocus + 1 }); });
@@ -316,6 +327,28 @@ export function hearSong() {
   else notice("Hearing the whole song needs Aria inside Live.");
 }
 export const stopHearing = () => send("stop_hearing");
+/** Rename a part or move an edge: the bridge keeps the edit for markers and checks */
+export function editArrangement(sections: Part[]) {
+  if (!state.arrangement) return;
+  set({ arrangement: { ...state.arrangement, mine: { ...state.arrangement.mine, sections } } });
+  send("arrangement_edit", { sections });
+}
+
+// ---------- Before and after (Oct 30) ----------
+export function recheck() {
+  if (send("recheck")) set({ rechecking: { step: "start", text: "Going back to the same bars" } });
+  else notice("Checking the same bars again needs Aria inside Live.");
+}
+
+// ---------- Live analyzer (Oct 30): frames of 31 third-octave levels in dB, 20 a second ----------
+// Kept out of the main state, so a frame redraws only the analyzer, not the whole window.
+export const ANALYZER_HZ = Array.from({ length: 31 }, (_, k) => 31.25 * 1.2599 ** k);
+const analyzerListeners = new Set<(frame: number[]) => void>();
+export function onAnalyzer(fn: (frame: number[]) => void) {
+  analyzerListeners.add(fn);
+  send("analyzer_on");
+  return () => { analyzerListeners.delete(fn); if (!analyzerListeners.size) send("analyzer_off"); };
+}
 export const addArrangementMarkers = () => send("arrangement_markers");
 
 // ---------- Reference song (build step 8) ----------

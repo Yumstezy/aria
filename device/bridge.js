@@ -449,6 +449,8 @@ async function checkMix() {
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
     }
+    lastCheck = { file, start_beat: live.song_beat, tempo: live.tempo, beats_per_bar: live.beats_per_bar, start_bar: startBar,
+                  findings: (res.json.clarity && res.json.clarity.findings) || [] };
     lastResult = { ...res.json, start_bar: startBar, chain: live.chain, ...(parts.mine && parts.mine.name ? { part: parts.mine.name } : {}),
                    ...(songEndBar && startBar + BARS - 1 > songEndBar ? { song_end_bar: songEndBar } : {}) };
     toUI("mix_result", lastResult);
@@ -579,6 +581,85 @@ function partsFor(startBar, bars) {
   const theirs = arrangement.ref && arrangement.ref.sections.filter((s) => s.name === mine.name)
     .sort((a, b) => b.energy_db - a.energy_db)[0];   // their loudest part of that name: the one producers compare
   return { mine, theirs };
+}
+
+// ---------- Live analyzer (Oct 30) ----------
+// The device's filter bank (Aria.amxd, an-*) reads 31 third-octave bands of Main 20 times a second, only while the
+// window's analyzer is open. Frames go to the window alone, in dB, never to the strip or the chat.
+let analyzerOn = false;
+Max.addHandler("analyzer_on", () => { analyzerOn = true; Max.outlet("an", 1); });
+Max.addHandler("analyzer_off", () => { analyzerOn = false; Max.outlet("an", 0); });
+Max.addHandler("analyzer_frame", (...rms) => {
+  if (!analyzerOn || !windowLoaded) return;
+  Max.outlet("window", "analyzer", encode(rms.map((x) => (x > 1e-6 ? Math.round(200 * Math.log10(x)) / 10 : -120))));
+});
+
+// ---------- Arrangement edits (Oct 30): renamed parts and moved edges, kept for markers and checks ----------
+Max.addHandler("arrangement_edit", (s) => {
+  const { sections } = decode(s);
+  if (!arrangement || !Array.isArray(sections) || !sections.length) return;
+  arrangement = { ...arrangement, mine: { ...arrangement.mine, sections, edited: true } };
+  toUI("arrangement", arrangement);
+});
+
+// ---------- Before and after (Oct 30): the same bars again, after a fix, at the same loudness ----------
+// Live plays from the bar the last check started in, and Main is recorded long enough to cover the same beats.
+// The engine lines the two up beat for beat, matches their loudness and says what changed in each problem's range.
+let lastCheck = null;   // { file, start_beat, tempo, beats_per_bar, start_bar, findings }
+Max.addHandler("recheck", () => serial(recheck));
+
+async function recheck() {
+  if (busy || !lastCheck) return;
+  busy = true;
+  const c = lastCheck;
+  try {
+    await ensureEngine();
+    toUI("before_after_progress", { step: "start", text: `Going to bar ${c.start_bar}` });
+    let live = await askLive("state", "live_state");
+    if (live.playing) {
+      const stopped = new Promise((resolve) => { waiters.live_playing = (on) => { if (!on) { delete waiters.live_playing; resolve(); } }; });
+      toLive("stop_song");
+      await Promise.race([stopped, sleep(LIVE_TIMEOUT_MS)]);
+      delete waiters.live_playing;
+    }
+    await askLive("jump", "jump_done", c.start_bar);
+    const playing = waitForPlaying(LIVE_TIMEOUT_MS);
+    toLive("play");
+    await playing;
+    const barBeat = (c.start_bar - 1) * c.beats_per_bar;
+    for (let i = 0; i < 20; i++) {
+      live = await askLive("state", "live_state");
+      if (Math.abs(live.song_beat - barBeat) < c.beats_per_bar) break;
+      await sleep(100);
+    }
+    const startBeat = live.song_beat;
+    const beats = (c.start_beat - startBeat) + BARS * c.beats_per_bar;   // up to where the first check ended
+    const ms = Math.round(beats * 60000 / live.tempo) + 300;
+    fs.mkdirSync(REC_DIR, { recursive: true });
+    const file = path.join(REC_DIR, `after-${Date.now()}.aif`);
+    recording = { stopped: false };
+    toRec("samptype", "float32");
+    toRec("open", file);
+    toRec("record", ms);
+    const started = Date.now();
+    while (Date.now() - started < ms) {
+      if (recording.stopped) { toRec(0); recording = null; throw new UserError("Playback stopped before the bars were heard again."); }
+      toUI("before_after_progress", { step: "record", text: `Listening to bars ${c.start_bar} to ${c.start_bar + BARS - 1} again`, done: Date.now() - started, total: ms });
+      await sleep(250);
+    }
+    await sleep(FILE_SETTLE_MS);
+    recording = null;
+    toUI("before_after_progress", { step: "analyze", text: "Comparing before and after at the same loudness" });
+    const res = await request("POST", "/mix/before-after", {
+      before: { path: c.file, start_beat: c.start_beat }, after: { path: file, start_beat: startBeat },
+      tempo: c.tempo, bars: BARS, findings: c.findings }, ANALYZE_TIMEOUT_MS);
+    if (res.status !== 200) throw new UserError((res.json && res.json.detail) || `The engine couldn't compare them (HTTP ${res.status}).`);
+    toUI("before_after", { ...res.json, start_bar: c.start_bar });
+  } catch (e) {
+    toUI("before_after_progress", { step: "error", text: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
+  } finally {
+    busy = false;
+  }
 }
 
 // ---------- messages from the UI ----------
@@ -767,6 +848,7 @@ Max.addHandler("close_chat", (s) => {
 // Closes only the main window. A popped-out chat stays, and grows into the space.
 Max.addHandler("close_window", () => {
   mainOpen = false;
+  if (analyzerOn) { analyzerOn = false; Max.outlet("an", 0); }
   Max.outlet("window", "wclose");
   if (chatOpen) placeChatAlone(loadWindowPrefs());
 });

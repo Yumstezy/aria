@@ -11,15 +11,17 @@ import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
 import { GlowCard, type Accent } from "@/components/ui/glow-card";
 import { RefChart, RefLegend, THEIRS, YOURS } from "@/components/ref-chart";
+import { Plot, PlotGrid, dbTicksOf, plotX, tilt } from "@/components/plot";
+import { path } from "@/components/waves";
 import { ProblemThumb } from "@/components/problem-thumb";
 import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon, SwapIcon, GoodMixIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
-import { addArrangementMarkers, barsLabel, checkMix, clearReference, hearSong, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
+import { ANALYZER_HZ, addArrangementMarkers, barsLabel, checkMix, clearReference, editArrangement, hearSong, onAnalyzer, recheck, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
          partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Part, type RefCompare, type Result, type SongParts } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
-type View = "home" | "mixcheck" | "arrangement" | "reference";
+type View = "home" | "mixcheck" | "arrangement" | "analyzer" | "reference";
 
 // Docked (a narrow panel beside Live) keeps the rail as icons and stacks the bento in one column.
 // Short as well as narrow means Ask Muse is popped out under it: show only what to fix.
@@ -64,8 +66,9 @@ export function AriaWindow() {
             <div className="flex items-center gap-2.5" style={{ minHeight: 32 }}>
               <span className="flex items-center gap-2 text-[14px] text-ink-muted">
                 {view === "mixcheck" ? <MixIcon style={{ width: 16, height: 16 }} /> : view === "reference" ? <ReferenceIcon style={{ width: 16, height: 16 }} />
-                  : view === "arrangement" ? <ArrangementIcon style={{ width: 16, height: 16 }} /> : <HomeIcon style={{ width: 16, height: 16 }} />}
-                {view === "mixcheck" ? "Mix check" : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : "Home"}</span>
+                  : view === "arrangement" ? <ArrangementIcon style={{ width: 16, height: 16 }} /> : view === "analyzer" ? <AnalyzerIcon style={{ width: 16, height: 16 }} />
+                  : <HomeIcon style={{ width: 16, height: 16 }} />}
+                {view === "mixcheck" ? "Mix check" : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : view === "analyzer" ? "Live analyzer" : "Home"}</span>
               <div className="ml-auto flex items-center gap-2">
                 {!narrow && view === "mixcheck" && result && (
                   <div className="cp-seg" role="group" aria-label="View">
@@ -84,9 +87,9 @@ export function AriaWindow() {
               </div>
             </div>
             {view !== "home" && <h1 className="cp-title" style={{ fontSize: narrow ? 28 : 34, lineHeight: narrow ? "34px" : "40px" }}>
-              {view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : "Home"}
+              {view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : view === "analyzer" ? "Live analyzer" : "Home"}
               <span className="text-ink-faint">{view === "mixcheck" ? (result ? `${result.part ? ` ${result.part}` : ""}${result.recording.tempo ? ` ${Math.round(result.recording.tempo)} BPM` : ""}` : "")
-                : view === "reference" || view === "arrangement" ? "" : session ? ` ${Math.round(session.tempo)} BPM` : ""}</span>
+                : view === "reference" || view === "arrangement" || view === "analyzer" ? "" : session ? ` ${Math.round(session.tempo)} BPM` : ""}</span>
             </h1>}
             {narrow && view === "mixcheck" && result && (
               <div className="cp-seg justify-self-start" role="group" aria-label="View">
@@ -107,6 +110,7 @@ export function AriaWindow() {
           {(view === "home" || view === "mixcheck") && <KeyTracks />}
           {view === "home" ? <Home narrow={narrow} onOpen={openMixCheck} go={setView} />
             : view === "arrangement" ? <ArrangementScreen narrow={narrow} onReference={() => setView("reference")} />
+            : view === "analyzer" ? <LiveAnalyzer narrow={narrow} />
             : view === "reference" ? <ReferenceScreen narrow={narrow} onOpen={openMixCheck} />
             : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />
@@ -199,7 +203,7 @@ const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView
         {item("home", "Home", <HomeIcon />)}
         {item("mixcheck", "Mix check", <MixIcon />, list.length ? <span className="ae-count">{list.length}</span> : null)}
         {item("arrangement", "Arrangement", <ArrangementIcon />)}
-        {item(null, "Live analyzer", <AnalyzerIcon />)}
+        {item("analyzer", "Live analyzer", <AnalyzerIcon />)}
         {item(null, "Groove match", <GrooveIcon />)}
         {item("reference", "Reference", <ReferenceIcon />)}
       </nav>
@@ -323,8 +327,14 @@ const timeOf = (bars: number, tempo: number | null) => {
 /** One song's parts, like clips in Ableton's Arrangement: each part a block with a colored name strip on its own
     full-width timeline (songs differ in length and tempo, so they're matched by name, not by bar), the bar each part
     starts on under it, and the parts as a list, which carries the words when the window is narrow. */
-function SongLane({ title, song, narrow, outline }: { title: string; song: SongParts; narrow: boolean; outline?: (p: Part) => boolean }) {
+const PART_NAMES = ["Intro", "Build", "Drop", "Break", "Bridge", "Outro"];
+
+function SongLane({ title, song, narrow, outline, editable }: { title: string; song: SongParts; narrow: boolean; outline?: (p: Part) => boolean; editable?: boolean }) {
   const parts = song.sections, total = parts.reduce((n, p) => n + p.bars, 0) || 1;
+  const rename = (i: number, name: string) => editArrangement(parts.map((p, k) => (k === i ? { ...p, name } : p)));
+  // Move where part i starts: the part before it grows or shrinks to match, no part under 4 bars
+  const move = (i: number, d: number) => editArrangement(parts.map((p, k) =>
+    k === i - 1 ? { ...p, bars: p.bars + d } : k === i ? { ...p, start_bar: p.start_bar + d, bars: p.bars - d } : p));
   const first = parts[0]?.start_bar ?? 1;
   const at = (bar: number) => ((bar - first) / total) * 100;
   return (
@@ -332,7 +342,7 @@ function SongLane({ title, song, narrow, outline }: { title: string; song: SongP
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="truncate text-[14px] font-medium text-ink" title={title}>{title}</span>
         <span className="font-mono text-[11.5px] text-ink-faint">{total} bars{timeOf(total, song.tempo)}{song.tempo ? ` · ${Math.round(song.tempo)} BPM` : ""}</span>
-        <span className="ml-auto font-mono text-[11px] text-ink-faint">{song.names_by ? "named by Muse Spark" : song.names_error}</span>
+        <span className="ml-auto font-mono text-[11px] text-ink-faint">{(song as SongParts & { edited?: boolean }).edited ? "named by Muse Spark, edited by you" : song.names_by ? "named by Muse Spark" : song.names_error}</span>
       </div>
       {/* the timeline */}
       <div className="relative" style={{ height: narrow ? 34 : 64 }}>
@@ -363,13 +373,25 @@ function SongLane({ title, song, narrow, outline }: { title: string; song: SongP
           <span key={p.start_bar} className={cn("absolute font-mono text-[10px] text-ink-faint", i && "-translate-x-1/2")} style={{ left: `${at(p.start_bar)}%` }}>{p.start_bar}</span>
         ))}
       </div>
-      {/* the parts in words */}
-      <div className={cn("grid gap-x-6 gap-y-1.5 border-t border-hairline pt-3", narrow ? "grid-cols-1" : "grid-cols-2 xl:grid-cols-3")}>
-        {parts.map((p) => (
-          <div key={p.start_bar} className="flex items-center gap-2.5 text-[13px]">
+      {/* the parts in words; on your song, each name is a menu and each edge moves by 4 bars (Ian, Oct 30) */}
+      <div className={cn("grid gap-x-6 gap-y-1.5 border-t border-hairline pt-3", narrow || editable ? "grid-cols-1" : "grid-cols-2 xl:grid-cols-3")}>
+        {parts.map((p, i) => (
+          <div key={i} className="flex items-center gap-2.5 text-[13px]">
             <span className="size-2.5 flex-none rounded-[3px]" style={{ background: partColor_(p) }} />
-            <span className="font-medium text-ink">{partName(p)}</span>
+            {editable ? (
+              <select className="rounded-[7px] border border-hairline bg-transparent px-1.5 py-0.5 font-medium text-ink" value={p.name ?? ""}
+                      aria-label={`Name of the part at bar ${p.start_bar}`} onChange={(e) => rename(i, e.target.value)}>
+                {!p.name && <option value="">{partName(p)}</option>}
+                {PART_NAMES.map((n) => <option key={n} value={n} style={{ background: "var(--card)" }}>{n}</option>)}
+              </select>
+            ) : <span className="font-medium text-ink">{partName(p)}</span>}
             <span className="ml-auto font-mono text-[11.5px] text-ink-muted">bars {p.start_bar} to {p.start_bar + p.bars - 1}</span>
+            {editable && (
+              <span className="flex gap-1" title="Move where this part starts by 4 bars">
+                <button className="cp-btn cp-btn-ghost cp-btn-sm px-1.5 font-mono" disabled={i === 0 || parts[i - 1].bars <= 4} onClick={() => move(i, -4)} aria-label={`Start ${partName(p)} 4 bars earlier`}>−4</button>
+                <button className="cp-btn cp-btn-ghost cp-btn-sm px-1.5 font-mono" disabled={i === 0 || p.bars <= 4} onClick={() => move(i, 4)} aria-label={`Start ${partName(p)} 4 bars later`}>+4</button>
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -414,7 +436,7 @@ const ArrangementScreen = memo(function ArrangementScreen({ narrow, onReference 
   const mineNames = new Set(mine.sections.map((p) => p.name).filter(Boolean));
   return (
     <div className="cp-bento">
-      <SongLane title="Your song" song={mine} narrow={narrow} />
+      <SongLane title="Your song" song={mine} narrow={narrow} editable />
       {theirs ? <SongLane title={theirs.song ?? "Your reference"} song={theirs} narrow={narrow} outline={(p) => !!p.name && mineNames.has(p.name)} />
         : <button className={cn("cp-tile cp-card text-left text-[13.5px] text-ink-muted hover:text-ink", span(narrow, 12))} onClick={onReference}>
             {ref ? "Reading your reference's parts" : "Pick a reference song to see its parts here, and compare part by part"}</button>}
@@ -624,6 +646,111 @@ function GoodMixRows({ rows, narrow }: { rows: NonNullable<Result["typical"]>["b
   );
 }
 
+/** Before and after (Oct 30): after a fix, hear the same bars again. Both takes at the same loudness: before in blue,
+    after in gold, and how much each problem's range changed. */
+function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
+  const ba = useAriaSel((s) => s.beforeAfter), busy = useAriaSel((s) => s.rechecking), progress = useAriaSel((s) => !!s.progress);
+  const list = problemsOf(r);
+  const working = !!busy && busy.step !== "error";
+  const share = busy?.total ? Math.min(1, (busy.done ?? 0) / busy.total) : 0;
+  return (
+    <Rise i={5}>
+      <section className="cp-tile cp-card" style={{ gap: 12 }}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-[14px] font-medium text-ink">Before and after</span>
+          {ba && <div className="min-w-0"><RefLegend name="Before" mine="After" /></div>}
+          <button className="cp-btn cp-btn-sm ml-auto" disabled={working || progress} onClick={recheck}>
+            {working ? "Listening" : ba ? "Check again" : `Check bars ${r.start_bar ?? ""} to ${(r.start_bar ?? 0) + 15} again`}</button>
+        </div>
+        {working && (
+          <div className="grid gap-2">
+            <div className="relative h-1.5 overflow-hidden rounded-full bg-well"><div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.max(2, share * 100)}%`, background: "var(--trk-0)" }} /></div>
+            <span className="cp-meta" role="status">{busy!.text}</span>
+          </div>
+        )}
+        {!working && busy?.step === "error" && <span className="cp-meta" style={{ color: "var(--hot)" }}>{busy.text}</span>}
+        {!working && !ba && busy?.step !== "error" && <span className="cp-meta">After Fix it, Aria plays the same bars again and shows what changed, at the same loudness.</span>}
+        {ba && !working && (
+          <>
+            <RefChart r={{ name: "Before", path: "", error: null, bands: [], curve: ba.curve }} height={narrow ? 300 : 170}
+                      zones={list.map((p, i) => zoneOf(p, i + 1))} />
+            <div className="grid gap-1.5">
+              {ba.problems.map((c) => {
+                const p = list.findIndex((x) => x.findings.some((f) => r.clarity.findings.indexOf(f) === c.index));
+                const name = p >= 0 ? list[p].name : `Problem ${c.index + 1}`;
+                const down = (c.change_db ?? 0) < -0.4, up = (c.change_db ?? 0) > 0.4;
+                return (
+                  <div key={c.index} className="flex items-center gap-2.5 text-[13px]">
+                    {p >= 0 && <span className="ae-pin" style={{ width: 20, height: 20, fontSize: 10 }}>{p + 1}</span>}
+                    <span className="truncate text-ink">{name}</span>
+                    <span className="ae-mono ml-auto" style={{ color: down ? "var(--good)" : up ? "var(--hot)" : undefined }}>
+                      {c.change_db === null ? "not measured" : `${c.change_db > 0 ? "+" : c.change_db < 0 ? "−" : ""}${Math.abs(c.change_db).toFixed(1)} dB ${down ? "less" : up ? "more" : "same"}`}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <span className="font-mono text-[11px] text-ink-faint">both at the same loudness · {ba.lufs.before} and {ba.lufs.after} LUFS as heard</span>
+          </>
+        )}
+      </section>
+    </Rise>
+  );
+}
+
+/** Live analyzer (Oct 30): your song's sound as it plays, 31 third-octave bands from Main, drawn like every chart
+    (Pro-Q tilt), with a peak line that holds a moment. Behind it, the shape of your reference (or the typical good mix
+    from your last check), matched to your level, so you see where the song falls short or sticks out as it plays. */
+function LiveAnalyzer({ narrow }: { narrow: boolean }) {
+  const result = useAriaSel((s) => s.result);
+  const [frame, setFrame] = useState<number[] | null>(null);
+  const peak = useRef<number[] | null>(null), avg = useRef<number[] | null>(null);
+  useEffect(() => onAnalyzer((f) => {
+    peak.current = f.map((v, i) => Math.max(v, (peak.current?.[i] ?? -120) - 0.6));       // falls 12 dB a second
+    avg.current = f.map((v, i) => (avg.current ? avg.current[i] * 0.97 + v * 0.03 : v));   // a few seconds' average
+    setFrame(f);
+  }), []);
+  const target = result?.reference?.curve ? { name: result.reference.name, hz: result.reference.curve.hz, v: result.reference.curve.ref }
+    : result?.typical?.curve ? { name: "Typical good mix", hz: result.typical.curve.hz, v: result.typical.curve.ref } : null;
+  const hz = ANALYZER_HZ.filter((h) => h <= 16000);
+  const W = 640, H = narrow ? 360 : 260, n = hz.length;
+  const draw = (vals: number[]) => vals.slice(0, n).map((v, i) => v + tilt(hz[i]));
+  const live = frame ? draw(frame) : null, pk = peak.current ? draw(peak.current) : null;
+  // The target's shape at the analyzer's bands, moved to the live average's level (between 100 Hz and 5 kHz)
+  let tgt: number[] | null = null;
+  if (target && avg.current) {
+    const at = (f: number) => { let k = 0; target.hz.forEach((h, j) => { if (Math.abs(Math.log(h / f)) < Math.abs(Math.log(target.hz[k] / f))) k = j; }); return target.v[k]; };
+    const shape = hz.map(at);
+    const mid = hz.map((h, i) => [h, i] as const).filter(([h]) => h >= 100 && h <= 5000).map(([, i]) => i);
+    const shift = mid.reduce((a, i) => a + (avg.current![i] - shape[i]), 0) / mid.length;
+    tgt = draw(shape.map((v) => v + shift));
+  }
+  const top = Math.max(-6, ...(pk ?? [-6])) + 3, floor = top - 54;
+  const X = (f: number) => plotX(f), Y = (db: number) => 8 + (1 - (Math.max(db, floor) - floor) / (top - floor)) * (H - 28);
+  const line = (v: number[]) => path(v.map((d, i) => [X(hz[i]), Y(d)] as [number, number]));
+  const ticks = dbTicksOf(-48, 12, (db) => Y(db + top - 3));
+  return (
+    <div className="grid gap-4 pt-1">
+      <section className="cp-tile cp-card" style={{ gap: 12 }}>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-[14px] font-medium text-ink">{frame ? "Playing now" : "Play your song"}</span>
+          <span className="font-mono text-[11px] text-ink-faint">Main · 20 frames a second</span>
+          {target && <div className="ml-auto min-w-0"><RefLegend name={`${target.name}, matched to your level`} mine="Now" /></div>}
+        </div>
+        <Plot height={H} dbTicks={ticks}>
+          <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="Your song's sound right now">
+            <PlotGrid height={H} dbTicks={ticks} />
+            {tgt && <path d={line(tgt)} fill="none" stroke={THEIRS} strokeWidth={1.6} strokeDasharray="5 4" opacity={0.85} vectorEffect="non-scaling-stroke" />}
+            {live && <path d={`${line(live)}L${X(hz[n - 1])},${H}L${X(hz[0])},${H}Z`} fill={YOURS} opacity={0.12} />}
+            {live && <path d={line(live)} fill="none" stroke={YOURS} strokeWidth={1.8} vectorEffect="non-scaling-stroke" />}
+            {pk && <path d={line(pk)} fill="none" stroke="var(--ink)" strokeWidth={1} opacity={0.45} vectorEffect="non-scaling-stroke" />}
+          </svg>
+        </Plot>
+        {!frame && <span className="cp-meta">Press play in Live. The analyzer listens to your Main track while this screen is open.</span>}
+      </section>
+    </div>
+  );
+}
+
 const EASE = [0.32, 0.72, 0, 1] as const;
 
 /** Cards rise in one after another when a result arrives. */
@@ -736,6 +863,8 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
           </section>
         </Rise>
       )}
+
+      <BeforeAfterCard r={r} narrow={narrow} />
 
       <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 1fr)" : "minmax(0, 1.55fr) minmax(0, 1fr)", alignItems: "start" }}>
         {!(r.reference && !r.reference.error && r.reference.curve) && <Rise i={3}>

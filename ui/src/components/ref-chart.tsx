@@ -88,10 +88,10 @@ export function RefChart({ r, height = 240, zones = [], onZone, range }: {
 }
 
 /** "● Yours  ● THE WEEKEND.wav" */
-export function RefLegend({ name }: { name: string }) {
+export function RefLegend({ name, mine = "Yours" }: { name: string; mine?: string }) {
   return (
     <div className="flex min-w-0 flex-wrap gap-x-3.5 gap-y-1 text-[12.5px] text-ink-muted">
-      <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: YOURS }} />Yours</span>
+      <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: YOURS }} />{mine}</span>
       <span className="inline-flex min-w-0 items-center gap-1.5"><span className="ae-dot" style={{ color: THEIRS }} /><span className="truncate">{name}</span></span>
     </div>
   );
