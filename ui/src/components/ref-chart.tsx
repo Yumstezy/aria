@@ -62,10 +62,17 @@ export function RefChart({ r, height = 240, zones = [], onZone }: {
             <clipPath id={`${id}-ar`}><path d={shape.aboveRef} /></clipPath>
           </defs>
           <PlotGrid height={H} dbTicks={shape.ticks} />
-          {zones.map((z) => (
-            <rect key={z.n} x={X(Math.max(PLOT_LO, z.lo))} y={0} width={Math.max(5, X(Math.min(PLOT_HI, z.hi)) - X(Math.max(PLOT_LO, z.lo)))} height={H}
-                  fill="var(--hot)" opacity={0.09} className={onZone ? "cursor-pointer" : undefined} onClick={() => onZone?.(z.n)} />
-          ))}
+          {/* Each problem: a thin strip along the top under its number; its full shade only while pointed at
+              (Ian: the shading covered half the chart when a problem spans whole bands) */}
+          {zones.map((z) => {
+            const x = X(Math.max(PLOT_LO, z.lo)), w = Math.max(5, X(Math.min(PLOT_HI, z.hi)) - x);
+            return (
+              <g key={z.n} className="group cursor-pointer" onClick={() => onZone?.(z.n)}>
+                <rect x={x} y={0} width={w} height={H} fill="var(--hot)" className="opacity-0 transition-opacity group-hover:opacity-[0.1]" />
+                <rect x={x} y={PAD_T - 6} width={w} height={3} rx={1.5} fill="var(--hot)" opacity={0.85} />
+              </g>
+            );
+          })}
           {/* The gap: blue where the reference is fuller (above your line), gold where yours is */}
           <path d={shape.between} fill={THEIRS} opacity={0.3} clipPath={`url(#${id}-am)`} />
           <path d={shape.between} fill={YOURS} opacity={0.3} clipPath={`url(#${id}-ar)`} />

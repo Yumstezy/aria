@@ -117,8 +117,10 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
                onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
             <PlotGrid height={H} dbTicks={ticks} />
             {zones.map((z, i) => (
-              <rect key={i} x={X(z.lo)} y={0} width={Math.max(6, X(z.hi) - X(z.lo))} height={H} fill="var(--hot)" opacity={0.09}
-                    className="cursor-pointer hover:opacity-30" onClick={() => onZone(z.f)} />
+              <g key={i} className="group cursor-pointer" onClick={() => onZone(z.f)}>
+                <rect x={X(z.lo)} y={0} width={Math.max(6, X(z.hi) - X(z.lo))} height={H} fill="var(--hot)" className="opacity-0 transition-opacity group-hover:opacity-[0.1]" />
+                <rect x={X(z.lo)} y={PAD_T - 8} width={Math.max(6, X(z.hi) - X(z.lo))} height={3} rx={1.5} fill="var(--hot)" opacity={0.85} />
+              </g>
             ))}
             {waves.map((wv, i) => (
               <motion.g key={wv.n} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: "easeOut", delay: i * 0.06 }}>

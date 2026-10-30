@@ -9,6 +9,7 @@ import { TickGauge } from "@/components/tick-gauge";
 import { CountUp } from "@/components/count-up";
 import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
+import { GlowCard, type Accent } from "@/components/ui/glow-card";
 import { RefChart, RefLegend, THEIRS, YOURS } from "@/components/ref-chart";
 import { ProblemThumb } from "@/components/problem-thumb";
 import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
@@ -82,11 +83,11 @@ export function AriaWindow() {
                 ) : <LayoutMenu mode="full" />}
               </div>
             </div>
-            <h1 className="cp-title" style={{ fontSize: narrow ? 28 : 34, lineHeight: narrow ? "34px" : "40px" }}>
+            {view !== "home" && <h1 className="cp-title" style={{ fontSize: narrow ? 28 : 34, lineHeight: narrow ? "34px" : "40px" }}>
               {view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : "Home"}
               <span className="text-ink-faint">{view === "mixcheck" ? (result ? `${result.part ? ` ${result.part}` : ""}${result.recording.tempo ? ` ${Math.round(result.recording.tempo)} BPM` : ""}` : "")
                 : view === "reference" || view === "arrangement" ? "" : session ? ` ${Math.round(session.tempo)} BPM` : ""}</span>
-            </h1>
+            </h1>}
             {narrow && view === "mixcheck" && result && (
               <div className="cp-seg justify-self-start" role="group" aria-label="View">
                 <button aria-pressed={!detailed} onClick={() => setDetailed(false)}>Simple</button>
@@ -104,7 +105,7 @@ export function AriaWindow() {
           )}
 
           {(view === "home" || view === "mixcheck") && <KeyTracks />}
-          {view === "home" ? <Home narrow={narrow} onOpen={openMixCheck} />
+          {view === "home" ? <Home narrow={narrow} onOpen={openMixCheck} go={setView} />
             : view === "arrangement" ? <ArrangementScreen narrow={narrow} onReference={() => setView("reference")} />
             : view === "reference" ? <ReferenceScreen narrow={narrow} onOpen={openMixCheck} />
             : !result ? <EmptyCheck narrow={narrow} />
@@ -239,39 +240,65 @@ const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView
 
 // ---------- Home ----------
 
-/** Home (Ember, Oct 29): no setup steps (Ian: "everything should be self explanatory"). Before a check, the
-    kinds of problem Aria finds, as icons, and Check mix. After one, how many to fix and the real picture. */
-const Home = memo(function Home({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
+/** Home, like the website (Ian, Oct 29: "the website should be your reference"): a big calm headline that says the
+    state of the song in words, then cards. Before a check, what Aria listens for; after one, what to fix, each a card
+    that opens Mix check on it. Then the two other places: Arrangement and Reference. */
+const Home = memo(function Home({ narrow, onOpen, go }: { narrow: boolean; onOpen: () => void; go: (v: View) => void }) {
   const result = useAriaSel((s) => s.result), progress = useAriaSel((s) => !!s.progress);
+  const arr = useAriaSel((s) => s.arrangement), ref = useAriaSel(referenceOf);
   const list = result ? problemsOf(result) : [];
-
+  const accentOf = (p: Problem): Accent => (p.findings[0].kind === "reference" ? ((p.findings[0].diff_db ?? 0) > 0 ? "gold" : "blue") : "hot");
+  const chip = { width: 36, height: 36, borderRadius: 11 };
   return (
-    <div className="cp-bento">
-      <section className={cn("cp-tile cp-hero", span(narrow, 12))} style={{ gap: 12 }}>
-        <span className="cp-cap">Your song</span>
-        {result ? (
-          <>
-            <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-              <span className="ae-big"><CountUp value={list.length} /></span>
-              <span className="pb-1.5 text-[15px] text-ink-muted">{list.length ? "to fix" : "Nothing sticks out"}</span>
-              <div className="flex gap-1.5 pb-1">{list.map((p, i) => <span key={i} className="ae-kind" title={p.name}>{iconFor(p)}</span>)}</div>
-              <span className="ae-mono ml-auto pb-1.5">{barsLabel(result)}</span>
-            </div>
-            {result.clarity.spectra && <div style={{ height: narrow ? 72 : 96 }}><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode !== "master"} /></div>}
-            <div><button className="cp-btn cp-btn-light" onClick={onOpen}>See what to fix</button></div>
-          </>
-        ) : (
-          <>
-            <span className="ae-big">Not checked yet</span>
-            <div className="ae-kinds">
-              {KINDS.map((k) => <span key={k.kind} title={k.name}><span className="ae-kind is-idle">{k.icon}</span>{k.name}</span>)}
-            </div>
-            <div><button className="cp-btn cp-btn-primary" disabled={progress} onClick={checkMix}>{progress ? "Checking" : "Check mix"}</button></div>
-          </>
-        )}
-      </section>
+    <div className="grid gap-10 pt-2">
+      <div className="grid gap-4">
+        <h2 className="m-0 font-medium tracking-[-0.035em]" style={{ fontSize: narrow ? 34 : 52, lineHeight: 1.04 }}>
+          {!result ? <>Your mix, checked.<br /><span className="text-ink-faint">Play the busiest part, press Check.</span></>
+            : list.length ? <>{list.length} {list.length === 1 ? "thing" : "things"} to fix<br /><span className="text-ink-faint">in {barsLabel(result).toLowerCase()}{result.part ? `, your ${result.part.toLowerCase()}` : ""}.</span></>
+            : <>Nothing sticks out.<br /><span className="text-ink-faint">Check another part next.</span></>}
+        </h2>
+        {!result && <div><button className="cp-btn cp-btn-primary" disabled={progress} onClick={checkMix}>{progress ? "Checking" : "Check mix"}</button></div>}
+      </div>
 
-      <WhereItHappens r={result} narrow={narrow} onPick={onOpen} />
+      {result && list.length > 0 ? (
+        <div className={cn("grid gap-3", narrow ? "grid-cols-1" : "grid-cols-3")}>
+          {list.slice(0, 6).map((p, i) => (
+            <button key={i} className="text-left" onClick={onOpen}>
+              <GlowCard accent={accentOf(p)} className="h-full">
+                <span className="ae-kind" style={chip}>{iconFor(p)}</span>
+                <b className="mt-4 text-[16.5px] font-medium leading-snug">{p.name}</b>
+                <span className="ae-mono mt-1">{p.where}</span>
+                <span className="ae-mono mt-auto pt-3" style={{ color: p.findings[0].kind === "reference" ? refColor(p) : "var(--hot)" }}>{amountText(p)}</span>
+              </GlowCard>
+            </button>
+          ))}
+        </div>
+      ) : !result && (
+        <div className={cn("grid gap-3", narrow ? "grid-cols-2" : "grid-cols-6")}>
+          {KINDS.map((k) => (
+            <GlowCard key={k.kind} accent="white" className="h-full">
+              <span className="ae-kind is-idle" style={chip}>{k.icon}</span>
+              <b className="mt-4 text-[14.5px] font-medium leading-snug">{k.name}</b>
+            </GlowCard>
+          ))}
+        </div>
+      )}
+
+      <div className={cn("grid gap-3", narrow ? "grid-cols-1" : "grid-cols-2")}>
+        <button className="text-left" onClick={() => go("arrangement")}>
+          <GlowCard accent="gold" className="h-full">
+            <div className="flex items-center gap-3"><span className="ae-kind is-idle" style={chip}><ArrangementIcon /></span><b className="text-[16.5px] font-medium">Arrangement</b></div>
+            <p className="m-0 mt-3 text-[14px] leading-relaxed text-ink-muted">
+              {arr?.mine && !arr.mine.error ? arr.mine.sections.map((x) => x.name ?? `Part ${x.label}`).join(", ") : "Aria hears your whole song and names its parts."}</p>
+          </GlowCard>
+        </button>
+        <button className="text-left" onClick={() => go("reference")}>
+          <GlowCard accent="blue" className="h-full">
+            <div className="flex items-center gap-3"><span className="ae-kind is-idle" style={chip}><ReferenceIcon /></span><b className="text-[16.5px] font-medium">Reference</b></div>
+            <p className="m-0 mt-3 truncate text-[14px] leading-relaxed text-ink-muted">{ref ? `Comparing with ${ref.name}` : "Pick a song you love, see how yours compares."}</p>
+          </GlowCard>
+        </button>
+      </div>
     </div>
   );
 });
@@ -357,29 +384,28 @@ const ArrangementScreen = memo(function ArrangementScreen({ narrow, onReference 
   const mine = arr?.mine && !arr.mine.error ? arr.mine : null;
   const theirs = arr?.ref && !arr.ref.error ? arr.ref : null;
 
-  // Listening, or nothing heard yet
+  // Listening, or nothing heard yet. Before: only the button and one short line, which goes once the song is heard (Ian)
   if (busy || !mine) {
+    const err = hearing?.step === "error" ? hearing.text : arr?.mine.error;
     return (
-      <div className="cp-bento">
-        <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 14 }}>
-          <span className="cp-cap">Your song</span>
-          <div className="relative h-14 overflow-hidden rounded-[10px] border border-dashed" style={{ borderColor: "var(--track)" }}>
-            {busy && <div className="absolute inset-y-0 left-0 transition-[width] duration-300 ease-linear" style={{ width: `${share * 100}%`, background: "color-mix(in srgb, var(--trk-0) 22%, transparent)" }} />}
-            {busy && hearing?.step === "record" && <div className="absolute inset-y-0 w-px bg-ink" style={{ left: `${share * 100}%` }} />}
-          </div>
-          {busy ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="cp-meta" role="status">{hearing!.text}</span>
+      <div className="grid gap-5 pt-2">
+        {busy ? (
+          <GlowCard accent="gold">
+            <div className="relative h-2 overflow-hidden rounded-full bg-well">
+              <div className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-300 ease-linear" style={{ width: `${Math.max(2, share * 100)}%`, background: "var(--trk-0)" }} />
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className="text-[15px] text-ink" role="status">{hearing!.text}</span>
               {hearing!.step === "record" && <button className="cp-btn cp-btn-ghost cp-btn-sm ml-auto" onClick={stopHearing}>Stop</button>}
             </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="cp-meta" style={hearing?.step === "error" || arr?.mine.error ? { color: "var(--hot)" } : undefined}>
-                {hearing?.step === "error" ? hearing.text : arr?.mine.error ?? "Aria plays your song from the start once, about as long as the song. Nothing in it changes."}</span>
-              <button className="cp-btn cp-btn-primary cp-btn-sm ml-auto" onClick={hearSong}>Hear the whole song</button>
-            </div>
-          )}
-        </section>
+          </GlowCard>
+        ) : (
+          <div className="grid justify-items-start gap-3">
+            <button className="cp-btn cp-btn-primary" onClick={hearSong}><ArrangementIcon style={{ width: 16, height: 16 }} />Hear the whole song</button>
+            <span className="text-[13.5px]" style={{ color: err ? "var(--hot)" : "var(--ink-muted)" }}>
+              {err ?? "Aria plays your song from bar 1 to the end once, finds its parts and names them. Nothing in your song changes."}</span>
+          </div>
+        )}
       </div>
     );
   }

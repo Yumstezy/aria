@@ -13,7 +13,11 @@ const MINOR = [30, 40, 60, 70, 80, 90, 300, 400, 600, 700, 800, 900, 3000, 4000,
     has less energy up top, so drawn flat the highs fall off a cliff; tipped up 4.5 dB an octave around 1 kHz, a
     balanced mix reads about level. Drawing only: the numbers Aria reports, and the hover, stay as measured. */
 export const TILT_DB_PER_OCT = 4.5;
-export const tilt = (f: number) => TILT_DB_PER_OCT * Math.log2(f / 1000);
+// Pro-Q tilts a per-bin spectrum. Aria's levels are each band's summed power, and fractional-octave bands get
+// twice as wide every octave, which already adds 3 dB an octave (Ian, Oct 29: drawn at the full 4.5 the bass sat far
+// under the highs, unlike his analyzer). So the extra tilt on Aria's numbers is the rest: 4.5 - 3.01.
+const BAND_SUM_DB_PER_OCT = 10 * Math.log10(2);
+export const tilt = (f: number) => (TILT_DB_PER_OCT - BAND_SUM_DB_PER_OCT) * Math.log2(f / 1000);
 
 export const plotX = (f: number) => ((Math.log(f) - Math.log(PLOT_LO)) / (Math.log(PLOT_HI) - Math.log(PLOT_LO))) * PLOT_W;
 const hzLabel = (f: number) => (f >= 1000 ? `${f / 1000}k` : `${f}`);
