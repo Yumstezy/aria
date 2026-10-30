@@ -92,3 +92,15 @@ def test_ians_song_has_a_few_parts_on_four_bar_lines():
     out = sections.find(x, r, tempo=165.0, start_beat=0.0)
     assert 2 <= len(out["sections"]) <= 8
     assert all((s["start_bar"] - 1) % 4 == 0 for s in out["sections"])
+
+
+def test_silent_bars_at_the_end_are_not_a_part():
+    x = np.concatenate([song(), np.zeros(BAR * 8)])          # 8 bars of nothing after the song
+    out = sections.find(np.column_stack([x, x]), RATE, tempo=TEMPO, start_beat=0.0)
+    last = out["sections"][-1]
+    assert last["start_bar"] + last["bars"] - 1 == 64, out["sections"]
+
+
+def test_a_recording_that_starts_a_hair_late_still_has_bar_1():
+    out = sections.find(np.column_stack([song(), song()]), RATE, tempo=TEMPO, start_beat=0.05)
+    assert out["sections"][0]["start_bar"] == 1

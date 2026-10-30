@@ -286,26 +286,66 @@ const LABEL_COLOR = ["var(--trk-1)", "var(--trk-0)", "var(--trk-2)", "var(--trk-
 const partColor_ = (p: Part) => (p.name ? PART_COLOR[p.name] : LABEL_COLOR[(p.label.charCodeAt(0) - 65) % LABEL_COLOR.length]);
 const partName = (p: Part) => p.name ?? `Part ${p.label}`;
 
-/** A song's parts as blocks on a bar scale shared by both lanes */
-function Lane({ title, song, total, highlight }: { title: string; song: SongParts; total: number; highlight?: (p: Part) => boolean }) {
+const timeOf = (bars: number, tempo: number | null) => {
+  if (!tempo) return "";
+  const sec = Math.round((bars * 4 * 60) / tempo);
+  return ` · ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+};
+
+/** One song's parts, like clips in Ableton's Arrangement: each part a block with a colored name strip on its own
+    full-width timeline (songs differ in length and tempo, so they're matched by name, not by bar), the bar each part
+    starts on under it, and the parts as a list, which carries the words when the window is narrow. */
+function SongLane({ title, song, narrow, outline }: { title: string; song: SongParts; narrow: boolean; outline?: (p: Part) => boolean }) {
+  const parts = song.sections, total = parts.reduce((n, p) => n + p.bars, 0) || 1;
+  const first = parts[0]?.start_bar ?? 1;
+  const at = (bar: number) => ((bar - first) / total) * 100;
   return (
-    <div className="grid gap-2">
-      <span className="truncate text-[13px] text-ink-muted" title={title}>{title}</span>
-      <div className="relative h-14">
-        {song.sections.map((p) => {
-          const left = ((p.start_bar - 1) / total) * 100, width = (p.bars / total) * 100, c = partColor_(p);
+    <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 12 }}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="truncate text-[14px] font-medium text-ink" title={title}>{title}</span>
+        <span className="font-mono text-[11.5px] text-ink-faint">{total} bars{timeOf(total, song.tempo)}{song.tempo ? ` · ${Math.round(song.tempo)} BPM` : ""}</span>
+        <span className="ml-auto font-mono text-[11px] text-ink-faint">{song.names_by ? "named by Muse Spark" : song.names_error}</span>
+      </div>
+      {/* the timeline */}
+      <div className="relative" style={{ height: narrow ? 34 : 64 }}>
+        {parts.map((p) => {
+          const c = partColor_(p), wide = p.bars / total >= (narrow ? 1 : 0.075);
           return (
             <div key={p.start_bar} title={`${partName(p)}: bars ${p.start_bar} to ${p.start_bar + p.bars - 1}`}
-                 className="absolute inset-y-0 overflow-hidden rounded-[10px] px-2 py-1.5"
-                 style={{ left: `calc(${left}% + 1.5px)`, width: `calc(${width}% - 3px)`, background: `color-mix(in srgb, ${c} 26%, var(--card-2))`,
-                          boxShadow: highlight?.(p) ? `inset 0 0 0 1.5px ${c}` : `inset 0 0 0 1px color-mix(in srgb, ${c} 45%, transparent)` }}>
-              <div className="truncate text-[12.5px] font-medium text-ink">{partName(p)}</div>
-              {p.bars / total >= 0.07 && <div className="truncate font-mono text-[10.5px] text-ink-muted">{p.bars} bars</div>}
+                 className="absolute inset-y-0 overflow-hidden rounded-[8px]"
+                 style={{ left: `calc(${at(p.start_bar)}% + 1px)`, width: `calc(${(p.bars / total) * 100}% - 2px)`,
+                          background: `color-mix(in srgb, ${c} 16%, var(--card-2))`, boxShadow: outline?.(p) ? `inset 0 0 0 1.5px ${c}` : undefined }}>
+              <div className="flex h-[18px] items-center px-2" style={{ background: c }}>
+                {wide && <span className="truncate text-[11px] font-semibold" style={{ color: "var(--on-action)" }}>{partName(p)}</span>}
+              </div>
+              {!narrow && wide && <div className="px-2 pt-1.5 font-mono text-[10.5px] text-ink-muted">{p.bars} bars</div>}
             </div>
           );
         })}
       </div>
-    </div>
+      {/* where each part starts, like Live's markers */}
+      <div className="relative -mt-1 h-3.5">
+        {parts.filter((p, i, all) => {
+          // skip a number that would crowd the one before it (the list below has every bar)
+          const gap = narrow ? 9 : 3.5;
+          let last = -Infinity;
+          for (const q of all.slice(0, i + 1)) if (at(q.start_bar) - last >= gap) last = at(q.start_bar);
+          return last === at(p.start_bar);
+        }).map((p, i) => (
+          <span key={p.start_bar} className={cn("absolute font-mono text-[10px] text-ink-faint", i && "-translate-x-1/2")} style={{ left: `${at(p.start_bar)}%` }}>{p.start_bar}</span>
+        ))}
+      </div>
+      {/* the parts in words */}
+      <div className={cn("grid gap-x-6 gap-y-1.5 border-t border-hairline pt-3", narrow ? "grid-cols-1" : "grid-cols-2 xl:grid-cols-3")}>
+        {parts.map((p) => (
+          <div key={p.start_bar} className="flex items-center gap-2.5 text-[13px]">
+            <span className="size-2.5 flex-none rounded-[3px]" style={{ background: partColor_(p) }} />
+            <span className="font-medium text-ink">{partName(p)}</span>
+            <span className="ml-auto font-mono text-[11.5px] text-ink-muted">bars {p.start_bar} to {p.start_bar + p.bars - 1}</span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -316,7 +356,6 @@ const ArrangementScreen = memo(function ArrangementScreen({ narrow, onReference 
   const share = hearing?.total ? Math.min(1, (hearing.done ?? 0) / hearing.total) : 0;
   const mine = arr?.mine && !arr.mine.error ? arr.mine : null;
   const theirs = arr?.ref && !arr.ref.error ? arr.ref : null;
-  const total = Math.max(mine?.bars ?? 0, theirs?.bars ?? 0, 1);
 
   // Listening, or nothing heard yet
   if (busy || !mine) {
@@ -348,27 +387,15 @@ const ArrangementScreen = memo(function ArrangementScreen({ narrow, onReference 
   const mineNames = new Set(mine.sections.map((p) => p.name).filter(Boolean));
   return (
     <div className="cp-bento">
-      <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 18 }}>
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-[14px] font-medium text-ink">{mine.sections.length} parts</span>
-          <span className="font-mono text-[11px] text-ink-faint">{mine.names_by ? "named by Muse Spark" : mine.names_error}</span>
-        </div>
-        <Lane title="Your song" song={mine} total={total} />
-        {theirs ? <Lane title={theirs.song ?? "Your reference"} song={theirs} total={total} highlight={(p) => !!p.name && mineNames.has(p.name)} />
-          : <button className="justify-self-start text-[13px] text-ink-muted underline-offset-2 hover:underline" onClick={onReference}>
-              {ref ? "Reading your reference's parts" : "Pick a reference song to see its parts here"}</button>}
-        {/* the bar ruler */}
-        <div className="relative h-3">
-          {Array.from({ length: Math.floor((total - 1) / 16) + 1 }, (_, k) => k * 16).map((b) => (
-            <span key={b} className="absolute -translate-x-1/2 font-mono text-[10px] text-ink-faint first:translate-x-0" style={{ left: `${(b / total) * 100}%` }}>{b + 1}</span>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={addArrangementMarkers}>Add {mine.sections.length} markers to Live</button>
-          <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={hearSong}>Hear it again</button>
-        </div>
-      </section>
-      <p className={cn("cp-meta", span(narrow, 12))}>Every Mix check now knows which part it heard{theirs ? ", and compares it with the same part of your reference" : ""}.</p>
+      <SongLane title="Your song" song={mine} narrow={narrow} />
+      {theirs ? <SongLane title={theirs.song ?? "Your reference"} song={theirs} narrow={narrow} outline={(p) => !!p.name && mineNames.has(p.name)} />
+        : <button className={cn("cp-tile cp-card text-left text-[13.5px] text-ink-muted hover:text-ink", span(narrow, 12))} onClick={onReference}>
+            {ref ? "Reading your reference's parts" : "Pick a reference song to see its parts here, and compare part by part"}</button>}
+      <div className={cn("flex flex-wrap items-center gap-2", span(narrow, 12))}>
+        <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={addArrangementMarkers}>Add {mine.sections.length} markers to Live</button>
+        <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={hearSong}>Hear it again</button>
+        {!narrow && <span className="cp-meta ml-auto">Every Mix check now knows which part it heard{theirs ? ", and compares it with the same part of your reference" : ""}.</span>}
+      </div>
     </div>
   );
 });

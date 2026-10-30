@@ -18,6 +18,7 @@ GRID = 4              # edges fall on 4-bar lines, counted from bar 1
 KERNEL = 4            # bars each side the checkerboard looks at
 SAME_PART = 0.86      # how alike two parts' notes and tone must be to share a label
 SILENT_LUFS = -70
+TAIL_DB = 45          # a bar this far under the loudest one is silence
 TEMPO_RANGE = (95.0, 190.0)   # EDM: a half-speed reading (82 for 165) is the common mistake
 MAX_BARS = 32         # a longer part is split at its strongest 4-bar line
 
@@ -66,7 +67,8 @@ def estimate_tempo(mono, rate):
 def _bars(n_samples, rate, tempo, start_beat, bpb):
     """Song bars wholly inside the recording: [(bar number, start sample, end sample)]."""
     spb = 60.0 / tempo * rate          # samples per beat
-    first = int(np.ceil(start_beat / bpb - 1e-6)) + 1
+    # A recording that starts a hair after a bar line (Live starts it a few ms late) still counts that bar
+    first = int(np.ceil(start_beat / bpb - 0.1)) + 1
     out = []
     bar = first
     while True:
@@ -74,7 +76,7 @@ def _bars(n_samples, rate, tempo, start_beat, bpb):
         e = s + bpb * spb
         if e > n_samples + 1:
             break
-        out.append((bar, int(round(s)), int(round(min(e, n_samples)))))
+        out.append((bar, max(0, int(round(s))), int(round(min(e, n_samples)))))
         bar += 1
     return out
 
@@ -157,6 +159,11 @@ def find(audio, rate, tempo=None, start_beat=0.0, beats_per_bar=4.0):
         return {"tempo": round(tempo, 2), "first_downbeat_sec": first_sec, "bars": len(bars), "sections": [],
                 "error": f"Only {len(bars)} bars were heard. Aria needs at least {MIN_BARS} to find parts."}
     feats = _features(mono, rate, bars)
+    # The song ends with its last sound (Ian): silent bars at the end, like a reverb tail Live counts, aren't a part
+    loudest = max(f["level"] for f in feats)
+    while len(feats) > MIN_BARS and feats[-1]["level"] < loudest - TAIL_DB:
+        feats.pop()
+        bars.pop()
     F = np.array([[f["level"] / 6, *f["balance"], f["busy"], *(f["chroma"] * 3)] for f in feats])
     edges, strength = _edges(_novelty(F), [b[0] for b in bars])
     bounds = [0, *edges, len(bars)]
