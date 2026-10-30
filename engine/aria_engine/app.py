@@ -271,6 +271,8 @@ def song_sections(req: SectionsRequest):
     names, names_error = muse.name_sections(out["sections"]) if out["sections"] else (None, out["error"])
     for s, n in zip(out["sections"], names or []):
         s["name"] = n
+    if names:
+        out["sections"] = sections.join_intro(out["sections"])
     out.update(names_by="Muse Spark" if names else None, names_error=names_error, path=str(path))
     if names or not out["sections"]:
         _sections_cache[key] = out

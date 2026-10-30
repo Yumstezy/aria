@@ -24,7 +24,7 @@ All engine calls are HTTP JSON on `http://127.0.0.1:8765`. Times are in bars (1-
 - Edges fall on 4-bar lines counted from bar 1, at least 8 bars apart; no part is longer than 32 bars. `confidence` is how clear the edge is (1.0 for the clearest in the song).
 - `label`: parts that sound alike (notes and tone balance, not loudness) share a letter.
 - `energy_db` is the part's level against the loudest bar of the song; `rise_db_per_bar` is positive when it climbs.
-- `name` comes from Muse Spark only, one of Intro, Build, Drop, Break, Bridge, Outro (EDM names only, so they stay the same from run to run and between songs), from those numbers. The first part is always Intro and the last always Outro (songs open and close there; loudness can't tell a loud intro from a drop). Without Muse it's `null` and `names_error` says why; the UI then shows the letters.
+- `name` comes from Muse Spark only, one of Intro, Build, Drop, Break, Bridge, Outro (EDM names only, so they stay the same from run to run and between songs), from those numbers. The first part is always Intro and the last always Outro (songs open and close there; loudness can't tell a loud intro from a drop). Everything before the first Break is the Intro, joined into one part (Ian, Oct 30: an EDM intro runs to the first break so DJs can mix the song in); its `energy_db` and `rise_db_per_bar` are the bar-weighted average. Without Muse it's `null` and `names_error` says why; the UI then shows the letters.
 - `error`: a silent recording, or fewer than 8 bars.
 - Results are cached per file and its change time.
 

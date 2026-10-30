@@ -92,6 +92,26 @@ def test_a_song_opens_with_its_intro_and_closes_with_its_outro():
     assert names == ["Intro", "Break", "Drop", "Outro"] and err is None
 
 
+def test_everything_before_the_first_break_is_the_intro():
+    """Ian, Oct 30: an EDM song opens with a DJ intro that runs to the first break, even when it's loud, so DJs can mix
+    it in. THE WEEKEND came back Intro 1 to 8, Drop 9 to 40, Break 41: that's one Intro, bars 1 to 40."""
+    found = [{"label": x} for x in "ABCDAC"]
+    names, err = muse.validate_section_names('{"names": ["Intro", "Drop", "Break", "Build", "Drop", "Outro"]}', found)
+    assert names == ["Intro", "Intro", "Break", "Build", "Drop", "Outro"] and err is None
+    # No break at all: only the first part is the intro
+    names, _ = muse.validate_section_names('{"names": ["Drop", "Build", "Drop", "Drop"]}', [{"label": x} for x in "ABAA"])
+    assert names == ["Intro", "Build", "Drop", "Outro"]
+
+
+def test_the_intro_parts_join_into_one():
+    parts = [{"name": "Intro", "label": "A", "start_bar": 1, "bars": 8, "start_sec": 0.0, "end_sec": 12.6, "energy_db": -9.0, "rise_db_per_bar": 0.2, "confidence": 1.0},
+             {"name": "Intro", "label": "B", "start_bar": 9, "bars": 32, "start_sec": 12.6, "end_sec": 63.2, "energy_db": -1.0, "rise_db_per_bar": 0.0, "confidence": 0.8},
+             {"name": "Break", "label": "C", "start_bar": 41, "bars": 8, "start_sec": 63.2, "end_sec": 75.8, "energy_db": -12.0, "rise_db_per_bar": 0.0, "confidence": 0.9}]
+    out = sections.join_intro(parts)
+    assert [(s["name"], s["start_bar"], s["bars"]) for s in out] == [("Intro", 1, 40), ("Break", 41, 8)]
+    assert out[0]["end_sec"] == 63.2 and out[0]["energy_db"] == round((-9 * 8 + -1 * 32) / 40, 1)
+
+
 @pytest.mark.skipif(not (MIXES / "full.wav").exists(), reason="test-pack mixes are local only")
 def test_ians_song_has_a_few_parts_on_four_bar_lines():
     x, r = sf.read(str(MIXES / "full.wav"), always_2d=True, dtype="float64")

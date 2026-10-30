@@ -248,6 +248,11 @@ def validate_section_names(raw, sections):
     # "Drop"; loudness can't tell them apart, so this is the song's shape, not a measurement)
     if len(names) >= 3:
         names = ["Intro", *names[1:-1], "Outro"]
+        # An EDM song's intro runs to the first break, even when it's loud: DJs need it to mix the song in (Ian, Oct 30:
+        # "99% of the time it's the intro"). sections.join_intro makes those parts one.
+        if "Break" in names[1:-1]:
+            first_break = names.index("Break")
+            names = ["Intro"] * first_break + names[first_break:]
     return names, None
 
 
