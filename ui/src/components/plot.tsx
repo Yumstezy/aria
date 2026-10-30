@@ -3,8 +3,10 @@
 // curves into an SVG of width PLOT_W; this adds the grid lines (in the SVG) and the numbers (HTML over it, so
 // they keep their size when the window is docked).
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { KindMark, RANGES } from "@/components/problem-mark";
 
 export const PLOT_W = 640, PLOT_LO = 30, PLOT_HI = 16000;
+const GAP = 26;   // px between pin marks
 const LABELS = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
 // Every 1 to 9 of each decade, like an analyzer's grid
 const MINOR = [30, 40, 60, 70, 80, 90, 300, 400, 600, 700, 800, 900, 3000, 4000, 6000, 7000, 8000, 9000];
@@ -34,11 +36,12 @@ export function PlotGrid({ height, dbTicks }: { height: number; dbTicks: { y: nu
   );
 }
 
-export interface Pin { n: number; lo: number; hi: number; title?: string }
+/** n identifies the pin; icon and color make its mark (the problem's kind, where it sits). Without an icon, the number shows. */
+export interface Pin { n: number; lo: number; hi: number; title?: string; icon?: ReactNode; color?: string }
 
 /** The chart: its SVG (children) in a dark rounded plot, with the Hz along the bottom and the dB down the right.
-    pins: each problem's number over its stretch, with a thin strip under the numbers showing the stretch; pointing at
-    a number shades its stretch. Numbers that would touch are pushed apart, so they stay readable when docked. */
+    pins: each problem's mark over its stretch, with a thin strip in its color under the marks showing the stretch;
+    pointing at a mark shades its stretch. Marks that would touch are pushed apart, so they stay readable when docked. */
 export function Plot({ height, dbTicks, pins = [], onPin, children }: {
   height: number; dbTicks: { y: number; label: string }[]; pins?: Pin[]; onPin?: (n: number) => void; children: ReactNode;
 }) {
@@ -53,10 +56,10 @@ export function Plot({ height, dbTicks, pins = [], onPin, children }: {
   }, []);
   const frac = (f: number) => plotX(Math.min(PLOT_HI, Math.max(PLOT_LO, f))) / PLOT_W;
   const at = (f: number) => `${frac(f) * 100}%`;
-  // Number positions in px, left to right, at least 22 px apart and inside the plot
+  // Mark positions in px, left to right, at least GAP apart and inside the plot
   const placed = [...pins].map((p) => ({ ...p, x: frac(Math.sqrt(p.lo * p.hi)) * width })).sort((a, b) => a.x - b.x);
-  placed.forEach((p, i) => { p.x = Math.max(p.x, 14, i ? placed[i - 1].x + 22 : 0); });
-  for (let i = placed.length - 1; i >= 0; i--) placed[i].x = Math.min(placed[i].x, width - 14 - (placed.length - 1 - i) * 22);
+  placed.forEach((p, i) => { p.x = Math.max(p.x, 14, i ? placed[i - 1].x + GAP : 0); });
+  for (let i = placed.length - 1; i >= 0; i--) placed[i].x = Math.min(placed[i].x, width - 14 - (placed.length - 1 - i) * GAP);
   const shade = pins.find((p) => p.n === hot);
   // Strips that overlap go on their own lines (greedy, left to right), so a wide problem can't swallow the others
   const lanes: number[] = [], laneOf: Record<number, number> = {};
@@ -66,28 +69,35 @@ export function Plot({ height, dbTicks, pins = [], onPin, children }: {
     lanes[k] = frac(p.hi); laneOf[p.n] = k;
   });
   // The numbers and strips sit in their own row above the drawing, so they never touch the curves at any width
-  const head = pins.length ? 28 + lanes.length * 5 : 0;
+  const head = pins.length ? 32 + lanes.length * 5 : 0;
   return (
     <div ref={box} className="relative overflow-hidden rounded-[12px]" style={{ background: "color-mix(in srgb, var(--ground) 55%, transparent)", border: "1px solid var(--hairline)" }}>
       {pins.length > 0 && (
         <div className="relative" style={{ height: head }}>
           {pins.map((p) => (
-            <div key={p.n} className="absolute h-[3px] rounded-full" style={{ top: 26 + laneOf[p.n] * 5, left: at(p.lo), width: `max(5px, ${(frac(p.hi) - frac(p.lo)) * 100}%)`,
-                 background: "var(--hot)", opacity: hot === null || hot === p.n ? 0.85 : 0.3 }} />
+            <div key={p.n} className="absolute h-[3px] rounded-full" style={{ top: 30 + laneOf[p.n] * 5, left: at(p.lo), width: `max(5px, ${(frac(p.hi) - frac(p.lo)) * 100}%)`,
+                 background: p.color ?? "var(--hot)", opacity: hot === null || hot === p.n ? 0.85 : 0.3 }} />
           ))}
           {placed.map((p) => (
-            <button key={p.n} className="ae-pin absolute top-1 -translate-x-1/2" title={p.title} onClick={() => onPin?.(p.n)}
-                    onPointerEnter={() => setHot(p.n)} onPointerLeave={() => setHot(null)}
-                    style={{ left: p.x, width: 18, height: 18, fontSize: 10 }}>{p.n}</button>
+            <button key={p.n} className={p.icon ? "absolute top-1 -translate-x-1/2 rounded-full" : "ae-pin absolute top-1 -translate-x-1/2"} title={p.title} aria-label={p.title}
+                    onClick={() => onPin?.(p.n)} onPointerEnter={() => setHot(p.n)} onPointerLeave={() => setHot(null)}
+                    style={p.icon ? { left: p.x } : { left: p.x, width: 18, height: 18, fontSize: 10 }}>
+              {p.icon ? <KindMark icon={p.icon} color={p.color ?? "var(--hot)"} size={22} /> : p.n}
+            </button>
           ))}
         </div>
       )}
       <div className="relative">
         {children}
         <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          {shade && <div className="absolute inset-y-0" style={{ left: at(shade.lo), width: `${(frac(shade.hi) - frac(shade.lo)) * 100}%`, background: "color-mix(in srgb, var(--hot) 10%, transparent)" }} />}
+          {shade && <div className="absolute inset-y-0" style={{ left: at(shade.lo), width: `${(frac(shade.hi) - frac(shade.lo)) * 100}%`, background: `color-mix(in srgb, ${shade.color ?? "var(--hot)"} 12%, transparent)` }} />}
           {/* the tilt, in the top corner when there's room */}
           {width >= 420 && <span className="absolute left-2 top-1.5 font-mono text-[10px] leading-3 text-ink-faint" title="Drawn tipped up 4.5 dB per octave, like Pro-Q. The numbers stay as measured.">+{TILT_DB_PER_OCT} dB/oct</span>}
+          {/* What the marks' colors mean: lows to highs, a thin ribbon along the bottom, the range's name on hover */}
+          {pins.some((p) => p.icon) && RANGES.map((r) => (
+            <span key={r.name} className="pointer-events-auto absolute bottom-0 h-[3px]" title={r.name}
+                  style={{ left: at(r.lo), width: `${(frac(r.hi) - frac(r.lo)) * 100}%`, background: r.color, opacity: 0.7 }} />
+          ))}
           {LABELS.map((f) => (
             <span key={f} className="absolute bottom-1 -translate-x-1/2 font-mono text-[10px] leading-3 text-ink-faint" style={{ left: at(f) }}>{hzLabel(f)}</span>
           ))}

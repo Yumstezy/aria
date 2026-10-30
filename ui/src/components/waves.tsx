@@ -9,6 +9,7 @@ import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { BANDS } from "@/lib/problems";
 import { cn } from "@/lib/utils";
 import { Plot, PlotGrid, dbTicksOf, tilt } from "@/components/plot";
+import { findingIcon, rangeOf } from "@/components/problem-mark";
 
 // Short names for the tooltip, so it stays small
 const SHORT: Record<string, string> = { vocals: "Vocal", other: "Synths", bass: "Bass", drums: "Drums", mix: "Mix" };
@@ -107,12 +108,12 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
   );
 
   // Bare (Ember, the window's Mix check): the Pro-Q look of every chart (components/plot.tsx). Hz along the
-  // bottom and dB down the right inside the plot, 0 dB at the mix's loudest point, numbered pins over each problem.
+  // bottom and dB down the right inside the plot, 0 dB at the mix's loudest point, each problem's mark over its stretch.
   if (bare) {
     const ticks = dbTicksOf(FLOOR_DB, 12, Y);
     return (
       <div className="flex flex-col gap-2">
-        <Plot height={H} dbTicks={ticks} pins={zones.map((z, i) => ({ n: i + 1, lo: z.lo, hi: z.hi, title: `${describe(z.f).name}, ${z.where}` }))}
+        <Plot height={H} dbTicks={ticks} pins={zones.map((z, i) => ({ n: i + 1, lo: z.lo, hi: z.hi, title: `${describe(z.f).name}, ${z.where}`, icon: findingIcon(z.f), color: rangeOf(z.lo, z.hi).color }))}
               onPin={(n) => onZone(zones[n - 1].f)}>
           <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="Each part's frequency curve"
                onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
