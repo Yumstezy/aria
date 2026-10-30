@@ -175,7 +175,7 @@ def compare_with(ref_path, audio, rate, bars, name=None):
     """The reference block of a result, and its findings for the problem list."""
     path = Path(ref_path).expanduser()
     if not path.is_file():
-        raise HTTPException(400, f"The reference song isn't at {path} any more. Drop it on the window again.")
+        raise HTTPException(400, f"The reference song isn't at {path} any more. Choose it again on the Reference screen.")
     try:
         ref_audio, ref_rate = reference.read(path)
     except (RuntimeError, sf.LibsndfileError) as e:

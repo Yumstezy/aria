@@ -96,7 +96,7 @@ With `reference_path`, the result's `reference` is:
 - The bridge sends `reference_name` (the song's own file name) with `reference_path`, since the engine stores it under another name.
 - What stands out becomes a finding, first in `clarity.findings`: `{kind: "reference", shape: "stretch" | "band", hz, hz_range, diff_db, stands_out_db (stretch), band (band), bars}`. A stretch is louder than the reference: at least 2 dB above the difference curve around it and 1.5 dB above the reference. Something missing counts only as a whole band 3 dB off (a pro track's deeper sub isn't a stretch to fix). At most 2, louder ones first. Frequencies are rounded to two significant figures.
 - Muse gets `reference: {name, bands}` and may compare with the song by name. It may give an `eq_band` cut for a stretch that's louder than the reference, never for a quieter one.
-- `error` says why nothing was compared (a silent reference). A reference that's gone from disk is a 400 that says to drop it again.
+- `error` says why nothing was compared (a silent reference). A reference that's gone from disk is a 400 that says to choose it again.
 
 ### Clarity findings (build step 3, master mode)
 
