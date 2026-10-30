@@ -19,6 +19,7 @@
 Run:  python3.11 device/tools/make_aria_amxd.py
 """
 from pathlib import Path
+from urllib.parse import quote
 
 from amxd import FONT, obj, template_patch, wire, write_amxd
 
@@ -26,6 +27,20 @@ OUT = Path(__file__).resolve().parent.parent / "Aria.amxd"
 STRIP_W, STRIP_H = 150.0, 169.0   # just the buttons, glassy and muted like Live's devices (Ian, Oct 28)
 WINDOW_W, WINDOW_H = 1200.0, 860.0
 CHAT_W, CHAT_H = 400.0, 620.0
+
+# The page the strip starts on, built into the device. The bridge swaps in the real strip about
+# 0.15 s after load, but its message goes through Max's queue, and that queue stops when Live's
+# audio isn't running (Oct 29: the device sat blank until Ian fixed Live's audio device). This page
+# needs no message, so the producer always sees what to do. Live's dark greys, like the strip.
+FALLBACK_PAGE = """<!doctype html><meta charset="utf-8"><body style="margin:0;height:100vh;background:#3a3a3a;color:#dcdcdc;
+font:11px -apple-system,Arial,sans-serif;padding:10px;box-sizing:border-box;overflow:hidden">
+<div style="display:flex;align-items:center;gap:6px;font-weight:600">
+<span id="l" style="width:8px;height:8px;border-radius:50%;background:#7a7a7a"></span><span>Aria</span>
+<span id="w" style="margin-left:auto;color:#a8a8a8;font-size:9.5px">Starting</span></div>
+<p id="m" style="display:none;margin:12px 0 0;line-height:1.4">Live's audio isn't running, so Aria can't start.
+<br><br>Open Live's Settings, then Audio, and pick an Audio Output Device. Aria starts by itself.</p>
+<script>setTimeout(function(){l.style.background="#e0703a";w.textContent="Waiting";m.style.display="block"},4000)</script>"""
+FALLBACK_URL = "data:text/html," + quote(" ".join(FALLBACK_PAGE.split()), safe="")
 
 
 def window_patcher(template, ui_name="aria-window-ui", w=WINDOW_W, h=WINDOW_H):
@@ -61,7 +76,7 @@ def build():
     jweb = {"box": {**FONT, "id": "ui", "maxclass": "jweb", "numinlets": 1, "numoutlets": 1, "outlettype": [""],
                     "patching_rect": [8.0, 200.0, 350.0, 85.0],
                     "presentation": 1, "presentation_rect": [0.0, 0.0, STRIP_W, STRIP_H],
-                    "rendermode": 0, "url": ""}}
+                    "rendermode": 0, "url": FALLBACK_URL}}
 
     # The mapped key: Live maps keys and MIDI only to its own controls, so the strip has one small
     # live.text under the page's left column. Key Map (Cmd+K), click it, press a key: that key opens Ask Muse.

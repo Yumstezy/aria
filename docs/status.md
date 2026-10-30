@@ -2,22 +2,15 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
-## Pick up here (end of Oct 29)
+## Pick up here (Oct 29, 20:15)
 
-**Blocker: Aria's device on Main shows a blank "jweb" box in Live (since about 18:40, Oct 29).** Not solved yet. Next step: Ian restarts the Mac, checks System Settings, Privacy & Security, Files and Folders, Ableton Live, Desktop Folder is on, then drags `device/Aria.amxd` onto Main.
+**Fixed: the blank "jweb" box on Main.** It was Live's audio, not the UI. From about 18:40 Live's audio wasn't running (its device list includes a "rekordbox Aggregate Device" that reports a sample rate of 0). Max's message queue inside Live stops when Live's audio does, so the bridge's one message to the jweb, "load the strip page", never arrived. The Max log showed it: Node for Max's `start success` came 22 to 37 s late or never, and arrived the same second Ian saved Live's audio settings (20:09:26). Probes that only printed hello, or had their page built in, worked, which is why it looked like the device.
 
-What we know:
-- It isn't the UI swap. The page build that worked at 18:17 (from 738515e) fails the same way, and `device/` (Aria.amxd, bridge.js, live.js) is unchanged since it last worked (`git diff 738515e -- device/` is empty).
-- Live's web view works: a probe device with only a jweb and a `data:` page drew it.
-- Node for Max works: probe devices posted hello, including Aria's full patch running a hello script, and a copy of bridge.js in a plain patch.
-- Aria's bridge loads inside Live (seen with the Node inspector: `bridge.js` in the module cache, `loaded: true`), and `Max.post` from it reaches the Max log, and Live answered a `state` request without a "not ready" warning.
-- But Aria's jweb never shows any page, not the strip file and not a `data:` page sent from the bridge. Live's browser had no renderer process.
-- Not the cause: missing files, the watch flag (`Aria test.amxd` without `@watch` failed too), stale Node for Max sockets (cleared with Live closed), disk space (16 GB free).
-- Around the time it started, Claude's headless Chrome test browsers (42 processes) were left running and polling the engine; they were closed at 18:43. No link proven.
+So a producer is never stuck on a blank box, the strip now starts on a page built into the device (`FALLBACK_PAGE` in `device/tools/make_aria_amxd.py`). Normally the real strip replaces it in a moment. If it's still there after 4 s, it says Live's audio isn't running and where to pick an output device. When audio comes back, the real strip loads by itself.
 
-If a restart doesn't fix it: compare a jweb that loads a `file://` page from `~/Desktop` (probe) against the `data:` probe, to test file access from Live's browser.
+Manual check for Ian: drag the new `device/Aria.amxd` onto Main. The strip shows as before. Optional: in Live's Settings, Audio, set Audio Output Device to No Device, remove and re-add Aria: after 4 s it says "Live's audio isn't running". Set the speakers back: the strip appears without re-adding.
 
-Test files to delete once it works (not committed): `device/Aria test.amxd`, `device/Probe A.amxd`, `device/hello-test.js`, and `~/Desktop/n4m-test/`.
+Test files from the debug, not committed, still to delete (Ian to OK): `device/Aria test.amxd`, `device/Probe A.amxd`, `device/hello-test.js`, and `~/Desktop/n4m-test/`.
 
 **Then continue the polish (Ian, Oct 29: "lets move on to other features ui/ux and polishing everything else up"):**
 - The Ember look is in for Mix check, Simple (commit 89558f3, `DESIGN.md` "Ember direction"). Ian hasn't seen it in Live yet because of the blocker; he liked the mockup and said "the glow may be too much", so it has no glow.
