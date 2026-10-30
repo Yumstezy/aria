@@ -254,7 +254,7 @@ Built Oct 30 (`engine/aria_engine/groove.py`): `anchor.kind` is `straight` (the 
 
 ## Vocal sync (Groove match, Oct 30)
 
-`POST /groove/vocal` `{path, song_tempo, tempo?, beat_shift?}` returns `{tempo, tempo_source: "file name" | "measured" | "you", beats_tempo, song_tempo, beat_shift, first_beat_sec, first_sound_sec, seconds, picture: {start_sec, step_sec, levels_db}, warp: {markers: [{beat_time, sample_time}] (2), start_marker, end_marker, bars_before}}`. `beats_tempo` is the tempo counted at the song's scale (half or double). The device sets the markers on the vocal's Arrangement clip with warping on in Complex Pro (live.js `vocal_warp`), with Undo; bridge messages `groove_pick {role: "vocal"}`, `vocal_analyze {tempo, beat_shift}`, `vocal_apply`, reply `vocal_done`.
+`POST /groove/vocal` `{path, song_tempo, tempo?, beat_shift?, kick?: {path, start_beat, start_marker}, place?: {start_beat, beats_per_bar}}` returns `{tempo, tempo_source: "file name" | "measured" | "you", beats_tempo, song_tempo, beat_shift, key ("A minor", from the notes, Krumhansl profiles), confidence, sync: {kick_found, kick_offset_ms (the kick against Live's grid), bar, kicks_sec (where the kicks land in the vocal's file, for the picture)}, first_beat_sec, first_sound_sec, seconds, picture: {start_sec, step_sec, levels_db}, warp: {markers: [{beat_time, sample_time}] (2), start_marker, end_marker, bars_before}}`. `beats_tempo` is the tempo counted at the song's scale (half or double). The device sets the markers on the vocal's Arrangement clip with warping on in Complex Pro (live.js `vocal_warp`), with Undo; bridge messages `groove_pick {role: "vocal"}`, `vocal_analyze {tempo, beat_shift}`, `vocal_apply`, reply `vocal_done`.
 
 ## Muse Spark actions
 
