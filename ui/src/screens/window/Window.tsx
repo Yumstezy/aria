@@ -777,6 +777,13 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
   const list = problemsOf(r);
   const first = list[0];
   const spectra = r.clarity.spectra, names = spectra ? partNames(spectra) : [];
+  // A mark on the chart or in To fix (Ian, Oct 30): open that problem's explanation, close the others, and bring it
+  // into view once it has opened (the row grows for about 220 ms)
+  const show = (i: number) => {
+    if (i < 0) return;
+    setOpen(i);
+    setTimeout(() => document.getElementById(`problem-${i}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 260);
+  };
   const tracksMode = (r.clarity.mode as string) === "tracks";
   const whoOf = (p: Problem) => p.findings.flatMap((f) => (f.kind === "clash" ? f.tracks! : f.kind === "masking" ? [f.masked!] : [])).filter((n, k, a) => names.includes(n) && a.indexOf(n) === k);
   const legend = names.length >= 2 && (
@@ -791,7 +798,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
           <section className="cp-tile cp-card" style={{ gap: 2 }}>
             <span className="cp-cap">To fix</span>
             <span className="ae-big"><CountUp value={list.length} /></span>
-            <div className="mt-2 flex flex-wrap gap-1.5">{list.map((p, i) => <button key={i} className="ae-kind" style={{ color: colorOf(p) }} title={p.name} aria-label={p.name} onClick={() => setOpen(i)}>{iconFor(p)}</button>)}</div>
+            <div className="mt-2 flex flex-wrap gap-1.5">{list.map((p, i) => <button key={i} className="ae-kind" style={{ color: colorOf(p) }} title={p.name} aria-label={p.name} onClick={() => show(i)}>{iconFor(p)}</button>)}</div>
           </section>
         </Rise>
         <Rise i={1}>
@@ -844,7 +851,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
               <span className="text-[14px] font-medium text-ink" title="Both songs at the same loudness. Blue is where the reference is fuller, gold where yours is.">{r.reference.part ? `Against their ${r.reference.part}` : "Against your reference"}</span>
               <div className="ml-auto min-w-0"><RefLegend name={r.reference.name} /></div>
             </div>
-            <RefChart r={r.reference} height={narrow ? 340 : 220} zones={list.map((p, i) => zoneOf(p, i + 1))} onZone={(n) => setOpen(n - 1)} />
+            <RefChart r={r.reference} height={narrow ? 340 : 220} zones={list.map((p, i) => zoneOf(p, i + 1))} onZone={(n) => show(n - 1)} />
           </section>
         </Rise>
       )}
@@ -860,7 +867,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
             </div>
             {spectra
               ? <Waves spectra={spectra} findings={r.clarity.findings} split={r.clarity.mode !== "master"} bare
-                       onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
+                       onZone={(f) => show(list.findIndex((p) => p.findings.includes(f)))} />
               : <p className="cp-meta">The picture appears after the next Check mix.</p>}
           </section>
         </Rise>}
@@ -868,7 +875,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
           <Rise i={4}>
             <section className="cp-tile cp-card" style={{ paddingTop: 4, paddingBottom: 4, gap: 0 }}>
               {list.map((p, i) => (
-                <div key={p.name + i}>
+                <div key={p.name + i} id={`problem-${i}`} style={{ scrollMarginTop: 12, scrollMarginBottom: 12 }}>
                   <button className="ae-row" aria-expanded={open === i} onClick={() => setOpen(open === i ? -1 : i)}>
                     <MarkOf p={p} />
                     <span className="min-w-0">
