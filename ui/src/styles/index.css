@@ -140,6 +140,8 @@ html.see-through, html.see-through body, .see-through .cp-stage { background: tr
   --shadow-tile: none; --shadow-rim: none; --shadow-rim-tile: none;
   --side: #0e0e10; --card-2: #1a1a1d;
   --trk-0: #f5c451; --trk-1: #6ea8ff; --trk-2: #ff7eb6; --trk-3: #4ade80; --trk-4: #a78bfa; --trk-5: #5eead4;
+  /* where a problem sits, lows to highs (components/problem-mark.tsx) */
+  --rng-low: #ff6b6b; --rng-lowmid: #ff9f43; --rng-mid: #c3e45a; --rng-himid: #3fd5e6; --rng-high: #b49cff;
 }
 :root, [data-theme="sky"] {
   --ground: #f4f4f5; --orb-1: transparent; --orb-2: transparent;
@@ -155,6 +157,7 @@ html.see-through, html.see-through body, .see-through .cp-stage { background: tr
   --shadow-tile: 0 1px 2px rgba(0,0,0,0.04); --shadow-rim: none; --shadow-rim-tile: none;
   --side: #fafafa; --card-2: #f4f4f5;
   --trk-0: #d99a0b; --trk-1: #2f6fe0; --trk-2: #db2777; --trk-3: #16a34a; --trk-4: #7c3aed; --trk-5: #0d9488;
+  --rng-low: #dc2626; --rng-lowmid: #ea580c; --rng-mid: #65a30d; --rng-himid: #0891b2; --rng-high: #7c3aed;
 }
 /* Split parts and the producer's tracks share one palette */
 :root, [data-theme="sky"], [data-theme="night"], .cp-hero {
@@ -191,6 +194,8 @@ html.see-through, html.see-through body, .see-through .cp-stage { background: tr
 .ae-kind { width: 30px; height: 30px; border-radius: 9px; background: var(--card-2); border: 1px solid var(--glass-edge); display: grid; place-items: center; color: var(--hot); flex: none; }
 .ae-kind svg { width: 15px; height: 15px; }
 .ae-pin { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--font-mono); color: var(--on-action); background: var(--hot); flex: none; }
+.ae-mark { border-radius: 50%; display: grid; place-items: center; flex: none; background: color-mix(in srgb, currentColor 16%, var(--card)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, currentColor 70%, transparent); }
+.ae-mark svg { width: var(--mark-icon, 15px); height: var(--mark-icon, 15px); }
 .ae-thumb { border-radius: 12px; background: var(--card-2); border: 1px solid var(--hairline); overflow: hidden; }
 .ae-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--hairline); width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; color: var(--ink); font: inherit; cursor: pointer; }
 .ae-row:first-child { border-top: 0; }

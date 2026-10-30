@@ -14,6 +14,7 @@ import { RefChart, RefLegend, THEIRS, YOURS } from "@/components/ref-chart";
 import { Plot, PlotGrid, dbTicksOf, plotX, tilt } from "@/components/plot";
 import { path } from "@/components/waves";
 import { ProblemThumb } from "@/components/problem-thumb";
+import { KINDS, KindMark, findingIcon, rangeOf } from "@/components/problem-mark";
 import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon, SwapIcon, GoodMixIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
@@ -269,7 +270,7 @@ const Home = memo(function Home({ narrow, onOpen, go }: { narrow: boolean; onOpe
           {list.slice(0, 6).map((p, i) => (
             <button key={i} className="text-left" onClick={onOpen}>
               <GlowCard accent={accentOf(p)} className="h-full">
-                <span className="ae-kind" style={chip}>{iconFor(p)}</span>
+                <span className="ae-kind" style={{ ...chip, color: colorOf(p) }}>{iconFor(p)}</span>
                 <b className="mt-4 text-[16.5px] font-medium leading-snug">{p.name}</b>
                 <span className="ae-mono mt-1">{p.where}</span>
                 <span className="ae-mono mt-auto pt-3" style={{ color: compared(p) ? refColor(p) : "var(--hot)" }}>{amountText(p)}</span>
@@ -512,7 +513,7 @@ const ReferenceScreen = memo(function ReferenceScreen({ narrow, onOpen }: { narr
         <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ paddingTop: 6, paddingBottom: 6, gap: 0 }}>
           {refProblems.length ? refProblems.map(({ p, n }) => (
             <div key={n} className="grid items-center gap-3 border-t border-hairline py-3 first:border-t-0" style={{ gridTemplateColumns: "26px minmax(0, 1fr) auto" }}>
-              <span className="ae-pin">{n}</span>
+              <MarkOf p={p} />
               <span className="min-w-0">
                 <span className="block text-[14px] font-medium">{p.name}</span>
                 <span className="ae-mono">{p.where} <span style={{ color: refColor(p) }}>{amountText(p)}</span></span>
@@ -574,24 +575,18 @@ const KeyTracks = memo(function KeyTracks() {
 
 // ---------- Mix check ----------
 
-const KINDS: { kind: Kind; name: string; icon: ReactNode }[] = [
-  { kind: "masking", name: "Buried sounds", icon: <BuriedIcon /> },
-  { kind: "buildup", name: "Mud", icon: <MudIcon /> },
-  { kind: "harsh", name: "Harsh hits", icon: <HarshIcon /> },
-  { kind: "resonance", name: "Ringing notes", icon: <RingIcon /> },
-  { kind: "bass_click", name: "Bass clicks", icon: <ClickIcon /> },
-  { kind: "clash", name: "Clashing tracks", icon: <ClashIcon /> },
-];
 // Mud is measured as synths buried in the low mids, so it gets the mud icon, not the buried one
 /** A problem as a pin on a chart: its stretch and where it hits, numbered as in the list */
-const zoneOf = (p: Problem, n: number) => ({ n, lo: Math.min(...p.findings.map((f) => f.hz_range[0])), hi: Math.max(...p.findings.map((f) => f.hz_range[1])),
-  where: `${p.name}, ${p.where}, ${amountText(p)}` });
+const spanOf = (p: Problem) => [Math.min(...p.findings.map((f) => f.hz_range[0])), Math.max(...p.findings.map((f) => f.hz_range[1]))] as const;
+const zoneOf = (p: Problem, n: number) => ({ n, lo: spanOf(p)[0], hi: spanOf(p)[1], where: `${p.name}, ${p.where}, ${amountText(p)}`, icon: iconFor(p), color: colorOf(p) });
+/** Where a problem sits, lows to highs, as a color (the same on its chart mark and its row) */
+const colorOf = (p: Problem) => rangeOf(...spanOf(p)).color;
+/** A problem's mark: its kind's icon in its range's color, in place of a number (Ian, Oct 30) */
+const MarkOf = ({ p, size }: { p: Problem; size?: number }) => <KindMark icon={iconFor(p)} color={colorOf(p)} size={size} title={`${p.name}, ${rangeOf(...spanOf(p)).name}`} />;
 /** Louder than the reference is gold (yours is fuller), quieter is blue (theirs is) */
 const refColor = (p: Problem) => ((p.findings[0].kind === "typical" ? p.findings[0].outside_db ?? 0 : p.findings[0].diff_db ?? 0) > 0 ? YOURS : THEIRS);
 const compared = (p: Problem) => p.findings[0].kind === "reference" || p.findings[0].kind === "typical";
-const iconFor = (p: Problem) => p.findings[0].kind === "typical" ? <GoodMixIcon style={{ color: refColor(p) }} />
-  : p.findings[0].kind === "reference" ? <ReferenceIcon style={{ color: refColor(p) }} />
-  : KINDS.find((x) => x.kind === (p.name === "Mud" ? "buildup" : p.findings[0].kind))!.icon;
+const iconFor = (p: Problem) => findingIcon(p.findings[0]);
 
 /** Before the first check: the Simple view's layout greyed out. Its shapes say what will appear; no sentences. */
 const EmptyCheck = memo(function EmptyCheck({ narrow }: { narrow: boolean }) {
@@ -681,7 +676,7 @@ function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
                 const down = (c.change_db ?? 0) < -0.4, up = (c.change_db ?? 0) > 0.4;
                 return (
                   <div key={c.index} className="flex items-center gap-2.5 text-[13px]">
-                    {p >= 0 && <span className="ae-pin" style={{ width: 20, height: 20, fontSize: 10 }}>{p + 1}</span>}
+                    {p >= 0 && <MarkOf p={list[p]} size={22} />}
                     <span className="truncate text-ink">{name}</span>
                     <span className="ae-mono ml-auto" style={{ color: down ? "var(--good)" : up ? "var(--hot)" : undefined }}>
                       {c.change_db === null ? "not measured" : `${c.change_db > 0 ? "+" : c.change_db < 0 ? "−" : ""}${Math.abs(c.change_db).toFixed(1)} dB ${down ? "less" : up ? "more" : "same"}`}</span>
@@ -822,7 +817,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
           <section className="cp-tile cp-card" style={{ gap: 2 }}>
             <span className="cp-cap">To fix</span>
             <span className="ae-big"><CountUp value={list.length} /></span>
-            <div className="mt-2 flex flex-wrap gap-1.5">{list.map((p, i) => <button key={i} className="ae-kind" title={p.name} aria-label={p.name} onClick={() => setOpen(i)}>{iconFor(p)}</button>)}</div>
+            <div className="mt-2 flex flex-wrap gap-1.5">{list.map((p, i) => <button key={i} className="ae-kind" style={{ color: colorOf(p) }} title={p.name} aria-label={p.name} onClick={() => setOpen(i)}>{iconFor(p)}</button>)}</div>
           </section>
         </Rise>
         <Rise i={1}>
@@ -921,14 +916,14 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
               {list.map((p, i) => (
                 <div key={p.name + i}>
                   <button className="ae-row" aria-expanded={open === i} onClick={() => setOpen(open === i ? -1 : i)}>
-                    <span className="ae-pin">{i + 1}</span>
+                    <MarkOf p={p} />
                     <span className="min-w-0">
                       <span className="flex items-center gap-2 text-[14px] font-medium"><span className="truncate">{p.name}</span>
                         {whoOf(p).map((n) => <span key={n} className="ae-dot" style={{ color: partColor(n, names.indexOf(n)), width: 7, height: 7 }} />)}</span>
                       <span className="ae-mono block truncate">{p.where}</span>
                     </span>
                     <span className="ae-mono whitespace-nowrap">{amountText(p)}</span>
-                    <span className="flex items-center gap-1.5 text-ink-muted"><span className="ae-kind" style={{ width: 28, height: 28 }}>{iconFor(p)}</span>
+                    <span className="flex items-center gap-1.5 text-ink-muted">
                       <BackIcon style={{ width: 13, height: 13, transform: open === i ? "rotate(90deg)" : "rotate(180deg)", transition: "transform 160ms" }} /></span>
                   </button>
                   <AnimatePresence initial={false}>
@@ -1021,7 +1016,7 @@ const Detailed = memo(function Detailed({ r, narrow }: { r: Result; narrow: bool
         <span className="cp-cap pb-1" title="Found by Aria's measurement rules (version 1). The mix model we're training on rated mixes joins in once it beats its baselines.">Everything Muse Spark said</span>
         {r.advice ? r.advice.notes.map((note, i) => (
           <div key={i} className="grid items-start gap-3 border-t border-hairline py-2.5 first-of-type:border-t-0" style={{ gridTemplateColumns: "26px minmax(0, 1fr)" }}>
-            <span className="ae-pin">{i + 1}</span>
+            {(() => { const f = r.clarity.findings[note.finding]; return f ? <KindMark icon={findingIcon(f)} color={rangeOf(f.hz_range[0], f.hz_range[1]).color} /> : <span className="ae-pin">{i + 1}</span>; })()}
             <span className="text-[13.5px] leading-[20px] text-ink">{note.text}</span>
           </div>
         )) : <p className="cp-meta py-2">{r.advice_error ?? "No advice."}</p>}
@@ -1075,7 +1070,7 @@ function Compact() {
               {list.map((p, i) => (
                 <button key={i} onClick={() => jumpTo(p.bar)} title={`${p.short} Tap to hear it in Live.`}
                         className={cn("flex h-[42px] shrink-0 items-center gap-2.5 text-left text-ink", i > 0 && "border-t border-hairline")}>
-                  <span className="ae-kind" style={{ width: 26, height: 26 }}>{iconFor(p)}</span>
+                  <MarkOf p={p} />
                   <span className="flex-1 truncate text-[13px] font-medium">{p.name}</span>
                   <span className="ae-mono whitespace-nowrap" style={{ color: "var(--hot)" }}>{amountText(p)}</span>
                   <span className="ae-mono whitespace-nowrap text-right text-ink-faint">{barsOf(p)}</span>

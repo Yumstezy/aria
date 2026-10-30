@@ -3,7 +3,7 @@
 // yours in gold, the reference in blue, the gap shaded in the color of whichever is fuller there. Drawn in the
 // Pro-Q style of every chart (components/plot.tsx): Hz along the bottom, dB down the right, 0 dB at the louder
 // song's peak, both tipped up 4.5 dB an octave as Pro-Q draws them. Every point is measured (result.reference.curve); the lines are smoothed for display only.
-import { useId, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useId, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { hz, type RefCompare } from "@/lib/aria";
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { path, smoothValues } from "@/components/waves";
@@ -12,10 +12,10 @@ import { PLOT_HI, PLOT_LO, PLOT_W as W, Plot, PlotGrid, dbTicksOf, plotX as X, t
 export const YOURS = "var(--trk-0)", THEIRS = "var(--cool)";
 const PAD_T = 14, PAD_B = 20, STEP_DB = 6;   // the problem numbers have their own row above the drawing (plot.tsx)
 
-export interface Zone { n: number; lo: number; hi: number; where?: string }
+export interface Zone { n: number; lo: number; hi: number; where?: string; icon?: ReactNode; color?: string }
 
 /** height: the drawing's height for its 640 width (it scales with the card, keeping its shape).
-    zones: the problems, numbered as in the list: a shaded stretch with its number at the top. */
+    zones: the problems, marked as in the list: a shaded stretch with its mark at the top. */
 export function RefChart({ r, height = 240, zones = [], onZone, range }: {
   r: RefCompare; height?: number; zones?: Zone[]; onZone?: (n: number) => void;
   /** where most of the comparison songs sit (the good mixes' 10th to 90th percentile), drawn as a soft blue band */
@@ -60,7 +60,7 @@ export function RefChart({ r, height = 240, zones = [], onZone, range }: {
 
   return (
     <>
-      <Plot height={H} dbTicks={shape.ticks} pins={zones.map((z) => ({ n: z.n, lo: z.lo, hi: z.hi, title: z.where }))} onPin={onZone}>
+      <Plot height={H} dbTicks={shape.ticks} pins={zones.map((z) => ({ n: z.n, lo: z.lo, hi: z.hi, title: z.where, icon: z.icon, color: z.color }))} onPin={onZone}>
         <svg ref={svg} viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label={`Your mix and ${r.name}, at the same loudness`}
              onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
           <defs>
