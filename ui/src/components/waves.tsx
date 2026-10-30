@@ -8,6 +8,7 @@ import { describe, hz, hzRange, partColor, partNames, soundName, type Finding, t
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { BANDS } from "@/lib/problems";
 import { cn } from "@/lib/utils";
+import { Plot, PlotGrid, dbTicksOf } from "@/components/plot";
 
 // Short names for the tooltip, so it stays small
 const SHORT: Record<string, string> = { vocals: "Vocal", other: "Synths", bass: "Bass", drums: "Drums", mix: "Mix" };
@@ -93,6 +94,46 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spectra, findings, split]);
 
+  const tooltip = hover && (
+    <ChartTooltip x={hover.left} y={hover.top}
+      title={hz(spectra.hz[hover.i])}
+      rows={names.slice().reverse().map((n) => {
+        const v = (n === "mix" ? spectra.mix : spectra.parts[n]!)[hover.i];
+        return { label: SHORT[n] ?? soundName(n), value: v <= FLOOR_DB ? "silent" : `${v.toFixed(0)} dB`, color: getComputedStyle(svgRef.current!).getPropertyValue(color(n).slice(4, -1)) };
+      })} />
+  );
+
+  // Bare (Ember, the window's Mix check): the Pro-Q look of every chart (components/plot.tsx). Hz along the
+  // bottom and dB down the right inside the plot, 0 dB at the mix's loudest point, numbered pins over each problem.
+  if (bare) {
+    const ticks = dbTicksOf(FLOOR_DB, 12, Y);
+    return (
+      <div className="flex flex-col gap-2">
+        <Plot height={H} dbTicks={ticks} pins={zones.map((z, i) => ({ n: i + 1, f: Math.sqrt(z.lo * z.hi), title: `${describe(z.f).name}, ${z.where}` }))}
+              onPin={(n) => onZone(zones[n - 1].f)}>
+          <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="Each part's frequency curve"
+               onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
+            <PlotGrid height={H} dbTicks={ticks} />
+            {zones.map((z, i) => (
+              <rect key={i} x={X(z.lo)} y={0} width={Math.max(6, X(z.hi) - X(z.lo))} height={H} fill="var(--hot)" opacity={0.09}
+                    className="cursor-pointer hover:opacity-30" onClick={() => onZone(z.f)} />
+            ))}
+            {waves.map((wv, i) => (
+              <motion.g key={wv.n} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, ease: "easeOut", delay: i * 0.06 }}>
+                <path d={`${wv.line}L${W},${H}L0,${H}Z`} fill={color(wv.n)} opacity={wv.quiet ? 0.02 : 0.06} />
+                <motion.path d={wv.line} fill="none" stroke={color(wv.n)} strokeWidth={1.75} opacity={wv.quiet ? 0.35 : 1} vectorEffect="non-scaling-stroke"
+                             initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, ease: [0.3, 0.8, 0.2, 1], delay: 0.2 + i * 0.06 }} />
+              </motion.g>
+            ))}
+            {hover && <line x1={X(spectra.hz[hover.i])} x2={X(spectra.hz[hover.i])} y1={0} y2={H} stroke="currentColor" strokeOpacity={0.6} vectorEffect="non-scaling-stroke" />}
+          </svg>
+        </Plot>
+        {tooltip}
+        {split && playing.length === 1 && <span className="text-xs text-ink-muted">Only the {soundName(playing[0]).toLowerCase()} is playing in these bars.</span>}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2.5">
       <svg ref={svgRef} viewBox={`0 0 ${W} ${bare ? H - PAD_B + 2 : H}`} className="block h-auto w-full" role="img" aria-label="Each part's frequency curve"
@@ -123,13 +164,6 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
         {hover && <line x1={X(spectra.hz[hover.i])} x2={X(spectra.hz[hover.i])} y1={PAD_T - 6} y2={H - PAD_B} stroke="currentColor" strokeOpacity={0.6} strokeWidth={1.5} />}
       </svg>
 
-      {/* Bare (Ember): the Hz under the grid lines as HTML, so it keeps its size in a narrow window (Ian: "show the hz") */}
-      {bare && (
-        <div className="relative -mt-1 h-3.5" aria-hidden="true">
-          {TICKS.map((t) => <span key={t} className="absolute -translate-x-1/2 font-mono text-[10px] leading-3 text-ink-faint" style={{ left: `${(X(t) / W) * 100}%` }}>{hzShort(t)}</span>)}
-        </div>
-      )}
-
       {/* What each stretch of the picture is called, low to high, so 200 or 5k means something.
           Bare (Ember): names only, the numbers on hover and in the pointer's tooltip (Ian: "a little cluttered"). */}
       <div className="flex" aria-label="Frequency ranges">
@@ -146,14 +180,7 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
         })}
       </div>
 
-      {hover && (
-        <ChartTooltip x={hover.left} y={hover.top}
-          title={hz(spectra.hz[hover.i])}
-          rows={names.slice().reverse().map((n) => {
-            const v = (n === "mix" ? spectra.mix : spectra.parts[n]!)[hover.i];
-            return { label: SHORT[n] ?? soundName(n), value: v <= FLOOR_DB ? "silent" : `${v.toFixed(0)} dB`, color: getComputedStyle(svgRef.current!).getPropertyValue(color(n).slice(4, -1)) };
-          })} />
-      )}
+      {tooltip}
 
       {/* The problems, numbered like the pins. Tap one to read about it. */}
       {zones.length > 0 && !bare && (

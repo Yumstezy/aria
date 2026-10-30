@@ -9,7 +9,7 @@ import { TickGauge } from "@/components/tick-gauge";
 import { CountUp } from "@/components/count-up";
 import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
-import { RefChart, RefLegend, THEIRS, YOURS, ZoneChips } from "@/components/ref-chart";
+import { RefChart, RefLegend, THEIRS, YOURS } from "@/components/ref-chart";
 import { ProblemThumb } from "@/components/problem-thumb";
 import { AnalyzerIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
@@ -272,24 +272,6 @@ const Home = memo(function Home({ narrow, onOpen }: { narrow: boolean; onOpen: (
   );
 });
 
-/** Each band against the reference in one slim row: the difference in dB, blue where the reference is fuller
-    and gold where yours is, once it's 2 dB or more. The picture above shows where; this says by how much. */
-function RefBandRow({ r }: { r: RefCompare }) {
-  return (
-    <div className="flex" aria-label="Each band against the reference">
-      {r.bands.map((b, i) => {
-        const d = b.diff_db, off = d !== null && Math.abs(d) >= 2;
-        return (
-          <span key={b.name} className="ae-mono min-w-0 truncate text-center text-[11px]" title={`${b.name}, ${hz(b.lo)} to ${hz(b.hi)}`}
-                style={{ flex: 1, color: off ? (d! > 0 ? YOURS : THEIRS) : "var(--ink-faint)", borderLeft: i ? "1px solid var(--hairline)" : undefined }}>
-            {d === null ? "none" : `${d > 0 ? "+" : d < 0 ? "−" : ""}${Math.abs(d).toFixed(1)}`}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 /** Reference (build step 8, Ian: compare first). Live's web view takes no dropped files, so the song is chosen
     from Finder. After: the song, Change and Remove, and the last check against it: both curves, then each band. */
 const ReferenceScreen = memo(function ReferenceScreen({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
@@ -339,7 +321,7 @@ const ReferenceScreen = memo(function ReferenceScreen({ narrow, onOpen }: { narr
         {compared ? (compared.error || !compared.curve ? <p className="cp-meta">{compared.error ?? "Nothing to compare."}</p> : (
           <>
             {result?.advice?.summary && <p className="m-0 text-[16px] leading-[22px] text-ink">{result.advice.summary}</p>}
-            <RefChart r={compared} height={narrow ? 300 : 210} bands={compared.bands} zones={refProblems.map(({ p, n }) => zoneOf(p, n))} />
+            <RefChart r={compared} height={narrow ? 340 : 250} zones={refProblems.map(({ p, n }) => zoneOf(p, n))} />
           </>
         )) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -424,9 +406,9 @@ const KINDS: { kind: Kind; name: string; icon: ReactNode }[] = [
   { kind: "clash", name: "Clashing tracks", icon: <ClashIcon /> },
 ];
 // Mud is measured as synths buried in the low mids, so it gets the mud icon, not the buried one
-/** A problem as a pin on a chart: its stretch, where it hits and by how much, numbered as in the list */
+/** A problem as a pin on a chart: its stretch and where it hits, numbered as in the list */
 const zoneOf = (p: Problem, n: number) => ({ n, lo: Math.min(...p.findings.map((f) => f.hz_range[0])), hi: Math.max(...p.findings.map((f) => f.hz_range[1])),
-  where: p.where, amount: amountText(p), amountColor: p.findings[0].kind === "reference" ? refColor(p) : "var(--hot)" });
+  where: `${p.name}, ${p.where}, ${amountText(p)}` });
 /** Louder than the reference is gold (yours is fuller), quieter is blue (theirs is) */
 const refColor = (p: Problem) => ((p.findings[0].diff_db ?? 0) > 0 ? YOURS : THEIRS);
 const iconFor = (p: Problem) => p.findings[0].kind === "reference" ? <ReferenceIcon style={{ color: refColor(p) }} />
@@ -511,11 +493,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
                     {!narrow && <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={() => jumpTo(first.bar)}>Hear it</button>}
                   </div>
                 </div>
-                <div className="ae-thumb relative">{first.findings[0].kind === "reference" && r.reference?.curve
-                  ? <div className="absolute inset-2 grid place-items-center" title={`Yours (gold) and ${r.reference.name} (blue), ${first.where}`}>
-                      <div className="w-full"><RefChart r={r.reference} zoom={[first.findings[0].hz_range[0] / 3, first.findings[0].hz_range[1] * 3]} height={400}
-                                zones={[{ n: 1, lo: first.findings[0].hz_range[0], hi: first.findings[0].hz_range[1] }]} /></div></div>
-                  : <ProblemThumb p={first} spectra={spectra} />}</div>
+                <div className="ae-thumb"><ProblemThumb p={first} spectra={spectra} /></div>
               </>
             ) : (
               <div className="flex flex-col gap-1">
@@ -551,7 +529,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
               <span className="text-[14px] font-medium text-ink" title="Both songs at the same loudness. Blue is where the reference is fuller, gold where yours is.">Against your reference</span>
               <div className="ml-auto min-w-0"><RefLegend name={r.reference.name} /></div>
             </div>
-            <RefChart r={r.reference} height={narrow ? 300 : 190} zones={list.map((p, i) => zoneOf(p, i + 1))} onZone={(n) => setOpen(n - 1)} />
+            <RefChart r={r.reference} height={narrow ? 340 : 220} zones={list.map((p, i) => zoneOf(p, i + 1))} onZone={(n) => setOpen(n - 1)} />
           </section>
         </Rise>
       )}
@@ -567,7 +545,6 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
               ? <Waves spectra={spectra} findings={r.clarity.findings} split={r.clarity.mode !== "master"} bare
                        onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
               : <p className="cp-meta">The picture appears after the next Check mix.</p>}
-            {spectra && list.length > 0 && <ZoneChips zones={list.map((p, i) => zoneOf(p, i + 1))} onZone={(n) => setOpen(n - 1)} />}
           </section>
         </Rise>}
         {list.length > 0 && (
