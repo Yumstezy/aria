@@ -738,8 +738,12 @@ function LiveAnalyzer({ narrow }: { narrow: boolean }) {
       <section className="cp-tile cp-card" style={{ gap: 12 }}>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-[14px] font-medium text-ink">{playing ? "Playing now" : "Play your song"}</span>
-          <span className="font-mono text-[11px] text-ink-faint">Main · 20 frames a second</span>
-          {target && <div className="ml-auto min-w-0"><RefLegend name={`${target.name}, matched to your level`} mine="Now" /></div>}
+          {/* What each line is (Ian, Oct 30: "what is the grey line supposed to signify") */}
+          <div className="ml-auto flex min-w-0 flex-wrap gap-x-3.5 gap-y-1 text-[12.5px] text-ink-muted">
+            <span className="inline-flex items-center gap-1.5" title="Your Main track right now"><i className="h-[3px] w-3.5 rounded-sm" style={{ background: YOURS }} />Now</span>
+            <span className="inline-flex items-center gap-1.5" title="The loudest each range got in the last moment"><i className="h-[2px] w-3.5 rounded-sm bg-ink opacity-50" />Peaks</span>
+            {target && <span className="inline-flex min-w-0 items-center gap-1.5" title="Your reference's shape, moved to your level"><i className="w-3.5 border-t-2 border-dashed" style={{ borderColor: THEIRS }} /><span className="truncate">{target.name}</span></span>}
+          </div>
         </div>
         <Plot height={H} dbTicks={ticks}>
           <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="Your song's sound right now">

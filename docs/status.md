@@ -11,6 +11,8 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 - **Intro runs to the first Break** (Ian: EDM intros are for DJs to mix in): THE WEEKEND now reads Intro 1 to 40, Break 41 to 48, Build, Drop, Break, Build, Drop, Drop, Outro (real Muse run). Check: Hear the whole song again; your song's Intro should reach its first break.
 
+- **Checked in Live by Ian (Oct 30, 12:37):** the new build runs well (arrangement, markers, before and after, analyzer, marks). To polish later: navigation, and shorter explanations. The analyzer now has a legend (Now, Peaks, your reference).
+
 **Bug queue**
 - Home's kind cards (GlowCard): hovering lags a little, and since the cards fill half the page, scrolling over them feels sticky (Ian, Oct 30, 12:35).
 
