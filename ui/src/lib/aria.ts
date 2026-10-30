@@ -6,7 +6,7 @@ import { startRecording, stopRecording, transcribe } from "@/lib/voice";
 
 export const ENGINE = "http://127.0.0.1:8765";
 
-export type Kind = "resonance" | "buildup" | "harsh" | "masking" | "bass_click" | "clash" | "reference" | "typical";
+export type Kind = "resonance" | "buildup" | "harsh" | "masking" | "bass_click" | "clash" | "reference";
 export interface Finding {
   kind: Kind;
   hz?: number;
@@ -25,7 +25,6 @@ export interface Finding {
   clicky_share?: number;
   bursts_per_bar?: number;
   shape?: "stretch" | "band";   // reference: a stretch that stands out, or a whole band off
-  value_db?: number; median_db?: number; range_db?: [number, number]; outside_db?: number; mixes?: number;   // typical
   band?: string;
   stands_out_db?: number;
 }
@@ -54,10 +53,6 @@ export interface Spectra { hz: number[]; mix: number[]; parts: Record<string, nu
 export interface Result {
   recording: { path: string; start_beat: number | null; tempo: number | null; bars: number | null };
   reference?: RefCompare | null;
-  /** Without a reference song: each band against the good-rated mixes (ml/data), where 8 in 10 of them sit */
-  typical?: { mixes: number; error: string | null; bands: { name: string; lo: number; hi: number; value_db: number; median_db: number; range_db: [number, number]; outside: boolean }[];
-    /** Once ml/curves.py has measured the rated mixes: your EQ curve, the good mixes' middle (ref) and their range */
-    curve?: { hz: number[]; mine: number[]; ref: number[]; lo: number[]; hi: number[]; mixes: number } | null } | null;
   measured: {
     integrated_lufs: number | null; true_peak_dbtp: number | null;
     bands_db: Record<string, number | null>; width: Record<string, number | null>;
@@ -263,7 +258,7 @@ export function connect() {
     on<{ state: EngineState; text: string }>("engine", (e) => set({ engine: e, ...(e.state === "error" ? { error: e.text }
       : e.state === "up" && state.engine.state === "error" && state.error === state.engine.text ? { error: null } : {}) }));
     on<Progress>("progress", (p) => set({ progress: p, error: null }));
-    on<Result>("mix_result", (r) => set({ result: r, progress: null, error: null, beforeAfter: null }));   // a new check: a new "before"
+    on<Result>("mix_result", (r) => set({ result: known(r), progress: null, error: null, beforeAfter: null }));   // a new check: a new "before"
     on<{ text: string }>("error", (e) => set({ error: e?.text || "Something went wrong.", progress: null }));
     on<{ bar: number; name: string }>("marker_done", (m) => set({ marker: m }));
     on<{ request: string | null }>("ask_pending", (p) => {
@@ -313,7 +308,7 @@ export async function checkMix() {
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.detail || `The engine could not analyze that file (HTTP ${res.status}).`);
-    set({ result: body, progress: null });
+    set({ result: known(body), progress: null });
   } catch (e) {
     set({ error: e instanceof TypeError ? "The engine is not running." : (e as Error).message, progress: null });
   }
@@ -520,7 +515,19 @@ export const openWindow = () => { if (!send("open_window", { screen: screenRect(
 export const addMarker = (bar: number) => send("add_marker", { bar, name: "Aria check" });
 
 /** For previews and tests: show a result without the device (window.Aria.showResult in the console). */
-export function showResult(r: Result | null) { set({ result: r, progress: null, error: null }); }
+export function showResult(r: Result | null) { set({ result: r && known(r), progress: null, error: null }); }
+
+// A result saved before a kind of problem was taken out (Oct 30: "typical", the good-mixes comparison) would break
+// the screen: drop findings of kinds this screen doesn't know, and Muse's notes on them, keeping the notes' indexes right.
+const KNOWN: Kind[] = ["resonance", "buildup", "harsh", "masking", "bass_click", "clash", "reference"];
+function known(r: Result): Result {
+  const fs = r.clarity?.findings ?? [];
+  if (fs.every((f) => KNOWN.includes(f.kind))) return r;
+  const newIndex = new Map<number, number>();
+  const findings = fs.filter((f, i) => KNOWN.includes(f.kind) && newIndex.set(i, newIndex.size));
+  const advice = r.advice && { ...r.advice, notes: r.advice.notes.filter((n) => newIndex.has(n.finding)).map((n) => ({ ...n, finding: newIndex.get(n.finding)! })) };
+  return { ...r, clarity: { ...r.clarity, findings }, advice };
+}
 if (typeof window !== "undefined") (window as unknown as { Aria: unknown }).Aria = { showResult, askMuse: (t: string) => askMuse(t) };
 
 // ---------- plain words for what the engine found (DESIGN.md: words first, numbers as detail) ----------
@@ -563,11 +570,6 @@ export function describe(f: Finding): { name: string; where: string; size: strin
       name, where: hzRange(f.hz_range), size: `${f.gap_db!.toFixed(1)} dB`,
       about: `${soundName(f.masked!)} sits ${Math.abs(f.gap_db!).toFixed(1)} dB under ${soundName(f.by!)} in ${hzRange(f.hz_range)}, ${Math.round(f.share! * 100)}% of the time it plays.`,
     };
-  }
-  if (f.kind === "typical") {
-    const more = (f.outside_db ?? 0) > 0, past = Math.abs(f.outside_db!).toFixed(1);
-    return { name: `${f.band} ${more ? "fuller" : "thinner"} than most good mixes`, where: hzRange(f.hz_range), size: `${more ? "+" : "−"}${past} dB`,
-      about: `${f.band} is ${past} dB ${more ? "above" : "below"} where 8 in 10 of ${f.mixes} good-rated mixes keep it.` };
   }
   if (f.kind === "reference") {
     const more = (f.diff_db ?? 0) > 0, where = f.shape === "band" ? f.band! : hzRange(f.hz_range);

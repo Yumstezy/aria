@@ -16,7 +16,7 @@ import { path } from "@/components/waves";
 import { ProblemThumb } from "@/components/problem-thumb";
 import { KINDS, KindMark, findingIcon, rangeOf } from "@/components/problem-mark";
 import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
-         ReferenceIcon, RingIcon, SunIcon, SwapIcon, GoodMixIcon } from "@/components/icons";
+         ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { ANALYZER_HZ, addArrangementMarkers, barsLabel, checkMix, clearReference, editArrangement, hearSong, onAnalyzer, recheck, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
          partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Part, type RefCompare, type Result, type SongParts } from "@/lib/aria";
@@ -584,8 +584,8 @@ const colorOf = (p: Problem) => rangeOf(...spanOf(p)).color;
 /** A problem's mark: its kind's icon in its range's color, in place of a number (Ian, Oct 30) */
 const MarkOf = ({ p, size }: { p: Problem; size?: number }) => <KindMark icon={iconFor(p)} color={colorOf(p)} size={size} title={`${p.name}, ${rangeOf(...spanOf(p)).name}`} />;
 /** Louder than the reference is gold (yours is fuller), quieter is blue (theirs is) */
-const refColor = (p: Problem) => ((p.findings[0].kind === "typical" ? p.findings[0].outside_db ?? 0 : p.findings[0].diff_db ?? 0) > 0 ? YOURS : THEIRS);
-const compared = (p: Problem) => p.findings[0].kind === "reference" || p.findings[0].kind === "typical";
+const refColor = (p: Problem) => ((p.findings[0].diff_db ?? 0) > 0 ? YOURS : THEIRS);
+const compared = (p: Problem) => p.findings[0].kind === "reference";
 const iconFor = (p: Problem) => findingIcon(p.findings[0]);
 
 /** Before the first check: the Simple view's layout greyed out. Its shapes say what will appear; no sentences. */
@@ -614,32 +614,6 @@ const EmptyCheck = memo(function EmptyCheck({ narrow }: { narrow: boolean }) {
     </div>
   );
 });
-
-/** Each band, centred on the good mixes' middle: the grey bar is where 8 in 10 of them sit, the dot is yours, gold
-    when you're past it (more than most) and blue when under. One scale for all bands, ±8 dB around the middle. */
-function GoodMixRows({ rows, narrow }: { rows: NonNullable<Result["typical"]>["bands"]; narrow: boolean }) {
-  const SPAN = 8, x = (d: number) => `${((Math.max(-SPAN, Math.min(SPAN, d)) + SPAN) / (2 * SPAN)) * 100}%`;
-  return (
-    <div className="grid gap-2.5">
-      {rows.map((b) => {
-        const d = b.value_db - b.median_db, over = b.value_db > b.range_db[1], under = b.value_db < b.range_db[0];
-        const c = b.outside ? (over ? YOURS : THEIRS) : "var(--ink)";
-        return (
-          <div key={b.name} className="grid items-center gap-3" style={{ gridTemplateColumns: `${narrow ? "5.5rem" : "7rem"} minmax(0, 1fr) 4.5rem` }} title={`${b.name}, ${hz(b.lo)} to ${hz(b.hi)}: yours ${b.value_db} dB of the mix, good mixes ${b.range_db[0]} to ${b.range_db[1]} dB`}>
-            <span className="truncate text-[13px] text-ink-muted">{b.name}</span>
-            <span className="relative h-4">
-              <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-hairline" />
-              <span className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full" style={{ left: x(b.range_db[0] - b.median_db), right: `calc(100% - ${x(b.range_db[1] - b.median_db)})`, background: "var(--track)" }} />
-              <span className="absolute top-0 h-4 w-px bg-ink-faint" style={{ left: x(0) }} />
-              <span className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: x(d), background: c, boxShadow: "0 0 0 2px var(--card)" }} />
-            </span>
-            <span className="ae-mono text-right" style={{ color: b.outside ? c : undefined }}>{Math.abs(d) < 0.05 ? "0.0" : `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}`} dB</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 /** Before and after (Oct 30): after a fix, hear the same bars again. Both takes at the same loudness: before in blue,
     after in gold, and how much each problem's range changed. */
@@ -693,8 +667,8 @@ function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
 }
 
 /** Live analyzer (Oct 30): your song's sound as it plays, 31 third-octave bands from Main, drawn like every chart
-    (Pro-Q tilt), with a peak line that holds a moment. Behind it, the shape of your reference (or the typical good mix
-    from your last check), matched to your level, so you see where the song falls short or sticks out as it plays.
+    (Pro-Q tilt), with a peak line that holds a moment. Behind it, the shape of your reference
+   , matched to your level, so you see where the song falls short or sticks out as it plays.
     Frames come 20 a second; the lines are drawn at the screen's own rate (Ian, Oct 30: it moved "very choppy"),
     gliding toward each frame like an analyzer's ballistics: up in about 25 ms, down in about 150 ms. The moving
     lines are written straight to the SVG, so a frame doesn't re-render React, and the dB scale only moves in 6 dB steps. */
@@ -707,7 +681,7 @@ function LiveAnalyzer({ narrow }: { narrow: boolean }) {
   const latest = useRef<number[] | null>(null), shown = useRef<number[] | null>(null), peak = useRef<number[] | null>(null), avg = useRef<number[] | null>(null);
   const liveEl = useRef<SVGPathElement>(null), fillEl = useRef<SVGPathElement>(null), peakEl = useRef<SVGPathElement>(null);
   const target = result?.reference?.curve ? { name: result.reference.name, hz: result.reference.curve.hz, v: result.reference.curve.ref }
-    : result?.typical?.curve ? { name: "Typical good mix", hz: result.typical.curve.hz, v: result.typical.curve.ref } : null;
+    : null;
   const hz = ANALYZER_HZ.filter((h) => h <= 16000);
   const W = 640, H = narrow ? 360 : 260, n = hz.length;
   const floor = top - 54;
@@ -862,26 +836,6 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
           </Rise>
         )}
       </div>
-
-      {!r.reference && r.typical && !r.typical.error && r.typical.bands.length > 0 && (
-        <Rise i={3}>
-          <section className="cp-tile cp-card" style={{ gap: 12 }}>
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="text-[14px] font-medium text-ink" title="Each band's share of your mix, against EDM mixes people rated good. The grey bar is where 8 in 10 of them sit.">Against good mixes</span>
-              <span className="font-mono text-[11px] text-ink-faint">{r.typical.mixes} rated good by people{r.typical.curve ? "" : " · dB from their middle"}</span>
-              {r.typical.curve ? <div className="ml-auto min-w-0"><RefLegend name="Typical good mix" /></div> : (
-              <span className="ml-auto inline-flex items-center gap-3 text-[12px] text-ink-muted">
-                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-5 rounded-full" style={{ background: "var(--track)" }} />good mixes</span>
-                <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: YOURS }} />yours</span>
-              </span>)}
-            </div>
-            {r.typical.curve
-              ? <RefChart r={{ name: "Typical good mix", path: "", error: null, bands: [], curve: r.typical.curve }} range={r.typical.curve} height={narrow ? 340 : 220}
-                          zones={list.map((p, i) => zoneOf(p, i + 1))} onZone={(n) => setOpen(n - 1)} />
-              : <GoodMixRows rows={r.typical.bands} narrow={narrow} />}
-          </section>
-        </Rise>
-      )}
 
       {r.reference && !r.reference.error && r.reference.curve && (
         <Rise i={3}>

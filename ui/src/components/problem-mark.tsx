@@ -2,7 +2,7 @@
 // of its kind (mud, harsh, buried...) in the color of where it sits, lows to highs. The same mark sits over the
 // problem's stretch on the charts and at the start of its row, so the eye matches them without reading.
 import type { ReactNode } from "react";
-import { BuriedIcon, ClashIcon, ClickIcon, GoodMixIcon, HarshIcon, MudIcon, ReferenceIcon, RingIcon } from "@/components/icons";
+import { BuriedIcon, ClashIcon, ClickIcon, HarshIcon, MudIcon, ReferenceIcon, RingIcon } from "@/components/icons";
 import type { Finding, Kind } from "@/lib/aria";
 import { BANDS } from "@/lib/problems";
 
@@ -37,7 +37,6 @@ export function rangeOf(lo: number, hi: number) {
 
 /** The icon for a finding. Mud is measured as synths buried in the low mids, so it gets the mud icon. */
 export function findingIcon(f: Finding): ReactNode {
-  if (f.kind === "typical") return <GoodMixIcon />;
   if (f.kind === "reference") return <ReferenceIcon />;
   const mud = f.kind === "masking" && f.masked === "other" && f.range === "low-mid";
   return KINDS.find((k) => k.kind === (mud ? "buildup" : f.kind))!.icon;
