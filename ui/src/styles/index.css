@@ -100,6 +100,8 @@ html.see-through, html.see-through body, .see-through .cp-stage { background: tr
 .cp-where.is-wrap button { flex: 1 1 calc(25% - 4px); height: 52px; padding: 6px 10px; }
 .cp-where button.is-hot { box-shadow: inset 0 0 0 2px var(--hot); }
 .cp-where button.is-hot small { color: var(--hot); }
+.cp-where.is-empty button { color: var(--ink-muted); cursor: default; }
+.cp-where.is-empty button small { color: var(--ink-faint); font-weight: 500; }
 
 /* The done pill on the light card of the Ask pop-up (cp-did is drawn for blue bubbles) */
 .cp-ask-pop .cp-did, .cp-chat .cp-did { align-self: flex-start; height: auto; min-height: 26px; padding: 3px 4px 3px 10px; background: var(--well); color: var(--good); }
@@ -192,3 +194,18 @@ html.see-through, html.see-through body, .see-through .cp-stage { background: tr
 .ae-thumb { border-radius: 12px; background: var(--card-2); border: 1px solid var(--hairline); overflow: hidden; }
 .ae-row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--hairline); width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; color: var(--ink); font: inherit; cursor: pointer; }
 .ae-row:first-child { border-top: 0; }
+.ae-kind.is-idle { color: var(--ink-muted); }
+.ae-kinds { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.ae-kinds > span { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-muted); }
+.ae-thumb.is-empty { border-style: dashed; border-color: var(--track); background: transparent; min-height: 96px; }
+/* A switch with its icon and name, like Ember's sidebar rows: the knob says on or off, no words needed */
+.ae-switch { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px 0 10px; border-radius: 10px; border: 1px solid var(--card-edge);
+  background: var(--card); color: var(--ink-muted); font: 500 13px/1 inherit; font-family: inherit; cursor: pointer; }
+.ae-switch:disabled { opacity: 0.6; cursor: default; }
+.ae-switch svg { width: 15px; height: 15px; }
+.ae-switch i { position: relative; width: 28px; height: 16px; border-radius: 8px; background: var(--track); transition: background 160ms; margin-left: 4px; }
+.ae-switch i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--ink-muted); transition: transform 160ms, background 160ms; }
+.ae-switch[aria-checked="true"] { color: var(--ink); }
+.ae-switch[aria-checked="true"] i { background: var(--good); }
+.ae-switch[aria-checked="true"] i::after { transform: translateX(12px); background: #fff; }
+.ae-switch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

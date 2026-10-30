@@ -12,6 +12,8 @@ Manual check for Ian: drag the new `device/Aria.amxd` onto Main. The strip shows
 
 Test files from the debug, not committed, still to delete (Ian to OK): `device/Aria test.amxd`, `device/Probe A.amxd`, `device/hello-test.js`, and `~/Desktop/n4m-test/`.
 
+**Done after that (Oct 29, evening): no more words where a picture works.** Home lost the Get started card and the tool tiles; before a check it shows the six kinds of problem as icons and Check mix, after one the count, the problem icons and the real spectrum. Name my tracks is one switch with an ear. The empty Mix check has no sentences. PNGs of every screen (from Ian's real 20:10 check, his Ask Muse history) are in `~/Desktop/Aria screens Oct 29/` for the group. Manual check for Ian: Open window in Live, look at Home before and after a check.
+
 **Then continue the polish (Ian, Oct 29: "lets move on to other features ui/ux and polishing everything else up"):**
 - The Ember look is in for Mix check, Simple (commit 89558f3, `DESIGN.md` "Ember direction"). Ian hasn't seen it in Live yet because of the blocker; he liked the mockup and said "the glow may be too much", so it has no glow.
 - Next screens in the Ember style: Home, Ask Muse, Detailed, the empty state before a first check, the compact view.

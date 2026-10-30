@@ -12,6 +12,7 @@ Ian picked the look of an "Ember" dashboard: "notice the spacing and way all com
 - One color per track or part, the same on the chart, the dots in the side menu and the list (`--trk-0` to `--trk-5`).
 - Pictures and icons instead of words: an icon per problem kind, the Fix first card shows the clashing parts' real curves (or Muse's EQ cut), and the side menu lists the tracks Aria heard with how many problems each is in.
 - Mix check, Simple: To fix, Fix first, Listening to, then the picture beside a numbered list. A row opens to Muse's words and Fix it.
+- No setup steps or explainer sentences (Ian, Oct 29: "everything should be self explanatory"). Home has no Get started card; before a check the screens show their shapes greyed out, the kinds of problem as icons, and Check mix. Explanations live in hover titles. The one setup warning left, "Move Aria last on Main", shows only when it's true.
 
 ## Principles
 

@@ -10,7 +10,7 @@ import { CountUp } from "@/components/count-up";
 import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
 import { ProblemThumb } from "@/components/problem-thumb";
-import { BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, ExpandIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
+import { BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { barsLabel, checkMix, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode, stopListening,
@@ -45,6 +45,9 @@ export function AriaWindow() {
   if (compact) return <Compact />;
 
   const status = progress ? `${progress.text}${progress.detail ? ` · ${progress.detail}` : ""}` : error ?? note;
+  // The one setup step that can go wrong after install: Aria hears only what comes before it on Main
+  const chain = session?.chain;
+  const placeWarning = chain && !chain.on_main ? "Put Aria on Main" : chain?.after.length ? "Move Aria last on Main" : null;
 
   return (
     <div className={cn("cp-stage", narrow && "is-flush")} style={narrow ? undefined : { height: "100vh", minHeight: 0 }}>
@@ -82,14 +85,15 @@ export function AriaWindow() {
               </div>
             )}
           </header>
-          {(status || engine.state !== "up") && (
+          {(status || engine.state !== "up" || placeWarning) && (
             <div className="cp-row flex-wrap" role="status">
               {engine.state !== "up" && <span className={cn("cp-tag", engine.state === "starting" ? "cp-tag-idle" : "cp-tag-hot")}>{engine.state === "starting" ? "Starting Aria" : "Engine not running"}</span>}
+              {placeWarning && <span className="cp-tag cp-tag-hot" title="Aria only hears what comes before it on the Main track.">{placeWarning}</span>}
               {status && <span className="cp-meta" style={error ? { color: "var(--hot)" } : undefined}>{status}</span>}
             </div>
           )}
 
-          <KeyTracks quiet={!!result} />
+          <KeyTracks />
           {view === "home" ? <Home narrow={narrow} onOpen={openMixCheck} />
             : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />
@@ -219,68 +223,37 @@ const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView
 
 // ---------- Home ----------
 
+/** Home (Ember, Oct 29): no setup steps (Ian: "everything should be self explanatory"). Before a check, the
+    kinds of problem Aria finds, as icons, and Check mix. After one, how many to fix and the real picture. */
 const Home = memo(function Home({ narrow, onOpen }: { narrow: boolean; onOpen: () => void }) {
-  const engine = useAriaSel((s) => s.engine), result = useAriaSel((s) => s.result), session = useAriaSel((s) => s.session);
-  const ask = { log: { length: useAriaSel((s) => s.ask.log.length) } };
+  const result = useAriaSel((s) => s.result), progress = useAriaSel((s) => !!s.progress);
   const list = result ? problemsOf(result) : [];
-  const steps: [string, boolean][] = [
-    ["Aria engine is running", engine.state === "up"],
-    ["Aria is last on your Main track", !!session && session.chain.on_main && !session.chain.after.length],
-    ["Play the busiest part, press Check mix", !!result],
-    ["Ask Muse to fix what it finds", ask.log.length > 0],
-  ];
-  const next = steps.findIndex(([, done]) => !done);
-  const tool = (label: string, icon: ReactNode, tag: ReactNode, onClick: () => void) => (
-    <a className={cn("cp-tile cp-card", span(narrow, 3))} href="#" style={{ minHeight: 118, gap: 8 }} onClick={(e) => { e.preventDefault(); onClick(); }}>
-      <span className="grid place-items-center" style={{ width: 34, height: 34, borderRadius: 12, background: "var(--well)", color: "var(--action)" }}>{icon}</span>
-      <span className="cp-tile-title">{label}</span>
-      <span className="cp-push">{tag}</span>
-    </a>
-  );
-  const soon = (label: string) => () => notice(`${label} is coming soon.`);
 
   return (
     <div className="cp-bento">
-      <section className={cn("cp-tile cp-hero", span(narrow, 7))} style={{ minHeight: narrow ? 0 : 286, gap: 10 }}>
+      <section className={cn("cp-tile cp-hero", span(narrow, 12))} style={{ gap: 12 }}>
         <span className="cp-cap">Your song</span>
         {result ? (
           <>
-            <span style={{ fontSize: 28, lineHeight: "32px", fontWeight: 600, letterSpacing: "-.02em" }}>
-              {list.length === 0 ? "Nothing sticks out" : `${list.length} ${list.length === 1 ? "thing" : "things"} to fix`}
-            </span>
-            <span style={{ fontSize: 14, lineHeight: "20px", color: "var(--on-tile-muted)" }}>{barsLabel(result)}. {list.slice(0, 3).map((p) => p.name).join(", ")}{list.length > 3 ? " and more" : ""}</span>
-            {result.clarity.spectra && <div className="cp-push" style={{ height: 64 }}><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode !== "master"} /></div>}
-            <div className={result.clarity.spectra ? "" : "cp-push"}><button className="cp-btn cp-btn-light" onClick={onOpen}>See what to fix</button></div>
+            <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+              <span className="ae-big"><CountUp value={list.length} /></span>
+              <span className="pb-1.5 text-[15px] text-ink-muted">{list.length ? "to fix" : "Nothing sticks out"}</span>
+              <div className="flex gap-1.5 pb-1">{list.map((p, i) => <span key={i} className="ae-kind" title={p.name}>{iconFor(p)}</span>)}</div>
+              <span className="ae-mono ml-auto pb-1.5">{barsLabel(result)}</span>
+            </div>
+            {result.clarity.spectra && <div style={{ height: narrow ? 72 : 96 }}><MiniWaves spectra={result.clarity.spectra} findings={result.clarity.findings} split={result.clarity.mode !== "master"} /></div>}
+            <div><button className="cp-btn cp-btn-light" onClick={onOpen}>See what to fix</button></div>
           </>
         ) : (
           <>
-            <span style={{ fontSize: 28, lineHeight: "32px", fontWeight: 600, letterSpacing: "-.02em" }}>Not checked yet</span>
-            <span style={{ fontSize: 14, lineHeight: "20px", color: "var(--on-tile-muted)", maxWidth: 460 }}>
-              Aria listens to 16 bars of your song and finds sounds that clash or stick out. Muse Spark says how to fix each one, and fixes it when you say yes.
-            </span>
-            <div className="cp-empty cp-push" style={{ flexDirection: "row", alignItems: "center", gap: 14, color: "var(--on-tile)" }}>
-              <MixIcon style={{ width: 22, height: 22, flex: "none" }} />
-              <div style={{ display: "grid", gap: 2 }}>
-                <b style={{ fontSize: 14 }}>Play the busiest part, then press Check mix</b>
-                <span style={{ fontSize: 12, color: "var(--on-tile-muted)" }}>Buried sounds, mud, harsh hits, ringing notes and bass clicks</span>
-              </div>
+            <span className="ae-big">Not checked yet</span>
+            <div className="ae-kinds">
+              {KINDS.map((k) => <span key={k.kind} title={k.name}><span className="ae-kind is-idle">{k.icon}</span>{k.name}</span>)}
             </div>
+            <div><button className="cp-btn cp-btn-primary" disabled={progress} onClick={checkMix}>{progress ? "Checking" : "Check mix"}</button></div>
           </>
         )}
       </section>
-
-      <section className={cn("cp-tile cp-card", span(narrow, 5))} style={{ minHeight: narrow ? 0 : 286, gap: 16 }}>
-        <span className="cp-cap">Get started</span>
-        <ul className="cp-check">
-          {steps.map(([label, done], i) => <li key={label} className={done ? "is-done" : i === next ? "is-next" : ""}><i />{label}</li>)}
-        </ul>
-        <span className="cp-meta cp-push">Nothing in your set changes until you ask Muse or say yes.</span>
-      </section>
-
-      {tool("Mix check", <MixIcon style={{ width: 20, height: 20 }} />,
-            !result ? <span className="cp-tag cp-tag-idle">Not run yet</span>
-              : list.length ? <span className="cp-tag cp-tag-hot">{list.length} to fix</span> : <span className="cp-tag cp-tag-good">Clear</span>, onOpen)}
-      {tool("Reference", <ReferenceIcon style={{ width: 20, height: 20 }} />, <span className="cp-tag cp-tag-idle">Coming soon</span>, soon("Reference"))}
 
       <WhereItHappens r={result} narrow={narrow} onPick={onOpen} />
     </div>
@@ -296,7 +269,7 @@ function WhereItHappens({ r, narrow, onPick }: { r: Result | null; narrow: boole
     <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 12 }}>
       <div className="cp-spread">
         <span className="cp-cap">Where it is in the mix</span>
-        {r ? <span className="cp-meta">Low to high. Tap one to see it</span> : <span className="cp-tag cp-tag-idle">No check yet</span>}
+        {r ? <span className="font-mono text-[11.5px] text-ink-faint">low to high</span> : <span className="cp-tag cp-tag-idle">No check yet</span>}
       </div>
       <div className={cn("cp-where", !r && "is-empty", narrow && "is-wrap")}>
         {bands.map((b) => (
@@ -307,71 +280,61 @@ function WhereItHappens({ r, narrow, onPick }: { r: Result | null; narrow: boole
           </button>
         ))}
       </div>
-      {!r && (
-        <div className="cp-empty" style={{ flexDirection: narrow ? "column" : "row", alignItems: narrow ? "flex-start" : "center", justifyContent: "space-between", padding: "18px 20px", gap: 12 }}>
-          <div style={{ display: "grid", gap: 4 }}>
-            <b style={{ fontSize: 15 }}>Your first Mix check fills this in</b>
-            <span className="cp-meta">Each problem lights up where it sits, from the sub bass to the air.</span>
-          </div>
-          <button className="cp-btn" onClick={checkMix}>Check mix</button>
-        </div>
-      )}
     </section>
   );
 }
 
 /** "Name my tracks": with it on, Check mix puts an Aria Ear on each key track (by name) and names the tracks
-    that clash. Set it before checking, so a song isn't checked twice. Off takes the Ears off. */
-const KeyTracks = memo(function KeyTracks({ quiet }: { quiet?: boolean }) {
+    that clash. Set it before checking, so a song isn't checked twice. Off takes the Ears off.
+    One switch; the tracks with Ears show beside it. Words only while it works or when turning on fails. */
+const KeyTracks = memo(function KeyTracks() {
   const session = useAriaSel((s) => s.session), ears = useAriaSel((s) => s.ears);
   const on = session?.ears ?? [];
   const wanted = !!session?.keyTracks || on.length > 0;
   return (
     <div className="cp-row flex-wrap" style={{ gap: 8 }}>
-      <span className="cp-meta" style={{ color: "var(--ink-muted)", fontWeight: 500 }} title="Check mix then says which of your tracks clash, like Kick and Bass. Aria adds a small Ear to each key track.">Name my tracks</span>
-      <div className="cp-seg" role="group" aria-label="Name my tracks">
-        <button aria-pressed={!wanted} disabled={ears.busy} onClick={() => wanted && stopListening()}>Off</button>
-        <button aria-pressed={wanted} disabled={ears.busy} onClick={() => !wanted && listenTracks()}>On</button>
-      </div>
-      {on.map((t, i) => <span key={i} className="cp-tag cp-tag-idle" title={t} style={{ maxWidth: 150 }}><span className="truncate">{shortName(t, 18)}</span></span>)}
-      {ears.text ? <span className="cp-meta">{ears.text}</span>
-        : !wanted && !quiet && <span className="cp-meta">Check mix then says which of your tracks clash, like Kick and Bass. Aria adds a small Ear to each key track.</span>}
+      <button className="ae-switch" role="switch" aria-checked={wanted} disabled={ears.busy} onClick={() => (wanted ? stopListening() : listenTracks())}
+              title="Check mix then says which of your tracks clash, like Kick and Bass. Aria adds a small Ear to each key track.">
+        <EarIcon />Name my tracks<i />
+      </button>
+      {on.map((t, i) => <span key={i} className="cp-tag cp-tag-idle" title={t} style={{ maxWidth: 150 }}><EarIcon style={{ width: 11, height: 11, flex: "none" }} /><span className="truncate">{shortName(t, 18)}</span></span>)}
+      {ears.text && (ears.busy || wanted) && <span className="cp-meta">{ears.text}</span>}
     </div>
   );
 });
 
 // ---------- Mix check ----------
 
-const KINDS: { kind: Kind; name: string; line: string; icon: ReactNode }[] = [
-  { kind: "masking", name: "Buried sounds", line: "A sound hidden under another one.", icon: <BuriedIcon /> },
-  { kind: "buildup", name: "Mud and build-up", line: "Too much piled up in one range.", icon: <MudIcon /> },
-  { kind: "harsh", name: "Harsh hits", line: "Sharp peaks that sting the ear.", icon: <HarshIcon /> },
-  { kind: "resonance", name: "Ringing notes", line: "One note that rings on too loud.", icon: <RingIcon /> },
-  { kind: "bass_click", name: "Bass clicks", line: "Clicks where bass notes start.", icon: <ClickIcon /> },
-  { kind: "clash", name: "Clashing tracks", line: "Two tracks fighting in one range. Needs Aria Ear.", icon: <ClashIcon /> },
+const KINDS: { kind: Kind; name: string; icon: ReactNode }[] = [
+  { kind: "masking", name: "Buried sounds", icon: <BuriedIcon /> },
+  { kind: "buildup", name: "Mud", icon: <MudIcon /> },
+  { kind: "harsh", name: "Harsh hits", icon: <HarshIcon /> },
+  { kind: "resonance", name: "Ringing notes", icon: <RingIcon /> },
+  { kind: "bass_click", name: "Bass clicks", icon: <ClickIcon /> },
+  { kind: "clash", name: "Clashing tracks", icon: <ClashIcon /> },
 ];
 // Mud is measured as synths buried in the low mids, so it gets the mud icon, not the buried one
 const iconFor = (p: Problem) => KINDS.find((x) => x.kind === (p.name === "Mud" ? "buildup" : p.findings[0].kind))!.icon;
 
-/** Before the first check: the Simple view's layout greyed out, saying what will appear and how to start. */
+/** Before the first check: the Simple view's layout greyed out. Its shapes say what will appear; no sentences. */
 const EmptyCheck = memo(function EmptyCheck({ narrow }: { narrow: boolean }) {
   return (
     <div className="cp-bento">
-      <section className={cn("cp-tile cp-hero", span(narrow, 7))} style={{ minHeight: narrow ? 0 : 228, gap: 10 }}>
+      <section className={cn("cp-tile cp-hero", span(narrow, 7))} style={{ minHeight: narrow ? 0 : 160, gap: 10 }}>
         <span className="cp-cap">Where the problems are</span>
-        <span style={{ fontSize: 34, lineHeight: "38px", fontWeight: 700, letterSpacing: "-.03em" }}>Not checked yet</span>
-        <span style={{ fontSize: 14, color: "var(--on-tile-muted)" }}>Play the busiest part of your song and press Check mix. Aria listens to 16 bars.</span>
         <div className="cp-score cp-push">{BANDS.map((b) => <span key={b.name}><i />{b.name}</span>)}</div>
       </section>
-      <section className={cn("cp-tile cp-solid", span(narrow, 5))} style={{ minHeight: narrow ? 0 : 228, gap: 8 }}>
-        <span className="cp-cap">Fix first</span>
-        <h2 className="cp-tile-title" style={{ fontSize: 20, lineHeight: "25px" }}>Nothing yet</h2>
-        <p className="cp-body is-quiet" style={{ margin: 0 }}>After a check, the one thing to fix first shows here, with a button that has Muse fix it for you.</p>
+      <section className={cn("cp-tile cp-card", span(narrow, 5))} style={{ minHeight: narrow ? 0 : 160, display: "grid", gridTemplateColumns: "minmax(0, 1fr) 42%", gap: 12 }}>
+        <div className="flex flex-col gap-1">
+          <span className="cp-cap">Fix first</span>
+          <span className="text-[22px] text-ink-faint">None yet</span>
+          <div className="mt-auto"><button className="cp-btn cp-btn-primary cp-btn-sm" disabled>Fix it</button></div>
+        </div>
+        <div className="ae-thumb is-empty" />
       </section>
-      {KINDS.map((k, i) => (
+      {KINDS.map((k) => (
         <section key={k.kind} className={cn("cp-tile cp-card cp-stat", span(narrow, 4))}>
-          <div className="cp-stat-head"><span className="cp-stat-icon">{k.icon}</span><span className="cp-stat-name">{k.name}</span><span className="cp-tag cp-tag-idle cp-stat-word">Not checked</span></div>
-          <p className="cp-stat-line">{k.line}</p>
+          <div className="cp-stat-head"><span className="cp-stat-icon">{k.icon}</span><span className="cp-stat-name">{k.name}</span></div>
           <TickGauge share={0} />
         </section>
       ))}
