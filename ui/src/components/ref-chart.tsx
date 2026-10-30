@@ -16,8 +16,10 @@ export interface Zone { n: number; lo: number; hi: number; where?: string }
 
 /** height: the drawing's height for its 640 width (it scales with the card, keeping its shape).
     zones: the problems, numbered as in the list: a shaded stretch with its number at the top. */
-export function RefChart({ r, height = 240, zones = [], onZone }: {
+export function RefChart({ r, height = 240, zones = [], onZone, range }: {
   r: RefCompare; height?: number; zones?: Zone[]; onZone?: (n: number) => void;
+  /** where most of the comparison songs sit (the good mixes' 10th to 90th percentile), drawn as a soft blue band */
+  range?: { lo: number[]; hi: number[] };
 }) {
   const id = useId().replace(/:/g, "");
   const svg = useRef<SVGSVGElement>(null);
@@ -37,10 +39,14 @@ export function RefChart({ r, height = 240, zones = [], onZone }: {
     const Y = (db: number) => PAD_T + (1 - (Math.max(db - top, floor) - floor) / -floor) * (H - PAD_T - PAD_B);
     const pts = (v: number[]) => pick.map(([h], k) => [X(h), Y(v[k])] as [number, number]);
     const pm = pts(mine), m = path(pm), t = path(pts(ref));
+    const band = range ? (() => {
+      const lo = smoothValues(pick.map(([h, i]) => range.lo[i] + tilt(h))), hi = smoothValues(pick.map(([h, i]) => range.hi[i] + tilt(h)));
+      return `${path(pts(hi))}${path(pts(lo).reverse()).replace(/^M/, "L")}Z`;
+    })() : null;
     const back = (v: number[]) => path(pts(v).reverse()).replace(/^M/, "L");
     return { m, t, between: `${m}${back(ref)}Z`, aboveMine: `${m}L${W},0L0,0Z`, aboveRef: `${t}L${W},0L0,0Z`,
-             mineArea: `${m}L${pm[pm.length - 1][0]},${H}L${pm[0][0]},${H}Z`, ticks: dbTicksOf(floor, STEP_DB, (db) => Y(db + top)) };
-  }, [r, H]);
+             mineArea: `${m}L${pm[pm.length - 1][0]},${H}L${pm[0][0]},${H}Z`, band, ticks: dbTicksOf(floor, STEP_DB, (db) => Y(db + top)) };
+  }, [r, H, range]);
 
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     const b = svg.current!.getBoundingClientRect();
@@ -62,6 +68,7 @@ export function RefChart({ r, height = 240, zones = [], onZone }: {
             <clipPath id={`${id}-ar`}><path d={shape.aboveRef} /></clipPath>
           </defs>
           <PlotGrid height={H} dbTicks={shape.ticks} />
+          {shape.band && <path d={shape.band} fill={THEIRS} opacity={0.12} />}
           {/* The gap: blue where the reference is fuller (above your line), gold where yours is */}
           <path d={shape.between} fill={THEIRS} opacity={0.3} clipPath={`url(#${id}-am)`} />
           <path d={shape.between} fill={YOURS} opacity={0.3} clipPath={`url(#${id}-ar)`} />

@@ -86,7 +86,7 @@ With no reference, the engine compares nothing. It returns what it measured and 
 
 ### Against good mixes (Oct 30)
 
-Without `reference_path`, the result has `typical: {mixes, bands: [{name, lo, hi, value_db, median_db, range_db: [p10, p90], outside}], error}`: each of 8 bands' share of the mix (30 Hz to 16 kHz, measured exactly as `ml/detail.py` does) against the mixes people rated good in `ml/data/features.csv`. A band more than 0.5 dB outside where 8 in 10 of them sit becomes a finding `{kind: "typical", band, hz, hz_range, value_db, median_db, range_db, diff_db, outside_db, mixes, bars}`, at most 2, fuller ones first. Muse says "more (or less) than most good mixes" and may cut a fuller one. With a reference, `typical` is null.
+Without `reference_path`, the result has `typical: {mixes, bands: [{name, lo, hi, value_db, median_db, range_db: [p10, p90], outside}], error}`: each of 8 bands' share of the mix (30 Hz to 16 kHz, measured exactly as `ml/detail.py` does) against the mixes people rated good in `ml/data/features.csv`. A band more than 0.5 dB outside where 8 in 10 of them sit becomes a finding `{kind: "typical", band, hz, hz_range, value_db, median_db, range_db, diff_db, outside_db, mixes, bars}`, at most 2, fuller ones first. Muse says "more (or less) than most good mixes" and may cut a fuller one. With a reference, `typical` is null. Once `ml/data/curves.csv` exists (`ml/curves.py`), `typical.curve` is `{hz, mine, ref, lo, hi, mixes}`: your EQ curve, the good mixes' middle and the range 8 in 10 sit in, at twelfth octaves with loudness taken out, drawn like the reference chart (yours gold, the typical good mix blue, the range a soft band).
 
 ### With a reference (build step 8, as built Oct 29)
 

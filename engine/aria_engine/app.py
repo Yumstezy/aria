@@ -238,7 +238,7 @@ def mix_analyze(req: MixRequest):
     return {
         "recording": {"path": str(path), "start_beat": req.start_beat, "tempo": req.tempo, "bars": req.bars},
         "reference": ref and {k: ref[k] for k in ("name", "path", "part", "bands", "curve", "error")},
-        "typical": good and {k: good[k] for k in ("mixes", "bands", "error")},
+        "typical": good and {k: good[k] for k in ("mixes", "bands", "curve", "error")},
         "measured": measured,
         "clarity": found,
         "advice": advice,

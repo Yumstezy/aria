@@ -45,3 +45,22 @@ def test_without_the_data_nothing_is_compared(tmp_path):
 def test_planted_boosts_are_over_the_good_range_more_than_the_control(name, band):
     over = lambda n: next((b["value_db"] - b["range_db"][1] for b in typical.compare(*sf.read(str(MIXES / f"{n}.wav"), always_2d=True))["bands"] if b["name"] == band))
     assert over(name) > 0.5 and over(name) > over("control") + 0.5
+
+
+def test_with_measured_curves_the_picture_has_yours_and_the_good_mixes(tmp_path):
+    hz = [int(round(c)) for c in __import__("aria_engine.reference", fromlist=["FINE"]).FINE]
+    rows = ["file,label,song," + ",".join(f"hz_{h}" for h in hz)]
+    rng = np.random.default_rng(1)
+    for i in range(12):
+        rows.append(f"g{i}.wav,good,s{i}," + ",".join(f"{-20 + rng.normal(0, 1):.1f}" for _ in hz))
+    (tmp_path / "curves.csv").write_text("\n".join(rows))
+    good_curve = typical._load_curve(tmp_path / "curves.csv")
+    assert good_curve["mixes"] == 12 and len(good_curve["good"]) == len(hz)
+    rng2 = np.random.default_rng(2)
+    x = np.column_stack([rng2.normal(0, 0.2, 48000 * 4)] * 2)
+    curve = typical.compare(x, 48000, good_curve=good_curve)["curve"]
+    assert len(curve["mine"]) == len(curve["ref"]) == len(curve["lo"]) > 90
+
+
+def test_without_measured_curves_there_is_no_picture(tmp_path):
+    assert typical._load_curve(tmp_path / "none.csv") is None

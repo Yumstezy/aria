@@ -19,6 +19,7 @@ You're building the part of Aria that can say how finished an EDM mix sounds, ev
 | `common.py` | Tiers, minimum data checks and the song-grouped split, shared by the scripts |
 | `train.py` | **The official evaluation.** Trains the models, compares them with the baselines, applies the ship rule |
 | `muse_rater.py` | Muse Spark as a second rater, on the same split |
+| `curves.py` | Each mix's EQ curve (twelfth octaves, loudness taken out) for the app's "typical good mix" chart. Writes `data/curves.csv`, numbers only |
 | `experiments/` | Side experiments. Never the official result |
 | `data/features.csv` | The measurements (about 2 KB per mix). No audio |
 | `data/song_groups.csv` | Fixes for file names the grouping rule gets wrong, each with a reason |
