@@ -1,8 +1,8 @@
 """Vocal sync (Groove match, Oct 30): put a vocal on the song's grid with Live's own warping.
 
 A vocal's tempo comes from its file name when it says one ("Vox 128bpm"), since acapellas are usually labeled, and is
-measured otherwise: the autocorrelation of how the sound starts and changes (spectral flux), like the song's tempo in
-sections.py but finer (5 ms steps), because syllables start softly. Half or double the song's tempo counts as the
+measured otherwise: how strongly the sound's starts and changes (spectral flux, 5 ms steps) repeat over one, two,
+four and eight beats where it sings. No measure is right on every vocal, so the next likely readings come too. Half or double the song's tempo counts as the
 song's (an 82 BPM acapella in a 165 song is counted at 164). Beat 1 is the bar line where the first phrase starts:
 the beat phase that lands on the most syllable starts, then the one of four beats with the strongest starts on it.
 The result is two warp markers that Live can set: beat 1 on a bar line, and the vocal's tempo, so Live stretches it to
@@ -38,43 +38,48 @@ def _flux(mono, rate):
     return np.r_[0.0, flux], rate / HOP
 
 
-def _pulse(flux, fps, bpm):
-    """How strongly sound starts on the beats at this tempo: the average start strength on the beats (best phase, a
-    step's slack) against the average overall"""
-    per = 60 * fps / bpm
-    best = 0.0
-    for ph in np.arange(0, per, 0.5):
-        idx = np.round(np.arange(ph, len(flux), per)).astype(int)
-        best = max(best, float(flux[idx[idx < len(flux)]].mean()))
-    return best / (float(flux.mean()) + 1e-12)
-
-
-def _measure_tempo(flux, fps):
-    """The tempo whose beats line up with the most syllable starts. Plain autocorrelation favours fast tempos on a
-    vocal (on Ian's 148 BPM vocal it said 183); this compares start strength on the beat, then refines to 0.05 BPM."""
-    slack = np.maximum.reduce([np.roll(flux, k) for k in (-1, 0, 1)])
-    coarse = np.arange(TEMPO_RANGE[0], TEMPO_RANGE[1] + 0.01, 0.5)
-    best = float(coarse[int(np.argmax([_pulse(slack, fps, b) for b in coarse]))])
-    fine = np.arange(best - 0.5, best + 0.501, 0.05)
-    return float(fine[int(np.argmax([_pulse(slack, fps, b) for b in fine]))])
+def _tempo_readings(flux, fps, level_db):
+    """The vocal's likely tempos, best first: how strongly its sound repeats one, two, four and eight beats apart,
+    over the frames where it sings (silence left out, so long gaps don't blur it). Repeating over whole bars is what
+    a vocal does most clearly; one beat alone was wrong on a real acapella (Ian, Oct 30: 190 for a 126 BPM Sugababes
+    acapella). Up to three readings that aren't the same beat counted half or double, each with its score (0 to 1)."""
+    act = level_db > level_db.max() - SILENT_DB
+    f = np.convolve(flux, np.ones(4) / 4, mode="same")
+    f = np.where(act, f - f[act].mean(), 0.0)
+    ac = np.correlate(f, f, mode="full")[len(f) - 1:]
+    n = np.correlate(act.astype(float), act.astype(float), mode="full")[len(f) - 1:]
+    ac = ac / np.maximum(n, 1)
+    at = lambda bpm, beats: np.interp(beats * 60 * fps / bpm, np.arange(len(ac)), ac)
+    cands = np.arange(TEMPO_RANGE[0], TEMPO_RANGE[1] + 0.01, 0.5)
+    sc = np.array([sum(at(b, k) for k in (1, 2, 4, 8)) for b in cands])
+    sc = sc / (sc.max() or 1)
+    out = []
+    for i in np.argsort(-sc):
+        b = float(cands[i])
+        same = any(min(abs(b * k - o["bpm"]) / o["bpm"] for k in (0.5, 1, 2)) < 0.04 for o in out)
+        if not same:
+            # refine to 0.05 BPM around it
+            fine = np.arange(b - 0.5, b + 0.501, 0.05)
+            fb = float(fine[int(np.argmax([sum(at(x, k) for k in (1, 2, 4, 8)) for x in fine]))])
+            out.append({"bpm": round(fb, 2), "score": round(float(sc[i]), 3)})
+        if len(out) == 3:
+            break
+    return out
 
 
 def _beat_one(flux, fps, tempo, first_sound):
-    """The bar line where the first phrase starts, in seconds"""
+    """Beat 1: the first beat at the vocal's first sound (a quarter beat of slack, so a word that starts just ahead
+    still counts). Picking which of four beats is a bar's first from a vocal alone put beat 1 two beats into the
+    silence on a real acapella (Ian, Oct 30), so Aria assumes the vocal comes in on beat 1 and the producer moves it
+    by a beat when it doesn't. The beat phase is the one that lands on the most syllable starts."""
     period = 60 * fps / tempo
-    # The beat phase that lands on the most syllable starts (each start counted at its 5 ms step, with a step's slack)
     smooth = np.convolve(flux, np.ones(3) / 3, mode="same")
-    pos = lambda phase, step: np.arange(phase, len(smooth), step)
-    score = lambda phase, step: smooth[np.round(pos(phase, step)).astype(int).clip(0, len(smooth) - 1)].sum()
+    pos = lambda phase: np.round(np.arange(phase, len(smooth), period)).astype(int).clip(0, len(smooth) - 1)
     phases = np.arange(0, period, 0.25)
-    beat_phase = phases[int(np.argmax([score(p, period) for p in phases]))]
-    # Of the four beats, the one with the strongest starts on it is the bar's first
-    down = max(range(4), key=lambda k: score(beat_phase + k * period, 4 * period))
-    phase_sec, bar = (beat_phase + down * period) / fps, 4 * 60 / tempo
-    # The last bar line at or just before the first sound (a little slack for a soft start)
-    n = np.floor((first_sound + 0.25 * 60 / tempo - phase_sec) / bar)
-    d = phase_sec + n * bar
-    return float(d if d >= 0 else d + bar)
+    phase_sec = phases[int(np.argmax([smooth[pos(p)].sum() for p in phases]))] / fps
+    beat = 60 / tempo
+    n = np.ceil((first_sound - 0.25 * beat - phase_sec) / beat)
+    return float(max(0.0, phase_sec + n * beat))
 
 
 # Krumhansl-Kessler key profiles: how strongly each of the 12 notes belongs to a major or a minor key
@@ -134,8 +139,11 @@ def analyze(path, song_tempo, tempo=None, beat_shift=0, kick=None, place=None):
     seconds = len(mono) / rate
     named = tempo_from_name(Path(path).stem)
     flux, fps = _flux(mono, rate)
+    hop_level = 20 * np.log10(np.sqrt(np.convolve(mono ** 2, np.ones(HOP * 4) / (HOP * 4), mode="same"))[::HOP][:len(flux)] + 1e-9)
+    hop_level = np.r_[hop_level, np.full(len(flux) - len(hop_level), -200.0)]
+    readings = _tempo_readings(flux, fps, hop_level)
     source = "you" if tempo else "file name" if named else "measured"
-    tempo = tempo or named or round(_measure_tempo(flux, fps), 2)
+    tempo = tempo or named or readings[0]["bpm"]
     # Counted at the song's tempo when it's about half or double (Live then stretches it only a little)
     k = min((0.5, 1, 2), key=lambda k: abs(tempo * k - song_tempo))
     beats_tempo = round(tempo * k, 3)
@@ -183,6 +191,7 @@ def analyze(path, song_tempo, tempo=None, beat_shift=0, kick=None, place=None):
     frames = [level[int(t * rate)] for t in np.arange(a, b, step)]
     picture = {"start_sec": round(a, 3), "step_sec": step, "levels_db": [round(max(-60.0, float(v - level.max())), 1) for v in frames]}
     return {"tempo": tempo, "tempo_source": source, "beats_tempo": beats_tempo, "beat_shift": beat_shift, "sync": sync,
+            "readings": readings,
             **key_of(audio, rate),
             "song_tempo": song_tempo, "first_beat_sec": beat1, "first_sound_sec": round(first_sound, 4), "seconds": round(seconds, 3),
             "warp": {"markers": markers, "start_marker": 0, "end_marker": round(end, 4), "bars_before": int(before // 4)}, "picture": picture}

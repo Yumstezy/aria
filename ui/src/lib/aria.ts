@@ -153,7 +153,7 @@ export interface GrooveState { moving: GrooveClip | null; anchor: GrooveClip | n
   vocal: GrooveClip | null; kick: GrooveClip | null; vocal_sync: VocalSync | null; vocal_applied: boolean }
 /** Vocal sync (Oct 30): the vocal's tempo and beat 1 from POST /groove/vocal */
 export interface VocalSync { tempo: number; tempo_source: "file name" | "measured" | "you"; beats_tempo: number; song_tempo: number; beat_shift: number;
-  key: string | null; confidence: number;
+  key: string | null; confidence: number; readings: { bpm: number; score: number }[];
   sync: { kick_found: boolean; kick_offset_ms: number | null; bar: number | null; kicks_sec: number[] };
   first_beat_sec: number; first_sound_sec: number; seconds: number; picture: { start_sec: number; step_sec: number; levels_db: number[] };
   warp: { markers: { beat_time: number; sample_time: number }[]; start_marker: number; end_marker: number; bars_before: number } }
