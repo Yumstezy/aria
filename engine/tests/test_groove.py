@@ -41,6 +41,15 @@ def test_straight_grid_puts_every_hit_in_time(tmp_path):
     assert sf.read(path)[0].shape == audio.shape    # the original stays as it was, next to the new file
 
 
+def test_after_a_hit_is_only_looked_for_where_it_was_put():
+    """A hit whose sound isn't where it was put is left out, never paired with its neighbour (the 190 ms bug)."""
+    times = [0.0, 0.125, 0.25]
+    x = hits(times, 0.5)
+    y = hits([0.0, 0.25], 0.5)                       # the middle hit is gone from the new file
+    out = groove._after(x, y, RATE, times, [0.0, 0.0, 0.0], times, 0.0)
+    assert out["missing"] == 1 and out["max_ms"] <= 0.1 and len(out["hits"]) == 2
+
+
 def test_half_strength_moves_hits_half_way(tmp_path):
     path = write(tmp_path / "Hat loop.wav", hits(sixteenths(LATE), BARS_SEC))
     out = groove.match(path, anchor={"kind": "straight"}, tempo=TEMPO, strength=0.5, out_dir=tmp_path)

@@ -335,7 +335,7 @@ Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete wai
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
 Max.addHandler("device_done", (s) => { const w = waiters.device_done; delete waiters.device_done; if (w) w(decode(s)); });
-for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done", "clips_playing", "selected_clip", "groove_placed", "groove_ab"]) {
+for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done", "clips_playing", "selected_clip", "groove_placed", "groove_ab_done"]) {
   Max.addHandler(reply, (s) => { const w = waiters[reply]; delete waiters[reply]; if (w) w(decode(s)); });
 }
 Max.addHandler("ears_removed", (s) => { const w = waiters.ears_removed; delete waiters.ears_removed; if (w) w(decode(s)); });
@@ -723,7 +723,8 @@ Max.addHandler("groove_ab", (s) => serial(async () => {
   const { play } = decode(s);
   if (!groove.placed) return;
   try {
-    const out = await askLive("groove_ab", "groove_ab", encode({ orig_id: groove.placed.orig_id, track_id: groove.placed.track_id, play }));
+    // The reply has its own name: under the request's name it came back here as a new press, switching forever
+    const out = await askLive("groove_ab", "groove_ab_done", encode({ orig_id: groove.placed.orig_id, track_id: groove.placed.track_id, play }));
     if (out.ok) groove.placed = { ...groove.placed, playing: play };
     grooveState({ error: out.ok ? null : out.text });
   } catch (e) { grooveState({ error: e.message }); }

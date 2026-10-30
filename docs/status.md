@@ -17,6 +17,8 @@ Updated at the end of each session: what passed, what's next, any blocker.
   Manual check (remove and re-add Aria on Main, live.js changed): put a hat loop in the Arrangement view, click its clip, Groove match, Use selected clip. Straight grid, Match it. Expected: a new track "<track> (matched)" right under it with the clip at the same bar, the original track muted, and the chart. Original / Matched switches which track plays. Undo removes the new track and unmutes the original. If "Live didn't make the new clip" shows, tell Claude. Then Another loop: click the perc loop's clip, Use selected clip, Match again: the earlier matched track is replaced, not added to.
 - **Ask Muse fixes:** the pop-up is at most about half the window; it opens at the newest message; requests queue instead of being dropped (the stuck "..." after an answer); Cmd+C/V/X/A work in its box. Check: paste text into Ask Muse with Cmd+V.
 
+- **Groove match, first try in Live (Ian, 13:59):** clip placed and matched. Fixed after: Original / Matched switched forever (live.js's reply had the request's name); "190 ms off" (after-measurement paired hits with neighbours; now each hit's own sound is found again where it was put); every hit read 13 ms late on low drums (attack finder stopped at a dip in the level). On Ian's tribal loop at 165 BPM: before 6.1 ms off on average, 12.2 at worst; after 0, all 66 found; half strength gives half. The chart folds every bar into one row of 16ths. Check again in Live: Original / Matched switches once per press.
+
 **Bug queue**
 - Home's kind cards (GlowCard): hovering lags a little, and since the cards fill half the page, scrolling over them feels sticky (Ian, Oct 30, 12:35).
 
