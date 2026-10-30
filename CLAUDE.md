@@ -89,6 +89,7 @@ engine/        FastAPI app, analysis modules, muse.py, tests/
 design/        design system, screen references, brand marks (read only, from the design phase)
 test-pack/     demo song, test mixes, loop pairs, reference, answer-key.json (we own all of it)
 ml/            dataset manifest, labels, feature extraction, training, evaluation (see docs/ml-plan.md)
+site/          the website (Vite + React + Tailwind, built and hosted by Vercel): what Aria does, real screenshots, logos, the video's beats
 docs/          build steps, contracts, screens
 ```
 

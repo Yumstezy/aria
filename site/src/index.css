@@ -1,0 +1,31 @@
+/* Aria's own colors (ui/src/styles/index.css, "Ember"): neutral near-black, cards a step lighter with hairline
+   edges, gold for yours, blue for a reference, orange for problems, green for done. */
+@import "tailwindcss";
+
+@theme {
+  --color-ground: #0a0a0b;
+  --color-card: #141416;
+  --color-card-2: #1a1a1d;
+  --color-edge: rgba(255, 255, 255, 0.08);
+  --color-hairline: rgba(255, 255, 255, 0.07);
+  --color-ink: #ededef;
+  --color-muted: #8e8e96;
+  --color-faint: #62626a;
+  --color-hot: #ff8a5b;
+  --color-good: #4ade80;
+  --color-gold: #f5c451;
+  --color-blue: #6ea8ff;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html { scroll-behavior: smooth; background: var(--color-ground); }
+body { margin: 0; background: var(--color-ground); color: var(--color-ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+::selection { background: rgba(245, 196, 81, 0.3); }
+
+/* The bird, as a mask, so it takes the text color around it (like ui/src/components/brand.tsx) */
+.mark { display: inline-block; flex: none; background: currentColor;
+  -webkit-mask: url(/img/mark.png) center / contain no-repeat; mask: url(/img/mark.png) center / contain no-repeat; }
+
+@keyframes caret { 50% { opacity: 0; } }
+.caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -2px; background: currentColor; animation: caret 1s steps(2, start) infinite; }

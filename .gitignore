@@ -24,3 +24,7 @@ ui/node_modules/
 
 # Ian's own audio for the checkpoint stays local
 test-pack/mixes/
+
+# Website build tooling (site/dist is built by Vercel)
+site/node_modules/
+site/dist/
