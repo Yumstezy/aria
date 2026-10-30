@@ -11,7 +11,7 @@ import numpy as np
 from pydantic import BaseModel
 import soundfile as sf
 
-from aria_engine import __version__, analysis, ask, clarity, muse, reference, split, stems, voice
+from aria_engine import __version__, analysis, ask, clarity, muse, reference, sections, split, stems, voice
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 # When the code this engine runs was last changed. The bridge compares it with the files on disk
@@ -225,6 +225,40 @@ def mix_analyze(req: MixRequest):
         "advice_by": "Muse Spark" if advice else None,
         "advice_error": advice_error,
     }
+
+
+class SectionsRequest(BaseModel):
+    wav_path: str
+    # The producer's song: Live's tempo and where the recording started. A reference file leaves them out.
+    tempo: Optional[float] = None
+    start_beat: Optional[float] = 0.0
+    beats_per_bar: Optional[float] = 4.0
+
+
+_sections_cache = {}   # a reference's parts, by file and its change time: a song doesn't change between checks
+
+
+@app.post("/sections")
+def song_sections(req: SectionsRequest):
+    """The song's parts (Arrangement, build step 8b): where each starts and stops, with Muse Spark's names."""
+    path = Path(req.wav_path).expanduser()
+    if not path.is_file():
+        raise HTTPException(400, f"No file at {path}.")
+    key = (str(path), path.stat().st_mtime, req.tempo, req.start_beat)
+    if key in _sections_cache:
+        return _sections_cache[key]
+    try:
+        audio, rate = reference.read(path)
+    except (RuntimeError, sf.LibsndfileError) as e:
+        raise HTTPException(400, f"Can't read {path.name} as audio: {e}")
+    out = sections.find(audio, rate, tempo=req.tempo, start_beat=req.start_beat or 0.0, beats_per_bar=req.beats_per_bar or 4.0)
+    names, names_error = muse.name_sections(out["sections"]) if out["sections"] else (None, out["error"])
+    for s, n in zip(out["sections"], names or []):
+        s["name"] = n
+    out.update(names_by="Muse Spark" if names else None, names_error=names_error, path=str(path))
+    if names or not out["sections"]:
+        _sections_cache[key] = out
+    return out
 
 
 class AskRequest(BaseModel):

@@ -152,6 +152,17 @@ Compare first (Ian, Oct 29: "we can test using a reference"). Sections in both s
 
 Pass: with `test-pack/mixes/control.wav` as the reference, the planted boosts in A (around 200 Hz), B (around 3.2 kHz) and C (350 to 710 Hz) each come out as "more than the reference" with a cut inside the range, and control against itself finds nothing (`engine/tests/test_reference.py`). In Live: choosing a song sets the reference, and the next Check mix shows the comparison and Muse's words about it, three times in a row.
 
+## Step 8b. Arrangement (Ian, Oct 29)
+
+The song's parts, so every check knows which part it heard and compares it with the same part of the reference.
+
+- A new Arrangement tab in the side menu. Its only button, "Hear the whole song", plays the song from bar 1 to its end once and records Main (Ian: no new buttons on Home or elsewhere).
+- The engine finds the parts (`POST /sections`) and Muse Spark names them. The reference's parts come from its file.
+- Two lanes, yours and the reference's, as colored blocks; parts that sound alike share a color. "Add markers to Live" writes the names as markers, with Undo.
+- After that, Mix check compares your part with the reference's part of the same name.
+
+Pass: the engine finds edges at the right bars on a test song of different parts and labels a louder repeat as the same part (`engine/tests/test_sections.py`), and names real songs. In Live: the button hears the whole song, the lanes show named parts, markers land with the right names and bars, and a check against a reference says which part it compared.
+
 ## Step 9. Groove match (Nov 2, freeze at end of day)
 
 - Read both loops' file paths. Check they share Live's tempo, find beat 1 in each, and let the producer drag the 1 marker if it's wrong.

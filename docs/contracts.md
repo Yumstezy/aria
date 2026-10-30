@@ -4,26 +4,29 @@ All engine calls are HTTP JSON on `http://127.0.0.1:8765`. Times are in bars (1-
 
 ## Sections
 
-`POST /sections`
+`POST /sections` (as built Oct 29, build step 8b, Arrangement). The producer's song sends Live's tempo and where its recording started; a reference file sends only its path, and the engine estimates the tempo (95 to 190 BPM) and the first beat.
 
 ```json
-{ "wav_path": "/abs/path/reference.wav", "tempo": 124.0 }
+{ "wav_path": "/abs/path/song.aif", "tempo": 165.0, "start_beat": 0.0, "beats_per_bar": 4 }
 ```
 
 ```json
 {
-  "tempo": 124.0,
-  "key": "A minor",
-  "first_downbeat_sec": 0.12,
+  "tempo": 165.0, "first_downbeat_sec": null, "bars": 65, "path": "...",
   "sections": [
-    { "name": "Intro", "start_bar": 1, "bars": 16, "confidence": 0.92 },
-    { "name": "Verse", "start_bar": 17, "bars": 16, "confidence": 0.58,
-      "note": "Louder and brighter, but the chords repeat the intro" }
-  ]
+    { "name": "Intro", "label": "A", "start_bar": 1, "bars": 16, "start_sec": 0.0, "end_sec": 23.27,
+      "energy_db": -3.7, "rise_db_per_bar": 0.07, "confidence": 1.0 }
+  ],
+  "names_by": "Muse Spark", "names_error": null, "error": null
 }
 ```
 
-A `confidence` below 0.7 shows the dashed "Not sure" block and the yes or no question in the UI.
+- Edges fall on 4-bar lines counted from bar 1, at least 8 bars apart; no part is longer than 32 bars. `confidence` is how clear the edge is (1.0 for the clearest in the song).
+- `label`: parts that sound alike (notes and tone balance, not loudness) share a letter.
+- `energy_db` is the part's level against the loudest bar of the song; `rise_db_per_bar` is positive when it climbs.
+- `name` comes from Muse Spark only, one of Intro, Verse, Pre-chorus, Chorus, Build, Drop, Break, Bridge, Outro, from those numbers. Without Muse it's `null` and `names_error` says why; the UI then shows the letters.
+- `error`: a silent recording, or fewer than 8 bars.
+- Results are cached per file and its change time.
 
 ## Mix check
 

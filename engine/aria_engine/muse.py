@@ -213,3 +213,57 @@ def advise(measured, context, findings=None, client=None, reference=None):
     if reference:   # its band differences are measured numbers the advice may cite
         return validate(raw, measured, {**context, "reference_bands": [b["diff_db"] for b in reference["bands"]]}, findings, has_reference=True)
     return validate(raw, measured, context, findings)
+
+
+# ---------- Naming the song's parts (Arrangement, build step 8b) ----------
+
+SECTIONS_MAX_TOKENS = 3000
+SECTION_NAMES = ["Intro", "Verse", "Pre-chorus", "Chorus", "Build", "Drop", "Break", "Bridge", "Outro"]
+
+SECTIONS_PROMPT = """You name the parts of a producer's song in Ableton Live. You get JSON: "sections", in order, each with
+"label" (parts with the same letter sound alike), "start_bar", "bars", "energy_db" (how loud the part is against the
+loudest bar of the song, 0 is the loudest) and "rise_db_per_bar" (positive when it climbs). EDM songs usually go
+Intro, Build, Drop, Break, Build, Drop, Outro, but follow the numbers: the loudest steady parts are drops or choruses,
+a part that climbs into one is a build, a quiet part in the middle is a break, the first and last quiet parts are the
+intro and the outro. Parts with the same label usually share a name.
+Answer with JSON only: {"names": ["...", ...]}, one name per section, in order, each one of: """ + ", ".join(SECTION_NAMES) + "."
+
+
+def validate_section_names(raw, sections):
+    """Names from the fixed list, one per section. Returns (names, error)."""
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return None, "Muse Spark's names weren't valid JSON."
+    names = data.get("names") if isinstance(data, dict) else None
+    if not isinstance(names, list) or len(names) != len(sections):
+        return None, "Muse Spark didn't name every part."
+    if any(n not in SECTION_NAMES for n in names):
+        return None, "Muse Spark used a name that isn't one of the part names."
+    return names, None
+
+
+def name_sections(sections, client=None):
+    """Ask Muse Spark to name the parts from their measured numbers. Returns (names, error)."""
+    if not sections:
+        return None, "There are no parts to name."
+    key = os.environ.get("MODEL_API_KEY", "").strip()
+    if client is None and not key:
+        return None, "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."
+    if client is None:
+        client = OpenAI(api_key=key, base_url=os.environ.get("MUSE_BASE_URL", "https://api.meta.ai/v1"), timeout=TIMEOUT_SEC, max_retries=1)
+    payload = {"sections": [{k: s[k] for k in ("label", "start_bar", "bars", "energy_db", "rise_db_per_bar")} for s in sections]}
+    # Naming a long song can take Muse most of its budget in thinking (863 of 905 tokens for 10 parts, Oct 29),
+    # and when the thinking runs out of room the reply is empty: a bigger budget, and one more try
+    for _ in range(2):
+        try:
+            res = client.chat.completions.create(
+                model=os.environ.get("MUSE_MODEL", "muse-spark-1.3"), max_tokens=SECTIONS_MAX_TOKENS, reasoning_effort="minimal",
+                response_format={"type": "json_object"},
+                messages=[{"role": "system", "content": SECTIONS_PROMPT}, {"role": "user", "content": json.dumps(payload)}])
+        except OpenAIError as e:
+            return None, f"Muse Spark is unavailable right now ({type(e).__name__})."
+        raw = res.choices[0].message.content if res.choices else None
+        if raw:
+            return validate_section_names(raw, sections)
+    return None, "Muse Spark returned an empty reply."
