@@ -9,10 +9,10 @@ import { TickGauge } from "@/components/tick-gauge";
 import { CountUp } from "@/components/count-up";
 import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
-import { RefChart, RefLegend, THEIRS, YOURS } from "@/components/ref-chart";
+import { RefChart, RefLegend, THEIRS, YOURS, ZoneChips } from "@/components/ref-chart";
 import { ProblemThumb } from "@/components/problem-thumb";
 import { AnalyzerIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
-         ReferenceIcon, RingIcon, SunIcon } from "@/components/icons";
+         ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { barsLabel, checkMix, clearReference, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
          partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type RefCompare, type Result } from "@/lib/aria";
@@ -296,6 +296,8 @@ const ReferenceScreen = memo(function ReferenceScreen({ narrow, onOpen }: { narr
   const ref = useAriaSel(referenceOf), result = useAriaSel((s) => s.result), progress = useAriaSel((s) => !!s.progress);
   const picker = useRef<HTMLInputElement>(null);
   const compared = result?.reference && ref && result.reference.path === ref.path ? result.reference : null;
+  const list = result ? problemsOf(result) : [];
+  const refProblems = list.map((p, i) => ({ p, n: i + 1 })).filter(({ p }) => p.findings[0].kind === "reference");
   const choose = (
     <input ref={picker} type="file" accept=".wav,.aif,.aiff,.flac,.mp3,.ogg,audio/*" className="hidden"
            onChange={(e) => { const f = e.target.files?.[0]; if (f) setReferenceFile(f); e.target.value = ""; }} />
@@ -317,26 +319,27 @@ const ReferenceScreen = memo(function ReferenceScreen({ narrow, onOpen }: { narr
   }
   return (
     <div className="cp-bento">
-      <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 14 }}>
+      <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 12 }}>
         {choose}
-        <span className="ae-kind" style={{ width: 40, height: 40, borderRadius: 12, color: "var(--ink)" }}><ReferenceIcon style={{ width: 20, height: 20 }} /></span>
+        <span className="ae-kind" style={{ width: 40, height: 40, borderRadius: 12, color: THEIRS }}><ReferenceIcon style={{ width: 20, height: 20 }} /></span>
         <div className="grid min-w-0 flex-1 gap-0.5">
           <span className="cp-cap">Your reference</span>
-          <span className="truncate text-[17px] font-medium" title={ref.path}>{ref.name}</span>
+          <span className="break-words text-[16px] font-medium leading-5" title={ref.path}>{ref.name}</span>
         </div>
-        <button className="cp-btn cp-btn-sm" onClick={() => picker.current?.click()}>Change</button>
-        <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={clearReference}>Remove</button>
+        <IconButton label="Choose another song" onClick={() => picker.current?.click()}><SwapIcon style={{ width: 15, height: 15 }} /></IconButton>
+        <IconButton label="Stop comparing with this song" onClick={clearReference}><CloseIcon style={{ width: 15, height: 15 }} /></IconButton>
       </section>
+
       <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 12 }}>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-[14px] font-medium text-ink" title="Both songs at the same loudness. Blue is where the reference is fuller, gold where yours is.">
+          <span className="cp-cap" title="Both songs at the same loudness. Blue is where the reference is fuller, gold where yours is.">
             {compared && result ? barsLabel(result) : "Against your reference"}</span>
           {compared && <div className="ml-auto min-w-0"><RefLegend name={ref.name} /></div>}
         </div>
         {compared ? (compared.error || !compared.curve ? <p className="cp-meta">{compared.error ?? "Nothing to compare."}</p> : (
           <>
-            <RefChart r={compared} height={narrow ? 300 : 230} zones={refZones(result!)} />
-            <RefBandRow r={compared} />
+            {result?.advice?.summary && <p className="m-0 text-[16px] leading-[22px] text-ink">{result.advice.summary}</p>}
+            <RefChart r={compared} height={narrow ? 300 : 210} bands={compared.bands} zones={refProblems.map(({ p, n }) => zoneOf(p, n))} />
           </>
         )) : (
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -344,10 +347,25 @@ const ReferenceScreen = memo(function ReferenceScreen({ narrow, onOpen }: { narr
             <button className="cp-btn cp-btn-primary cp-btn-sm" disabled={progress} onClick={checkMix}>{progress ? "Checking" : "Check mix"}</button>
           </div>
         )}
-        {compared && !compared.error && result && problemsOf(result).some((p) => p.findings[0].kind === "reference") && (
-          <div><button className="cp-btn cp-btn-light cp-btn-sm" onClick={onOpen}>See what to fix</button></div>
-        )}
       </section>
+
+      {compared && !compared.error && (
+        <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ paddingTop: 6, paddingBottom: 6, gap: 0 }}>
+          {refProblems.length ? refProblems.map(({ p, n }) => (
+            <div key={n} className="grid items-center gap-3 border-t border-hairline py-3 first:border-t-0" style={{ gridTemplateColumns: "26px minmax(0, 1fr) auto" }}>
+              <span className="ae-pin">{n}</span>
+              <span className="min-w-0">
+                <span className="block text-[14px] font-medium">{p.name}</span>
+                <span className="ae-mono">{p.where} <span style={{ color: refColor(p) }}>{amountText(p)}</span></span>
+              </span>
+              <span className="flex gap-1.5">
+                <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={() => { fixWithMuse(p); }}>Fix it</button>
+                {!narrow && <button className="cp-btn cp-btn-sm" onClick={onOpen}>See it</button>}
+              </span>
+            </div>
+          )) : <p className="cp-meta py-2.5">Nothing stands out against {ref.name} in these bars.</p>}
+        </section>
+      )}
     </div>
   );
 });
@@ -406,8 +424,9 @@ const KINDS: { kind: Kind; name: string; icon: ReactNode }[] = [
   { kind: "clash", name: "Clashing tracks", icon: <ClashIcon /> },
 ];
 // Mud is measured as synths buried in the low mids, so it gets the mud icon, not the buried one
-/** The reference problems as pins for the comparison picture, numbered as in the problem list */
-const refZones = (r: Result) => problemsOf(r).flatMap((p, i) => p.findings[0].kind === "reference" ? [{ n: i + 1, lo: p.findings[0].hz_range[0], hi: p.findings[0].hz_range[1] }] : []);
+/** A problem as a pin on a chart: its stretch, where it hits and by how much, numbered as in the list */
+const zoneOf = (p: Problem, n: number) => ({ n, lo: Math.min(...p.findings.map((f) => f.hz_range[0])), hi: Math.max(...p.findings.map((f) => f.hz_range[1])),
+  where: p.where, amount: amountText(p), amountColor: p.findings[0].kind === "reference" ? refColor(p) : "var(--hot)" });
 /** Louder than the reference is gold (yours is fuller), quieter is blue (theirs is) */
 const refColor = (p: Problem) => ((p.findings[0].diff_db ?? 0) > 0 ? YOURS : THEIRS);
 const iconFor = (p: Problem) => p.findings[0].kind === "reference" ? <ReferenceIcon style={{ color: refColor(p) }} />
@@ -493,9 +512,9 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
                   </div>
                 </div>
                 <div className="ae-thumb relative">{first.findings[0].kind === "reference" && r.reference?.curve
-                  ? <div className="absolute inset-2" title={`Yours (gold) and ${r.reference.name} (blue)`}>
-                      <RefChart r={r.reference} zoom={[first.findings[0].hz_range[0] / 3, first.findings[0].hz_range[1] * 3]} height={120}
-                                zones={[{ n: 1, lo: first.findings[0].hz_range[0], hi: first.findings[0].hz_range[1] }]} /></div>
+                  ? <div className="absolute inset-2 grid place-items-center" title={`Yours (gold) and ${r.reference.name} (blue), ${first.where}`}>
+                      <div className="w-full"><RefChart r={r.reference} zoom={[first.findings[0].hz_range[0] / 3, first.findings[0].hz_range[1] * 3]} height={400}
+                                zones={[{ n: 1, lo: first.findings[0].hz_range[0], hi: first.findings[0].hz_range[1] }]} /></div></div>
                   : <ProblemThumb p={first} spectra={spectra} />}</div>
               </>
             ) : (
@@ -532,13 +551,13 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
               <span className="text-[14px] font-medium text-ink" title="Both songs at the same loudness. Blue is where the reference is fuller, gold where yours is.">Against your reference</span>
               <div className="ml-auto min-w-0"><RefLegend name={r.reference.name} /></div>
             </div>
-            <RefChart r={r.reference} height={narrow ? 260 : 170} zones={refZones(r)} onZone={(n) => setOpen(n - 1)} />
+            <RefChart r={r.reference} height={narrow ? 300 : 190} zones={list.map((p, i) => zoneOf(p, i + 1))} onZone={(n) => setOpen(n - 1)} />
           </section>
         </Rise>
       )}
 
       <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 1fr)" : "minmax(0, 1.55fr) minmax(0, 1fr)", alignItems: "start" }}>
-        <Rise i={3}>
+        {!(r.reference && !r.reference.error && r.reference.curve) && <Rise i={3}>
           <section className="cp-tile cp-card" style={{ gap: 8 }}>
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
               <span className="text-[14px] font-medium text-ink">{list.length ? "Where the problems are" : "Your mix"}</span>
@@ -548,8 +567,9 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
               ? <Waves spectra={spectra} findings={r.clarity.findings} split={r.clarity.mode !== "master"} bare
                        onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />
               : <p className="cp-meta">The picture appears after the next Check mix.</p>}
+            {spectra && list.length > 0 && <ZoneChips zones={list.map((p, i) => zoneOf(p, i + 1))} onZone={(n) => setOpen(n - 1)} />}
           </section>
-        </Rise>
+        </Rise>}
         {list.length > 0 && (
           <Rise i={4}>
             <section className="cp-tile cp-card" style={{ paddingTop: 4, paddingBottom: 4, gap: 0 }}>

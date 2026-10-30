@@ -123,6 +123,13 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
         {hover && <line x1={X(spectra.hz[hover.i])} x2={X(spectra.hz[hover.i])} y1={PAD_T - 6} y2={H - PAD_B} stroke="currentColor" strokeOpacity={0.6} strokeWidth={1.5} />}
       </svg>
 
+      {/* Bare (Ember): the Hz under the grid lines as HTML, so it keeps its size in a narrow window (Ian: "show the hz") */}
+      {bare && (
+        <div className="relative -mt-1 h-3.5" aria-hidden="true">
+          {TICKS.map((t) => <span key={t} className="absolute -translate-x-1/2 font-mono text-[10px] leading-3 text-ink-faint" style={{ left: `${(X(t) / W) * 100}%` }}>{hzShort(t)}</span>)}
+        </div>
+      )}
+
       {/* What each stretch of the picture is called, low to high, so 200 or 5k means something.
           Bare (Ember): names only, the numbers on hover and in the pointer's tooltip (Ian: "a little cluttered"). */}
       <div className="flex" aria-label="Frequency ranges">
