@@ -26,3 +26,18 @@ def hits(times, seconds, rate=RATE, seed=0):
         i = int(round(t * rate))
         out[i:i + n] += burst[:max(0, min(n, len(out) - i))]
     return out
+
+
+def syllables(times, seconds, rate=RATE, accents=()):
+    """Vocal-like syllables for timing tests: a sung tone (220 to 330 Hz with a few harmonics) with a soft 15 ms
+    attack, 150 ms long, at the given times; the ones in accents are twice as loud."""
+    out = np.zeros(int(seconds * rate))
+    n = int(0.15 * rate)
+    t = np.arange(n) / rate
+    env = np.minimum(1, t / 0.015) * np.exp(-t / 0.12)
+    for k, start in enumerate(times):
+        f = 220 + 110 * ((k * 3) % 4) / 3
+        tone = sum(np.sin(2 * np.pi * f * h * t) / h for h in (1, 2, 3)) * env * (0.5 if k in accents else 0.25)
+        i = int(round(start * rate))
+        out[i:i + n] += tone[:max(0, min(n, len(out) - i))]
+    return out
