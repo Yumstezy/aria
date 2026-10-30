@@ -1,5 +1,5 @@
 // Aria's website (Oct 29). What Aria does, in plain words for people who don't make music, with real screenshots
-// of the app on a real song. Planned features are labeled Coming soon and drawn as simple pictures with no
+// of the app on a real song. Additional features still in development say so and are drawn as simple pictures with no
 // numbers, because nothing here may show data Aria didn't measure (CLAUDE.md, "No invented data").
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
@@ -118,8 +118,7 @@ function HeroAsk() {
   );
 }
 
-/* ---------- Coming soon pictures: simple shapes, no numbers ---------- */
-const Soon = () => <span className="rounded-md border border-edge px-1.5 py-px font-mono text-[10.5px] text-faint">Coming soon</span>;
+/* ---------- Additional features (in development): simple pictures of how each works, no numbers ---------- */
 
 function PicAnalyzer() {
   const bars = [6, 9, 14, 18, 15, 12, 13, 16, 11, 9, 10, 8, 6, 5, 4];
@@ -190,7 +189,7 @@ const NAV: LiquidNavItem[] = [
   { label: "Talk", href: "#talk", icon: Icon.speech(), fx: "pop" },
   { label: "Check", href: "#check", icon: Icon.wave(), fx: "wave" },
   { label: "Compare", href: "#compare", icon: Icon.ref(), fx: "spin" },
-  { label: "Next", href: "#next", icon: Icon.spark(), fx: "spin" },
+  { label: "More", href: "#next", icon: Icon.spark(), fx: "spin" },
   { label: "Video", href: "#video", icon: Icon.play(), fx: "pop" },
 ];
 
@@ -198,9 +197,10 @@ const BEATS = [
   { t: "0:00", title: "The problem", line: "Making music is hard. Making it sound good is harder.", shot: "Text only" },
   { t: "0:03", title: "Meet Aria", line: "Meet Aria. Your AI co-producer.", shot: "The Aria window over Ableton" },
   { t: "0:06", title: "Just tell it", line: "Just tell it what you want.", shot: "A request types in, a green Done card appears" },
-  { t: "0:10", title: "It listens", line: "It finds what sounds wrong.", shot: "Mix check: numbered problems on the graph" },
-  { t: "0:14", title: "Compare", line: "And shows how you compare to songs you love.", shot: "Gold and blue lines on one graph" },
-  { t: "0:17", title: "Logo", line: "Built with Meta Muse Spark.", shot: "The bird and \"Aria\" typing in" },
+  { t: "0:09", title: "It listens", line: "It finds what sounds wrong.", shot: "Mix check: numbered problems on the graph" },
+  { t: "0:12", title: "Compare", line: "And shows how you compare to songs you love.", shot: "Gold and blue lines on one graph" },
+  { t: "0:15", title: "And more", line: "Live analyzer. Groove match. Song sections. Mix score.", shot: "Quick cuts of the Additional features pictures" },
+  { t: "0:18", title: "Logo", line: "Built with Meta Muse Spark.", shot: "The bird and \"Aria\" typing in" },
 ];
 
 const SHOTS = [
@@ -377,9 +377,9 @@ export default function App() {
         </div>
       </Section>
 
-      {/* Coming soon */}
-      <Section id="next" label="What's next" title="Where Aria is going." dim="Designed, being built."
-               sub="These are on the way. The pictures show the idea, not finished screens.">
+      {/* Additional features (in development) */}
+      <Section id="next" label="Additional features" title="And there's more." dim="Same window, same idea."
+               sub="In development now. The pictures show how each one works.">
         <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {([
             ["Live analyzer", "Watch your song's sound move while it plays, with problems lighting up as they happen.", "blue", <PicAnalyzer />],
@@ -391,7 +391,7 @@ export default function App() {
           ] as [string, string, Accent, ReactNode][]).map(([t, d, a, pic], i) => (
             <Rise key={t} delay={(i % 3) * 0.06}><GlowCard accent={a} className="h-full">
               <div className="rounded-[12px] border border-hairline bg-ground/60 p-4">{pic}</div>
-              <div className="mt-4 flex items-center gap-2"><b className="text-[16.5px] font-medium">{t}</b><span className="ml-auto"><Soon /></span></div>
+              <b className="mt-4 text-[16.5px] font-medium">{t}</b>
               <p className="mt-2 text-[14.5px] leading-relaxed text-muted">{d}</p>
             </GlowCard></Rise>
           ))}
@@ -417,7 +417,7 @@ export default function App() {
       {/* For the video */}
       <Section id="video" label="For the video" title="The 20 second cut," dim="beat by beat."
                sub="Every screenshot here is the real app on a real song. The on-screen text is written for people who have never made music.">
-        <div className="mt-12 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="mt-12 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-7">
           {BEATS.map((b, i) => (
             <Rise key={b.t} delay={i * 0.05}><GlowCard accent={i === 2 ? "good" : "white"} className="h-full">
               <span className="font-mono text-[11.5px] text-faint">{b.t}</span>
