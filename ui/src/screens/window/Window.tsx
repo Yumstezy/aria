@@ -699,40 +699,76 @@ function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
 
 /** Live analyzer (Oct 30): your song's sound as it plays, 31 third-octave bands from Main, drawn like every chart
     (Pro-Q tilt), with a peak line that holds a moment. Behind it, the shape of your reference (or the typical good mix
-    from your last check), matched to your level, so you see where the song falls short or sticks out as it plays. */
+    from your last check), matched to your level, so you see where the song falls short or sticks out as it plays.
+    Frames come 20 a second; the lines are drawn at the screen's own rate (Ian, Oct 30: it moved "very choppy"),
+    gliding toward each frame like an analyzer's ballistics: up in about 25 ms, down in about 150 ms. The moving
+    lines are written straight to the SVG, so a frame doesn't re-render React, and the dB scale only moves in 6 dB steps. */
+const RISE_S = 0.025, FALL_S = 0.15, PEAK_FALL_DB_S = 12;
 function LiveAnalyzer({ narrow }: { narrow: boolean }) {
   const result = useAriaSel((s) => s.result);
-  const [frame, setFrame] = useState<number[] | null>(null);
-  const peak = useRef<number[] | null>(null), avg = useRef<number[] | null>(null);
-  useEffect(() => onAnalyzer((f) => {
-    peak.current = f.map((v, i) => Math.max(v, (peak.current?.[i] ?? -120) - 0.6));       // falls 12 dB a second
-    avg.current = f.map((v, i) => (avg.current ? avg.current[i] * 0.97 + v * 0.03 : v));   // a few seconds' average
-    setFrame(f);
-  }), []);
+  const [playing, setPlaying] = useState(false);
+  const [level, setLevel] = useState<number[] | null>(null);   // the live average, refreshed once a second, for the target line
+  const [top, setTop] = useState(0);
+  const latest = useRef<number[] | null>(null), shown = useRef<number[] | null>(null), peak = useRef<number[] | null>(null), avg = useRef<number[] | null>(null);
+  const liveEl = useRef<SVGPathElement>(null), fillEl = useRef<SVGPathElement>(null), peakEl = useRef<SVGPathElement>(null);
   const target = result?.reference?.curve ? { name: result.reference.name, hz: result.reference.curve.hz, v: result.reference.curve.ref }
     : result?.typical?.curve ? { name: "Typical good mix", hz: result.typical.curve.hz, v: result.typical.curve.ref } : null;
   const hz = ANALYZER_HZ.filter((h) => h <= 16000);
   const W = 640, H = narrow ? 360 : 260, n = hz.length;
+  const floor = top - 54;
+  const X = (f: number) => plotX(f), Y = (db: number) => 8 + (1 - (Math.max(db, floor) - floor) / (top - floor)) * (H - 28);
   const draw = (vals: number[]) => vals.slice(0, n).map((v, i) => v + tilt(hz[i]));
-  const live = frame ? draw(frame) : null, pk = peak.current ? draw(peak.current) : null;
+  const line = (v: number[]) => path(v.map((d, i) => [X(hz[i]), Y(d)] as [number, number]));
+  const geo = useRef({ line, draw, top, n, H, X });
+  geo.current = { line, draw, top, n, H, X };
+
+  useEffect(() => onAnalyzer((f) => {
+    latest.current = f;
+    avg.current = f.map((v, i) => (avg.current ? avg.current[i] * 0.97 + v * 0.03 : v));   // a few seconds' average
+  }), []);
+  useEffect(() => {
+    let raf = 0, last = performance.now(), lastLevel = 0;
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      const dt = Math.min(0.1, (now - last) / 1000); last = now;
+      const f = latest.current;
+      if (!f) return;
+      const s = shown.current ?? f.slice(), p = peak.current ?? f.slice();
+      const up = 1 - Math.exp(-dt / RISE_S), down = 1 - Math.exp(-dt / FALL_S);
+      for (let i = 0; i < f.length; i++) {
+        s[i] += (f[i] - s[i]) * (f[i] > s[i] ? up : down);
+        p[i] = Math.max(s[i], p[i] - PEAK_FALL_DB_S * dt);
+      }
+      shown.current = s; peak.current = p;
+      const g = geo.current, live = g.draw(s), pk = g.draw(p);
+      const d = g.line(live);
+      liveEl.current?.setAttribute("d", d);
+      fillEl.current?.setAttribute("d", `${d}L${g.X(hz[g.n - 1])},${g.H}L${g.X(hz[0])},${g.H}Z`);
+      peakEl.current?.setAttribute("d", g.line(pk));
+      // The scale: the loudest drawn peak plus 3 dB, in 6 dB steps; it comes down only when the song is 9 dB quieter
+      const want = Math.ceil((Math.max(-6, ...pk) + 3) / 6) * 6;
+      if (want > g.top || want < g.top - 9) setTop(want);
+      if (now - lastLevel > 1000) { lastLevel = now; setLevel(avg.current); setPlaying(true); }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   // The target's shape at the analyzer's bands, moved to the live average's level (between 100 Hz and 5 kHz)
   let tgt: number[] | null = null;
-  if (target && avg.current) {
+  if (target && level) {
     const at = (f: number) => { let k = 0; target.hz.forEach((h, j) => { if (Math.abs(Math.log(h / f)) < Math.abs(Math.log(target.hz[k] / f))) k = j; }); return target.v[k]; };
     const shape = hz.map(at);
     const mid = hz.map((h, i) => [h, i] as const).filter(([h]) => h >= 100 && h <= 5000).map(([, i]) => i);
-    const shift = mid.reduce((a, i) => a + (avg.current![i] - shape[i]), 0) / mid.length;
+    const shift = mid.reduce((a, i) => a + (level[i] - shape[i]), 0) / mid.length;
     tgt = draw(shape.map((v) => v + shift));
   }
-  const top = Math.max(-6, ...(pk ?? [-6])) + 3, floor = top - 54;
-  const X = (f: number) => plotX(f), Y = (db: number) => 8 + (1 - (Math.max(db, floor) - floor) / (top - floor)) * (H - 28);
-  const line = (v: number[]) => path(v.map((d, i) => [X(hz[i]), Y(d)] as [number, number]));
   const ticks = dbTicksOf(-48, 12, (db) => Y(db + top - 3));
   return (
     <div className="grid gap-4 pt-1">
       <section className="cp-tile cp-card" style={{ gap: 12 }}>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-[14px] font-medium text-ink">{frame ? "Playing now" : "Play your song"}</span>
+          <span className="text-[14px] font-medium text-ink">{playing ? "Playing now" : "Play your song"}</span>
           <span className="font-mono text-[11px] text-ink-faint">Main · 20 frames a second</span>
           {target && <div className="ml-auto min-w-0"><RefLegend name={`${target.name}, matched to your level`} mine="Now" /></div>}
         </div>
@@ -740,12 +776,12 @@ function LiveAnalyzer({ narrow }: { narrow: boolean }) {
           <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="Your song's sound right now">
             <PlotGrid height={H} dbTicks={ticks} />
             {tgt && <path d={line(tgt)} fill="none" stroke={THEIRS} strokeWidth={1.6} strokeDasharray="5 4" opacity={0.85} vectorEffect="non-scaling-stroke" />}
-            {live && <path d={`${line(live)}L${X(hz[n - 1])},${H}L${X(hz[0])},${H}Z`} fill={YOURS} opacity={0.12} />}
-            {live && <path d={line(live)} fill="none" stroke={YOURS} strokeWidth={1.8} vectorEffect="non-scaling-stroke" />}
-            {pk && <path d={line(pk)} fill="none" stroke="var(--ink)" strokeWidth={1} opacity={0.45} vectorEffect="non-scaling-stroke" />}
+            <path ref={fillEl} fill={YOURS} opacity={0.12} />
+            <path ref={liveEl} fill="none" stroke={YOURS} strokeWidth={1.8} vectorEffect="non-scaling-stroke" />
+            <path ref={peakEl} fill="none" stroke="var(--ink)" strokeWidth={1} opacity={0.45} vectorEffect="non-scaling-stroke" />
           </svg>
         </Plot>
-        {!frame && <span className="cp-meta">Press play in Live. The analyzer listens to your Main track while this screen is open.</span>}
+        {!playing && <span className="cp-meta">Press play in Live. The analyzer listens to your Main track while this screen is open.</span>}
       </section>
     </div>
   );
