@@ -12,7 +12,7 @@ import re
 
 from openai import OpenAI, OpenAIError
 
-KINDS = {"resonance", "buildup", "harsh", "masking", "bass_click", "clash", "reference", "typical"}
+KINDS = {"resonance", "buildup", "harsh", "masking", "bass_click", "clash", "reference"}
 TIMEOUT_SEC = 20
 SHORT_WORDS = 12          # the one-line version shown before the full note
 MAX_TOKENS = 1500
@@ -53,11 +53,6 @@ You get JSON:
     "stands_out_db" apart from the frequencies around it, like a boosted instrument; "band" means the whole named
     "band" is off. Fix when positive: an EQ cut inside the range ("fix" as for resonance, gain no deeper than diff_db).
     When negative: bring that range up on the part that should carry it, in words, "fix" null.
-  - "typical" (only without a reference song): against "mixes" EDM mixes people rated good, the named "band" ("hz_range")
-    takes "value_db" of the mix where good mixes keep it between "range_db" (8 in 10 of them), "median_db" in the middle.
-    "outside_db" is how far past that range it is (positive: more than good mixes, negative: less). Say it as "more than
-    most good mixes" or "less than most good mixes", never "too much". Fix when positive: an EQ cut inside the range
-    ("fix" as for resonance, no deeper than outside_db plus 1). When negative: in words, bring that range up, "fix" null.
   In key tracks mode, "masked" and "by" are the producer's track names, not split sounds. Use them as they are.
   "bars" is [first, last]. "share" and "clicky_share" are fractions (0.97 means 97 percent).
 - "measured": loudness and band levels, for background.
@@ -80,7 +75,7 @@ Rules:
 
 Answer with JSON only:
 {"summary": "one sentence, the most useful thing to know",
- "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click|clash|reference|typical, copied from the finding", "short": "at most 10 words", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
+ "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click|clash|reference, copied from the finding", "short": "at most 10 words", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
 
 
 def _numbers(text):
@@ -130,8 +125,7 @@ EQ_FIXABLE = {"resonance", "harsh", "buildup"}   # and "reference" when it's lou
 
 def _valid_fix(fix, finding):
     """An eq_band cut inside the finding's frequency range and the action menu's limits."""
-    cuttable = (finding.get("kind") in EQ_FIXABLE or (finding.get("kind") == "reference" and finding.get("diff_db", 0) > 0)
-                or (finding.get("kind") == "typical" and finding.get("outside_db", 0) > 0))
+    cuttable = finding.get("kind") in EQ_FIXABLE or (finding.get("kind") == "reference" and finding.get("diff_db", 0) > 0)
     if not isinstance(fix, dict) or fix.get("type") != "eq_band" or not cuttable:
         return None
     try:

@@ -2,6 +2,16 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
+## Oct 30, afternoon
+
+- **"Against good mixes" is out** (Ian: confusing, and 30 rated mixes aren't an industry standard). With no reference, Aria finds clashes and problem spots only. `typical.py` and its tests are deleted (in git history); `ml/` keeps the data and `ml/curves.py`.
+- **Problems marked by icon and color, not numbers** (8498781): the kind's icon, colored by range (lows red to highs violet), on the chart and in the rows; a ribbon under the chart shows the colors.
+- **Song end** (590e3da): the last clip that plays, not Live's last_event_time (which said bar 185 on a song ending near 49).
+- **Live analyzer**: glides at the screen's rate (d26e6d6). Ian asked what the grey line is (peaks) and wants the screen to explain itself; next.
+
+**Bug queue**
+- Home's kind cards (GlowCard): hovering lags a little, and since the cards fill half the page, scrolling over them feels sticky (Ian, Oct 30, 12:35).
+
 ## Pick up here (Oct 29, 20:15)
 
 **Fixed: the blank "jweb" box on Main.** It was Live's audio, not the UI. From about 18:40 Live's audio wasn't running (its device list includes a "rekordbox Aggregate Device" that reports a sample rate of 0). Max's message queue inside Live stops when Live's audio does, so the bridge's one message to the jweb, "load the strip page", never arrived. The Max log showed it: Node for Max's `start success` came 22 to 37 s late or never, and arrived the same second Ian saved Live's audio settings (20:09:26). Probes that only printed hello, or had their page built in, worked, which is why it looked like the device.

@@ -100,10 +100,10 @@ def test_a_reference_window_compares_with_just_that_part(tmp_path, monkeypatch):
     assert abs(mids(part)) < abs(mids(whole))   # the matching stretch is the same tone, the whole song isn't
 
 
-def test_without_a_reference_the_good_mixes_are_the_comparison(tmp_path, monkeypatch):
+def test_without_a_reference_nothing_is_compared(tmp_path, monkeypatch):
+    """Ian, Oct 30: the "good mixes" comparison is out. With no reference song, only the clarity rules speak."""
     monkeypatch.setenv("MODEL_API_KEY", "")
     path = write(tmp_path / "mix.wav", sine(3000, 0.5), sine(3000, 0.5))
     body = client.post("/mix/analyze", json={"mix_path": path}).json()
-    assert body["typical"]["mixes"] >= 20 and any(f["kind"] == "typical" for f in body["clarity"]["findings"])
-    with_ref = client.post("/mix/analyze", json={"mix_path": path, "reference_path": path}).json()
-    assert with_ref["typical"] is None
+    assert body["reference"] is None and "typical" not in body
+    assert all(f["kind"] != "reference" for f in body["clarity"]["findings"])

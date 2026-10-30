@@ -27,9 +27,8 @@ export function problemsOf(r: Result): Problem[] {
       : f.kind === "masking" ? { value: Math.abs(worst.gap_db!).toFixed(1), unit: "dB under" }
       : f.kind === "bass_click" ? { value: String(Math.round(f.clicky_share! * 100)), unit: "% of notes" }
       : f.kind === "reference" ? { value: `${f.diff_db! > 0 ? "+" : "−"}${Math.abs(f.diff_db!).toFixed(1)}`, unit: "dB vs reference" }
-      : f.kind === "typical" ? { value: `${f.outside_db! > 0 ? "+" : "−"}${Math.abs(f.outside_db!).toFixed(1)}`, unit: "dB past good mixes" }
       : { value: `+${f.size_db!.toFixed(1)}`, unit: "dB" };
-    const share = f.kind === "bass_click" ? f.clicky_share! : f.kind === "masking" ? worst.share! : f.kind === "reference" || f.kind === "typical" ? 1 : (f.share ?? 0);
+    const share = f.kind === "bass_click" ? f.clicky_share! : f.kind === "masking" ? worst.share! : f.kind === "reference" ? 1 : (f.share ?? 0);
     const shareLabel = f.kind === "bass_click" ? `${f.starts} note starts` : f.kind === "clash" ? `${Math.round(share * 100)}% of the time both play` : `${Math.round(share * 100)}% of the time`;
     return {
       name: d.name,
@@ -46,7 +45,6 @@ export function statusWord(p: Problem): string {
   const f = p.findings[0];
   if (f.kind === "masking") return p.name === "Mud" ? "Muddy" : "Buried";
   if (f.kind === "reference") return (f.diff_db ?? 0) > 0 ? "Over ref" : "Under ref";
-  if (f.kind === "typical") return (f.outside_db ?? 0) > 0 ? "Fuller" : "Thinner";
   return { resonance: "Ringing", buildup: "Build-up", harsh: "Harsh", bass_click: "Clicking", clash: "Clashing" }[f.kind];
 }
 

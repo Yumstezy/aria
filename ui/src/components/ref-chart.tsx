@@ -18,7 +18,7 @@ export interface Zone { n: number; lo: number; hi: number; where?: string; icon?
     zones: the problems, marked as in the list: a shaded stretch with its mark at the top. */
 export function RefChart({ r, height = 240, zones = [], onZone, range }: {
   r: RefCompare; height?: number; zones?: Zone[]; onZone?: (n: number) => void;
-  /** where most of the comparison songs sit (the good mixes' 10th to 90th percentile), drawn as a soft blue band */
+  /** an optional range around the comparison, drawn as a soft blue band */
   range?: { lo: number[]; hi: number[] };
 }) {
   const id = useId().replace(/:/g, "");
