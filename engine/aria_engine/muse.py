@@ -227,8 +227,9 @@ SECTIONS_PROMPT = """You name the parts of a producer's song in Ableton Live. Yo
 loudest bar of the song, 0 is the loudest) and "rise_db_per_bar" (positive when it climbs). These are electronic dance
 songs. They usually go Intro, Build, Drop, Break, Build, Drop, Outro, but follow the numbers: the loudest steady parts
 (energy within about 3 dB of 0) are drops, a part that climbs into a drop is a build, a quieter part between drops is a
-break, a quieter part that doesn't come back is a bridge, the first part is the intro unless it's already loud, and a
-last part that fades or drops in energy is the outro. Parts with the same label usually share a name.
+break, a quieter part that doesn't come back is a bridge. The first part is always the Intro and the last part is always
+the Outro, even when they're as loud as a drop: a song opens and closes there. Parts with the same label usually share a
+name.
 Answer with JSON only: {"names": ["...", ...]}, one name per section, in order, each one of: """ + ", ".join(SECTION_NAMES) + "."
 
 
@@ -243,6 +244,10 @@ def validate_section_names(raw, sections):
         return None, "Muse Spark didn't name every part."
     if any(n not in SECTION_NAMES for n in names):
         return None, "Muse Spark used a name that isn't one of the part names."
+    # A song opens with its intro and closes with its outro (Ian, Oct 29: his song's loud first 20 bars came back
+    # "Drop"; loudness can't tell them apart, so this is the song's shape, not a measurement)
+    if len(names) >= 3:
+        names = ["Intro", *names[1:-1], "Outro"]
     return names, None
 
 

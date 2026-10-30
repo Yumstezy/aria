@@ -83,7 +83,13 @@ def test_muse_names_are_checked_against_the_list(monkeypatch):
     names, err = muse.validate_section_names('{"names": ["Intro", "Drop", "Banana"]}', found)
     assert names is None and err
     names, err = muse.validate_section_names('{"names": ["Intro", "Drop", "Intro"]}', found)
-    assert names == ["Intro", "Drop", "Intro"] and err is None
+    assert names == ["Intro", "Drop", "Outro"] and err is None
+
+
+def test_a_song_opens_with_its_intro_and_closes_with_its_outro():
+    found = [{"label": "A"}, {"label": "B"}, {"label": "A"}, {"label": "B"}]
+    names, err = muse.validate_section_names('{"names": ["Drop", "Break", "Drop", "Break"]}', found)
+    assert names == ["Intro", "Break", "Drop", "Outro"] and err is None
 
 
 @pytest.mark.skipif(not (MIXES / "full.wav").exists(), reason="test-pack mixes are local only")
