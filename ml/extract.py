@@ -14,8 +14,10 @@ Run from the repo root:
 """
 import csv
 import hashlib
+import os
 import re
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -25,15 +27,19 @@ import soundfile as sf
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine"))
 from aria_engine import analysis  # noqa: E402  (same measurements as Mix check)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from detail import DETAIL_FIELDS, measure as measure_detail  # noqa: E402
+
 TIERS = ("good", "mid", "bad")
-AUDIO = {".wav", ".aif", ".aiff", ".flac"}
+AUDIO = {".wav", ".aif", ".aiff", ".flac", ".mp3"}   # mp3 via libsndfile 1.1+; m4a/aac is not readable and shows SKIPPED
+LOSSY = {".mp3"}
 EXCERPT_SEC = 60.0       # docs/ml-plan.md: the most important 30 to 90 s
 WINDOW_SEC = 3.0         # short-term loudness window (EBU R128)
 
-FIELDS = ["mix_id", "song", "label", "file", "excerpt_start_sec", "excerpt_sec",
+FIELDS = ["mix_id", "song", "label", "file", "file_format", "excerpt_start_sec", "excerpt_sec",
           "integrated_lufs", "true_peak_dbtp", "crest_db", "short_term_spread_lu",
           "bass_db", "mids_db", "treble_db", "bass_rel_db", "mids_rel_db", "treble_rel_db", "tilt_db",
-          "width_bass", "width_mids", "width_treble", "unmeasured"]
+          "width_bass", "width_mids", "width_treble", *DETAIL_FIELDS, "unmeasured"]
 TIER_PREFIX = re.compile(r"^(good|mid|bad)[_\s-]+", re.IGNORECASE)
 
 
@@ -66,9 +72,9 @@ def song_name(path):
     """The group a mix belongs to for the train/test split: the name before " - ".
     For "Song A - final" that's the song. For "Artist - Title" it's the artist, which keeps every
     track by one producer on the same side of the split (docs/ml-plan.md: split by song and producer).
-    Underscores count as spaces, and the tier prefix (GOOD_, MID_, BAD_) is dropped first."""
+    Underscores count as spaces, capitals are ignored, and the tier prefix (GOOD_, MID_, BAD_) is dropped first."""
     name = TIER_PREFIX.sub("", path.stem).replace("_", " ")
-    return " ".join(name.split(" - ")[0].split())
+    return " ".join(name.split(" - ")[0].split()).lower()
 
 
 def relative_bands(bands):
@@ -92,6 +98,7 @@ def row_for(path, label, root):
         "song": song_name(path),
         "label": label,
         "file": str(rel),
+        "file_format": path.suffix.lower().lstrip("."),   # mp3 is lossy: check it doesn't predict the tier
         "excerpt_start_sec": round(start, 1),
         "excerpt_sec": round(len(excerpt) / rate, 1),
         "integrated_lufs": m["integrated_lufs"],
@@ -102,25 +109,61 @@ def row_for(path, label, root):
         "bass_rel_db": rel_bands["bass"], "mids_rel_db": rel_bands["mids"], "treble_rel_db": rel_bands["treble"],
         "tilt_db": round(bands["treble"] - bands["bass"], 1) if None not in (bands["bass"], bands["treble"]) else None,
         "width_bass": m["width"]["bass"], "width_mids": m["width"]["mids"], "width_treble": m["width"]["treble"],
+        **measure_detail(audio, rate, excerpt),
         "unmeasured": "; ".join(f"{k}: {v}" for k, v in m["unmeasured"].items()),
     }
 
 
+def song_overrides(out):
+    """Optional ml/data/song_groups.csv (file, song, why): fixes for names the rule above gets wrong,
+    for example "Title - Artist" or one producer spelled two ways. Matched by file name."""
+    path = Path(out).parent / "song_groups.csv"
+    if not path.exists():
+        return {}
+    with open(path, newline="") as f:
+        return {r["file"].strip(): r["song"].strip().lower() for r in csv.DictReader(f)}
+
+
+def excluded(out):
+    """Optional ml/data/excluded.csv (file, why): files left out on purpose, such as exact duplicates."""
+    path = Path(out).parent / "excluded.csv"
+    if not path.exists():
+        return {}
+    with open(path, newline="") as f:
+        return {r["file"].strip(): r["why"].strip() for r in csv.DictReader(f)}
+
+
 def main(root, out):
     root = Path(root).expanduser().resolve()
-    files = [(p, label) for label in TIERS for p in sorted((root / label).rglob("*")) if p.suffix.lower() in AUDIO]
+    folders = {d.name.lower(): d for d in root.iterdir() if d.is_dir()}
+    files = [(p, label) for label in TIERS if label in folders
+             for p in sorted(folders[label].rglob("*")) if p.is_file() and p.suffix.lower() in AUDIO]
+    others = [p.name for label in TIERS if label in folders for p in folders[label].rglob("*")
+              if p.is_file() and p.suffix.lower() not in AUDIO and not p.name.startswith(".")]
+    for name in others:
+        print(f"SKIPPED {name}: not a format the script reads (convert it to WAV)")
+    others = []  # reported above
     if not files:
         sys.exit(f"No audio found in {root}/good, {root}/mid or {root}/bad")
     Path(out).parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "w", newline="") as f:
+    overrides, skip = song_overrides(out), excluded(out)
+    for path, _ in files:
+        if path.name in skip:
+            print(f"LEFT OUT {path.name}: {skip[path.name]}")
+    files = [(p, label) for p, label in files if p.name not in skip]
+    workers = max(1, min(4, os.cpu_count() or 1))
+    with open(out, "w", newline="") as f, ProcessPoolExecutor(workers) as pool:
         w = csv.DictWriter(f, fieldnames=FIELDS)
         w.writeheader()
-        for i, (path, label) in enumerate(files, 1):
+        jobs = [pool.submit(row_for, path, label, root) for path, label in files]
+        for i, ((path, label), job) in enumerate(zip(files, jobs), 1):
             try:
-                w.writerow(row_for(path, label, root))
-                print(f"[{i}/{len(files)}] {label:4} {path.name}")
+                row = job.result()
+                row["song"] = overrides.get(path.name, row["song"])
+                w.writerow(row)
+                print(f"[{i}/{len(files)}] {label:4} {path.name}", flush=True)
             except Exception as e:  # one unreadable file shouldn't stop the batch
-                print(f"[{i}/{len(files)}] SKIPPED {path.name}: {e}")
+                print(f"[{i}/{len(files)}] SKIPPED {path.name}: {e}", flush=True)
     print(f"Wrote {out}")
 
 

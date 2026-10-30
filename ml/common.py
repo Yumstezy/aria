@@ -1,4 +1,5 @@
-"""Shared by ml/train.py and ml/muse_rater.py: load features and split them honestly.
+"""Shared by ml/train.py and ml/muse_rater.py: the tiers, the basic measurements, minimum data checks
+and the song-grouped split (muse_rater.py uses the same split as the first of train.py's repeats).
 
 Three tiers, in order (docs/ml-plan.md, decided Oct 28): bad < mid < good.
 """
