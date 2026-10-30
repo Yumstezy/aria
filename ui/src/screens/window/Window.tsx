@@ -10,7 +10,7 @@ import { CountUp } from "@/components/count-up";
 import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
 import { ProblemThumb } from "@/components/problem-thumb";
-import { BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
+import { AnalyzerIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { barsLabel, checkMix, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, restore, setAskOpen, setTheme, setWindowMode, stopListening,
@@ -155,7 +155,7 @@ function LayoutMenu({ mode, chatOut }: { mode: "full" | "left" | "right"; chatOu
 }
 
 /** The side menu (Ember, Oct 29): Ask Muse first, then where to go, then the tracks Aria heard, each with how
-    many problems it's in. Docked, it's icons only. Tools that aren't built yet stay off it. */
+    many problems it's in. Docked, it's icons only. Every planned tool is listed (Ian); the unbuilt ones are dimmed and say coming soon when tapped. */
 const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView: (v: View) => void; narrow: boolean }) {
   const theme = useAriaSel((s) => s.theme), askOpen = useAriaSel((s) => s.ask.open), result = useAriaSel((s) => s.result);
   const list = result ? problemsOf(result) : [];
@@ -164,9 +164,10 @@ const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView
   const silent = spectra && tracksMode ? Object.keys(spectra.parts).filter((k) => !spectra.parts[k]) : [];
   const count = (name: string) => list.filter((p) => p.findings.some((f) => f.tracks?.includes(name) || f.masked === name || (f.kind === "bass_click" && name === "bass"))).length;
   const item = (id: View | null, label: string, icon: ReactNode, end?: ReactNode) => (
-    <a key={label} href="#" title={label} aria-current={id === view ? "page" : undefined} style={narrow ? { justifyContent: "center", padding: 0 } : undefined}
+    <a key={label} href="#" title={id ? label : `${label}: coming soon`} aria-current={id === view ? "page" : undefined}
+       style={{ ...(narrow ? { justifyContent: "center", padding: 0 } : {}), ...(id ? {} : { opacity: 0.45 }) }}
        onClick={(e: MouseEvent) => { e.preventDefault(); if (id) setView(id); else notice(`${label} is coming soon.`); }}>
-      {icon}{!narrow && label}{!narrow && end}
+      {icon}{!narrow && <span className="truncate">{label}</span>}{!narrow && end}
     </a>
   );
   return (
@@ -184,7 +185,9 @@ const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView
       <nav className="cp-nav" aria-label="Tools">
         {item("home", "Home", <HomeIcon />)}
         {item("mixcheck", "Mix check", <MixIcon />, list.length ? <span className="ae-count">{list.length}</span> : null)}
-        {item(null, "Reference", <ReferenceIcon />, <span className="ae-soon">soon</span>)}
+        {item(null, "Live analyzer", <AnalyzerIcon />)}
+        {item(null, "Groove match", <GrooveIcon />)}
+        {item(null, "Reference", <ReferenceIcon />)}
       </nav>
       {!narrow && names.length > 0 && (
         <>
@@ -429,10 +432,8 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
           <section className="cp-tile cp-card" style={{ gap: 8 }}>
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
               <span className="text-[14px] font-medium text-ink">{list.length ? "Where the problems are" : "Your mix"}</span>
-              <span className="font-mono text-[11.5px] text-ink-faint">{list.length ? "tap a number" : "hover for levels"}</span>
-              {!narrow && <div className="ml-auto">{legend}</div>}
+              <div className="ml-auto">{legend}</div>
             </div>
-            {narrow && legend}
             {spectra
               ? <Waves spectra={spectra} findings={r.clarity.findings} split={r.clarity.mode !== "master"} bare
                        onZone={(f) => setOpen(list.findIndex((p) => p.findings.includes(f)))} />

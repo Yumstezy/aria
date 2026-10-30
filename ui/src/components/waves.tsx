@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 import { describe, hz, hzRange, partColor, partNames, soundName, type Finding, type Spectra } from "@/lib/aria";
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { BANDS } from "@/lib/problems";
+import { cn } from "@/lib/utils";
 
 // Short names for the tooltip, so it stays small
 const SHORT: Record<string, string> = { vocals: "Vocal", other: "Synths", bass: "Bass", drums: "Drums", mix: "Mix" };
@@ -93,12 +94,12 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
 
   return (
     <div className="flex flex-col gap-2.5">
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="Each part's frequency curve"
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${bare ? H - PAD_B + 2 : H}`} className="block h-auto w-full" role="img" aria-label="Each part's frequency curve"
            onPointerMove={onMove} onPointerLeave={() => setHover(null)}>
         {TICKS.map((t) => (
           <g key={t}>
             <line x1={X(t)} x2={X(t)} y1={PAD_T - 6} y2={H - PAD_B} stroke="var(--hairline)" />
-            <text x={X(t)} y={H - 6} textAnchor="middle" className="fill-ink-faint font-mono text-[10.5px]">{t >= 1000 ? `${t / 1000}k` : t}</text>
+            {!bare && <text x={X(t)} y={H - 6} textAnchor="middle" className="fill-ink-faint font-mono text-[10.5px]">{t >= 1000 ? `${t / 1000}k` : t}</text>}
           </g>
         ))}
 
@@ -121,15 +122,17 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
         {hover && <line x1={X(spectra.hz[hover.i])} x2={X(spectra.hz[hover.i])} y1={PAD_T - 6} y2={H - PAD_B} stroke="currentColor" strokeOpacity={0.6} strokeWidth={1.5} />}
       </svg>
 
-      {/* What each stretch of the picture is called, low to high, so 200 or 5k means something */}
+      {/* What each stretch of the picture is called, low to high, so 200 or 5k means something.
+          Bare (Ember): names only, the numbers on hover and in the pointer's tooltip (Ian: "a little cluttered"). */}
       <div className="flex" aria-label="Frequency ranges">
         {BANDS.map((b, i) => {
           const lo = Math.max(LO, b.lo), hi = Math.min(HI, b.hi);
+          const range = i === BANDS.length - 1 ? `${hzShort(b.lo)}+` : `${hzShort(b.lo)}–${hzShort(b.hi)}`;
           return (
-            <div key={b.name} className="flex min-w-0 flex-col items-center gap-0.5 overflow-hidden whitespace-nowrap py-1 text-center"
+            <div key={b.name} className="flex min-w-0 flex-col items-center gap-0.5 overflow-hidden whitespace-nowrap py-1 text-center" title={`${b.name}: ${range} Hz`}
                  style={{ width: `${((X(hi) - X(lo)) / W) * 100}%`, borderLeft: i ? "1px solid var(--hairline)" : undefined }}>
-              <span className="text-[11px] font-semibold leading-3 text-ink-muted">{b.name}</span>
-              <span className="font-mono text-[9.5px] leading-3 text-ink-faint">{i === BANDS.length - 1 ? `${hzShort(b.lo)}+` : `${hzShort(b.lo)}–${hzShort(b.hi)}`}</span>
+              <span className={cn("leading-3", bare ? "text-[10.5px] text-ink-faint" : "text-[11px] font-semibold text-ink-muted")}>{b.name}</span>
+              {!bare && <span className="font-mono text-[9.5px] leading-3 text-ink-faint">{range}</span>}
             </div>
           );
         })}

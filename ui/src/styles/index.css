@@ -209,3 +209,4 @@ html.see-through, html.see-through body, .see-through .cp-stage { background: tr
 .ae-switch[aria-checked="true"] i { background: var(--good); }
 .ae-switch[aria-checked="true"] i::after { transform: translateX(12px); background: #fff; }
 .ae-switch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.cp-nav a { white-space: nowrap; min-width: 0; }
