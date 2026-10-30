@@ -197,10 +197,12 @@ const BEATS = [
   { t: "0:00", title: "The problem", line: "Making music is hard. Making it sound good is harder.", shot: "Text only" },
   { t: "0:03", title: "Meet Aria", line: "Meet Aria. Your AI co-producer.", shot: "The Aria window over Ableton" },
   { t: "0:06", title: "Just tell it", line: "Just tell it what you want.", shot: "A request types in, a green Done card appears" },
-  { t: "0:09", title: "It listens", line: "It finds what sounds wrong.", shot: "Mix check: numbered problems on the graph" },
-  { t: "0:12", title: "Compare", line: "And shows how you compare to songs you love.", shot: "Gold and blue lines on one graph" },
-  { t: "0:15", title: "And more", line: "Live analyzer. Groove match. Song sections. Mix score.", shot: "Quick cuts of the Additional features pictures" },
-  { t: "0:18", title: "Logo, with a wink", line: "aria, make my song sound good. make no mistakes.", shot: "Types into the Ask Muse box like a real request, then the bird and \"Built with Meta Muse Spark\" below it" },
+  { t: "0:10", title: "Add, change, remove", line: "Add effects. Change any setting. Remove what you don't need. Undo anytime.", shot: "Done cards stack up one after another" },
+  { t: "0:14", title: "It listens", line: "It finds what sounds wrong.", shot: "Mix check: numbered problems on the graph" },
+  { t: "0:18", title: "Fix it", line: "One click to fix it.", shot: "The Fix first card, the EQ curve dips" },
+  { t: "0:21", title: "Compare", line: "See how you compare to songs you love.", shot: "Gold and blue lines on one graph" },
+  { t: "0:24", title: "And more", line: "Live analyzer. Groove match. Song sections. Mix score.", shot: "Quick cuts of the Additional features pictures" },
+  { t: "0:27", title: "Logo, with a wink", line: "aria, make my song sound good. make no mistakes.", shot: "Types into the Ask Muse box like a real request, then the bird and \"Built with Meta Muse Spark\" below it" },
 ];
 
 const SHOTS = [
@@ -415,9 +417,9 @@ export default function App() {
       </Section>
 
       {/* For the video */}
-      <Section id="video" label="For the video" title="The 20 second cut," dim="beat by beat."
+      <Section id="video" label="For the video" title="The 30 second cut," dim="beat by beat."
                sub="Every screenshot here is the real app on a real song. The on-screen text is written for people who have never made music.">
-        <div className="mt-12 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-7">
+        <div className="mt-12 grid gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
           {BEATS.map((b, i) => (
             <Rise key={b.t} delay={i * 0.05}><GlowCard accent={i === 2 ? "good" : "white"} className="h-full">
               <span className="font-mono text-[11.5px] text-faint">{b.t}</span>
