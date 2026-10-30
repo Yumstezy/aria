@@ -19,6 +19,7 @@ You're building the part of Aria that can say how finished an EDM mix sounds, ev
 | `common.py` | Tiers, minimum data checks and the song-grouped split, shared by the scripts |
 | `train.py` | **The official evaluation.** Trains the models, compares them with the baselines, applies the ship rule |
 | `muse_rater.py` | Muse Spark as a second rater, on the same split |
+| `aesthetics.py` | Meta's Audiobox Aesthetics scores (production quality, complexity, enjoyment, usefulness) for each mix. Writes `data/aesthetics.csv` |
 | `curves.py` | Each mix's EQ curve (twelfth octaves, loudness taken out) for the app's "typical good mix" chart. Writes `data/curves.csv`, numbers only |
 | `experiments/` | Side experiments. Never the official result |
 | `data/features.csv` | The measurements (about 2 KB per mix). No audio |
@@ -51,6 +52,14 @@ You're building the part of Aria that can say how finished an EDM mix sounds, ev
 - **Honest numbers.** Report the real held-out accuracy even if it's modest. If nothing passes the ship rule, it doesn't ship.
 - **Split by song and producer,** never by clip. The scripts do this for you. Don't change it.
 - **Decide before you look.** Any change to the models, measurements or ship rule is written down before the run. Ideas that come after seeing results go in `experiments/` and are reported as follow-ups.
+
+### Planned before running: Audiobox Aesthetics (written Oct 30, before any scores existed)
+
+Meta's Audiobox Aesthetics model scores audio on Production Quality, Production Complexity, Content Enjoyment and Content Usefulness. Question: do those four scores, alone or added to our measurements, tell the tiers apart better than loudness and the official best?
+
+- Scores: `ml/aesthetics.py`, on each mix's same loudest 60 s.
+- Test: `ml/experiments/audiobox.py`. Three new sets (Audiobox only; Audiobox plus tone and stereo; Audiobox plus detailed), three models (random forest, ordinal logistic, logistic regression), the same song-grouped splits, the shuffle test over the whole best-of step. Bars: loudness only and the official best, on the same splits.
+- It stays a side experiment. If it beats loudness in 80% of rounds with shuffle p under 0.05, it goes to the team as a proposal for the next official run, not shipped from this result.
 
 ## Timeline
 

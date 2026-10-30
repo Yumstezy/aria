@@ -1,3 +1,8 @@
 # ML track only (docs/ml-plan.md). Install into the engine venv: engine/.venv/bin/pip install -r ml/requirements.txt
 scikit-learn==1.6.1
 joblib==1.4.2
+
+# Meta Audiobox Aesthetics (Oct 30, ml/aesthetics.py): CC-BY 4.0. Install with torch pinned to the engine's version
+# (pip install -c <(echo torch==2.14.1) ...), since Demucs uses the same torch. requests is used but not declared by the package.
+audiobox_aesthetics==0.0.4
+requests
