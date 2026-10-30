@@ -257,7 +257,7 @@ def space(sounds, rate):
     return out
 
 
-SPECTRUM_LO, SPECTRUM_HI, SPECTRUM_STEPS_PER_OCT = 30.0, 16000.0, 6
+SPECTRUM_LO, SPECTRUM_HI, SPECTRUM_STEPS_PER_OCT = 30.0, 16000.0, 12   # twelfth octaves, like Pro-Q's detail (Oct 29)
 
 
 def spectra(sounds, rate, relative=True, playing=None):

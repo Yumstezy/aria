@@ -2,12 +2,12 @@
 // other, where their track excels and yours doesn't"). Both songs at the same loudness on one frequency axis:
 // yours in gold, the reference in blue, the gap shaded in the color of whichever is fuller there. Drawn in the
 // Pro-Q style of every chart (components/plot.tsx): Hz along the bottom, dB down the right, 0 dB at the louder
-// song's peak. Every point is measured (result.reference.curve); the lines are smoothed for display only.
+// song's peak, both tipped up 4.5 dB an octave as Pro-Q draws them. Every point is measured (result.reference.curve); the lines are smoothed for display only.
 import { useId, useMemo, useRef, useState, type PointerEvent } from "react";
 import { hz, type RefCompare } from "@/lib/aria";
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { path, smoothValues } from "@/components/waves";
-import { PLOT_HI, PLOT_LO, PLOT_W as W, Plot, PlotGrid, dbTicksOf, plotX as X } from "@/components/plot";
+import { PLOT_HI, PLOT_LO, PLOT_W as W, Plot, PlotGrid, dbTicksOf, plotX as X, tilt } from "@/components/plot";
 
 export const YOURS = "var(--trk-0)", THEIRS = "var(--cool)";
 const PAD_T = 30, PAD_B = 20, STEP_DB = 6;
@@ -27,7 +27,8 @@ export function RefChart({ r, height = 240, zones = [], onZone }: {
   const shape = useMemo(() => {
     const c = r.curve!;
     const pick = c.hz.map((h, i) => [h, i] as const).filter(([h]) => h >= PLOT_LO / 1.15 && h <= PLOT_HI * 1.15);
-    const mine = smoothValues(pick.map(([, i]) => c.mine[i])), ref = smoothValues(pick.map(([, i]) => c.ref[i]));
+    // Drawn with Pro-Q's tilt (both songs the same, so the gap between them is untouched)
+    const mine = smoothValues(pick.map(([h, i]) => c.mine[i] + tilt(h))), ref = smoothValues(pick.map(([h, i]) => c.ref[i] + tilt(h)));
     // 0 dB is the louder song's peak; the floor sits under the quietest point between 40 Hz and 12 kHz
     // (the deep sub and top air roll off), in whole 6 dB steps, so the curves fill the plot
     const top = Math.max(...mine, ...ref);

@@ -9,6 +9,12 @@ const LABELS = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
 // Every 1 to 9 of each decade, like an analyzer's grid
 const MINOR = [30, 40, 60, 70, 80, 90, 300, 400, 600, 700, 800, 900, 3000, 4000, 6000, 7000, 8000, 9000];
 
+/** Pro-Q's default analyzer tilt (Ian, Oct 29: Aria's curves should read like the analyzers producers know). Music
+    has less energy up top, so drawn flat the highs fall off a cliff; tipped up 4.5 dB an octave around 1 kHz, a
+    balanced mix reads about level. Drawing only: the numbers Aria reports, and the hover, stay as measured. */
+export const TILT_DB_PER_OCT = 4.5;
+export const tilt = (f: number) => TILT_DB_PER_OCT * Math.log2(f / 1000);
+
 export const plotX = (f: number) => ((Math.log(f) - Math.log(PLOT_LO)) / (Math.log(PLOT_HI) - Math.log(PLOT_LO))) * PLOT_W;
 const hzLabel = (f: number) => (f >= 1000 ? `${f / 1000}k` : `${f}`);
 
@@ -34,6 +40,7 @@ export function Plot({ height, dbTicks, pins = [], onPin, children }: {
     <div className="relative overflow-hidden rounded-[12px]" style={{ background: "color-mix(in srgb, var(--ground) 55%, transparent)", border: "1px solid var(--hairline)" }}>
       {children}
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <span className="absolute left-2 top-1.5 font-mono text-[10px] leading-3 text-ink-faint" title="Drawn tipped up 4.5 dB per octave, like Pro-Q. The numbers stay as measured.">+{TILT_DB_PER_OCT} dB/oct</span>
         {LABELS.map((f) => (
           <span key={f} className="absolute bottom-1 -translate-x-1/2 font-mono text-[10px] leading-3 text-ink-faint" style={{ left: at(f) }}>{hzLabel(f)}</span>
         ))}

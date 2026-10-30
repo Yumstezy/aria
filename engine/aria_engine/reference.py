@@ -24,7 +24,8 @@ STORE = Path(os.path.expanduser("~/Library/Application Support/Aria/references")
 EXTENSIONS = {".wav", ".aif", ".aiff", ".flac", ".mp3", ".ogg"}
 
 CENTRES = 1000 * 2 ** (np.arange(-15, 13) / 3)   # third octaves, 31.5 Hz to 16 kHz: what's compared
-FINE = 1000 * 2 ** (np.arange(-30, 25) / 6)      # sixth octaves, 31.5 Hz to 16 kHz: the two curves for the picture
+FINE = 1000 * 2 ** (np.arange(-60, 49) / 12)     # twelfth octaves, 31.5 Hz to 16 kHz: the two curves for the picture,
+                                                 # fine enough that real peaks show, as in Pro-Q (Ian, Oct 29)
 N_FFT, HOP = 8192, 2048
 PLAYING_DB = 15        # frames within this of the loudest count as playing
 BUMP_DB = 2.0          # a stretch this far above the curve around it
@@ -57,6 +58,9 @@ def _levels(spectrum, centres, per_octave, rate):
     out = []
     for c in centres:
         idx = (freqs >= c / half) & (freqs < c * half)
+        if not idx.any() and c < rate / 2:          # a slice narrower than one bin (deep bass, fine steps): the nearest bin
+            idx = np.zeros_like(freqs, dtype=bool)
+            idx[np.argmin(np.abs(freqs - c))] = True
         out.append(10 * np.log10(mean[idx].sum() + 1e-12) - lufs if idx.any() and c < rate / 2 else np.nan)
     return np.array(out)
 
@@ -136,7 +140,7 @@ def compare(audio, rate, ref_audio, ref_rate):
             findings.append({"kind": "reference", "shape": "band", "band": b["name"], "hz": _nice(np.sqrt(b["lo"] * min(b["hi"], 16000))),
                              "hz_range": [b["lo"], b["hi"]], "diff_db": b["diff_db"]})
     findings.sort(key=lambda f: (f["diff_db"] < 0, -abs(f["diff_db"])))   # louder than the reference first
-    fine_mine, fine_ref = _levels(spec_mine, FINE, 6, rate), _levels(spec_ref, FINE, 6, ref_rate)
+    fine_mine, fine_ref = _levels(spec_mine, FINE, 12, rate), _levels(spec_ref, FINE, 12, ref_rate)
     keep = np.isfinite(fine_mine) & np.isfinite(fine_ref)
     return {"bands": bands, "curve": {"hz": [round(float(c)) for c in FINE[keep]],
                                       "mine": [round(float(x), 1) for x in fine_mine[keep]], "ref": [round(float(x), 1) for x in fine_ref[keep]]},

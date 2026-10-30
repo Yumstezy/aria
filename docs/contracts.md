@@ -96,7 +96,7 @@ With `reference_path`, the result's `reference` is:
   "curve": { "hz": [32, 35, "... sixth octaves to 16000"], "mine": [-38.2, "..."], "ref": [-37.9, "..."] } }
 ```
 
-- Both songs are loudness matched (integrated LUFS) and compared in third octaves over the moments each plays. `diff_db` is the mix minus the reference. `curve` is both songs at sixth octaves, dB against their own loudness, for the picture (yours gold, the reference blue).
+- Both songs are loudness matched (integrated LUFS) and compared in third octaves over the moments each plays. `diff_db` is the mix minus the reference. `curve` is both songs at twelfth octaves, dB against their own loudness, for the picture (yours gold, the reference blue). The window draws both tipped up 4.5 dB an octave around 1 kHz, as Pro-Q does, and says so on the chart; the numbers stay as measured.
 - The bridge sends `reference_name` (the song's own file name) with `reference_path`, since the engine stores it under another name.
 - What stands out becomes a finding, first in `clarity.findings`: `{kind: "reference", shape: "stretch" | "band", hz, hz_range, diff_db, stands_out_db (stretch), band (band), bars}`. A stretch is louder than the reference: at least 2 dB above the difference curve around it and 1.5 dB above the reference. Something missing counts only as a whole band 3 dB off (a pro track's deeper sub isn't a stretch to fix). At most 2, louder ones first. Frequencies are rounded to two significant figures.
 - Muse gets `reference: {name, bands}` and may compare with the song by name. It may give an `eq_band` cut for a stretch that's louder than the reference, never for a quieter one.

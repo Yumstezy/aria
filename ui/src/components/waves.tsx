@@ -8,7 +8,7 @@ import { describe, hz, hzRange, partColor, partNames, soundName, type Finding, t
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { BANDS } from "@/lib/problems";
 import { cn } from "@/lib/utils";
-import { Plot, PlotGrid, dbTicksOf } from "@/components/plot";
+import { Plot, PlotGrid, dbTicksOf, tilt } from "@/components/plot";
 
 // Short names for the tooltip, so it stays small
 const SHORT: Record<string, string> = { vocals: "Vocal", other: "Synths", bass: "Bass", drums: "Drums", mix: "Mix" };
@@ -73,8 +73,10 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
 
   // Waves with their label positions, labels nudged so none overlap. Worked out once per result,
   // not on every pointer move.
+  // Drawn with Pro-Q's tilt, then shifted so the mix's highest point is 0 dB again (the hover shows the real levels)
+  const lift = Math.max(...spectra.mix.map((v, i) => v + tilt(spectra.hz[i])));
   const waves = useMemo(() => { const out = names.map((n) => {
-    const values = smoothValues(n === "mix" ? spectra.mix : spectra.parts[n]!);
+    const values = smoothValues((n === "mix" ? spectra.mix : spectra.parts[n]!).map((v, i) => v + tilt(spectra.hz[i]) - lift));
     const line = path(spectra.hz.map((h, i) => [X(h), Y(values[i])]));
     const peak = values.indexOf(Math.max(...values));
     return { n, line, quiet: showParts && involved.size > 0 && !involved.has(n),
