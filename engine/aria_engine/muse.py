@@ -218,14 +218,17 @@ def advise(measured, context, findings=None, client=None, reference=None):
 # ---------- Naming the song's parts (Arrangement, build step 8b) ----------
 
 SECTIONS_MAX_TOKENS = 3000
-SECTION_NAMES = ["Intro", "Verse", "Pre-chorus", "Chorus", "Build", "Drop", "Break", "Bridge", "Outro"]
+# EDM part names only (Oct 29): with Verse and Chorus on the list too, one song came back Drop, Break, Build one run
+# and Chorus, Verse, Pre-chorus the next. One vocabulary keeps the names steady, so "your drop against their drop" works.
+SECTION_NAMES = ["Intro", "Build", "Drop", "Break", "Bridge", "Outro"]
 
 SECTIONS_PROMPT = """You name the parts of a producer's song in Ableton Live. You get JSON: "sections", in order, each with
 "label" (parts with the same letter sound alike), "start_bar", "bars", "energy_db" (how loud the part is against the
-loudest bar of the song, 0 is the loudest) and "rise_db_per_bar" (positive when it climbs). EDM songs usually go
-Intro, Build, Drop, Break, Build, Drop, Outro, but follow the numbers: the loudest steady parts are drops or choruses,
-a part that climbs into one is a build, a quiet part in the middle is a break, the first and last quiet parts are the
-intro and the outro. Parts with the same label usually share a name.
+loudest bar of the song, 0 is the loudest) and "rise_db_per_bar" (positive when it climbs). These are electronic dance
+songs. They usually go Intro, Build, Drop, Break, Build, Drop, Outro, but follow the numbers: the loudest steady parts
+(energy within about 3 dB of 0) are drops, a part that climbs into a drop is a build, a quieter part between drops is a
+break, a quieter part that doesn't come back is a bridge, the first part is the intro unless it's already loud, and a
+last part that fades or drops in energy is the outro. Parts with the same label usually share a name.
 Answer with JSON only: {"names": ["...", ...]}, one name per section, in order, each one of: """ + ", ".join(SECTION_NAMES) + "."
 
 

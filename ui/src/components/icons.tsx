@@ -21,6 +21,7 @@ export const CheckIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidt
 export const UndoIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={2} {...p}><path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>;
 export const PopOutIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={2} {...p}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>;
 
+export const ArrangementIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} {...p}><rect x="3" y="8" width="5" height="8" rx="1.5" /><rect x="9.5" y="8" width="7" height="8" rx="1.5" /><rect x="18" y="8" width="3" height="8" rx="1.2" /></svg>;
 export const EarIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} {...p}><path d="M7 9.5a5 5 0 0 1 10 0c0 3-2.4 4-3.3 5.8-.7 1.5-1 3.7-3.4 3.7A2.8 2.8 0 0 1 7.5 16" /><path d="M10 9.5a2 2 0 0 1 4 0" /></svg>;
 
 // Mix check's kinds of problem, for the tiles

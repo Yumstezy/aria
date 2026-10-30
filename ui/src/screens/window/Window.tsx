@@ -11,14 +11,14 @@ import { AskMuse } from "@/components/ask-muse";
 import { MiniWaves } from "@/components/mini-waves";
 import { RefChart, RefLegend, THEIRS, YOURS } from "@/components/ref-chart";
 import { ProblemThumb } from "@/components/problem-thumb";
-import { AnalyzerIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
+import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
-import { barsLabel, checkMix, clearReference, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
-         partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type RefCompare, type Result } from "@/lib/aria";
+import { addArrangementMarkers, barsLabel, checkMix, clearReference, hearSong, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
+         partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Part, type RefCompare, type Result, type SongParts } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
-type View = "home" | "mixcheck" | "reference";
+type View = "home" | "mixcheck" | "arrangement" | "reference";
 
 // Docked (a narrow panel beside Live) keeps the rail as icons and stacks the bento in one column.
 // Short as well as narrow means Ask Muse is popped out under it: show only what to fix.
@@ -62,8 +62,9 @@ export function AriaWindow() {
           <header className="grid gap-2">
             <div className="flex items-center gap-2.5" style={{ minHeight: 32 }}>
               <span className="flex items-center gap-2 text-[14px] text-ink-muted">
-                {view === "mixcheck" ? <MixIcon style={{ width: 16, height: 16 }} /> : view === "reference" ? <ReferenceIcon style={{ width: 16, height: 16 }} /> : <HomeIcon style={{ width: 16, height: 16 }} />}
-                {view === "mixcheck" ? "Mix check" : view === "reference" ? "Reference" : "Home"}</span>
+                {view === "mixcheck" ? <MixIcon style={{ width: 16, height: 16 }} /> : view === "reference" ? <ReferenceIcon style={{ width: 16, height: 16 }} />
+                  : view === "arrangement" ? <ArrangementIcon style={{ width: 16, height: 16 }} /> : <HomeIcon style={{ width: 16, height: 16 }} />}
+                {view === "mixcheck" ? "Mix check" : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : "Home"}</span>
               <div className="ml-auto flex items-center gap-2">
                 {!narrow && view === "mixcheck" && result && (
                   <div className="cp-seg" role="group" aria-label="View">
@@ -82,8 +83,9 @@ export function AriaWindow() {
               </div>
             </div>
             <h1 className="cp-title" style={{ fontSize: narrow ? 28 : 34, lineHeight: narrow ? "34px" : "40px" }}>
-              {view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : view === "reference" ? "Reference" : "Home"}
-              <span className="text-ink-faint">{view === "mixcheck" ? (result?.recording.tempo ? ` ${Math.round(result.recording.tempo)} BPM` : "") : view === "reference" ? "" : session ? ` ${Math.round(session.tempo)} BPM` : ""}</span>
+              {view === "mixcheck" ? (result ? barsLabel(result) : "Not checked yet") : view === "reference" ? "Reference" : view === "arrangement" ? "Arrangement" : "Home"}
+              <span className="text-ink-faint">{view === "mixcheck" ? (result ? `${result.part ? ` ${result.part}` : ""}${result.recording.tempo ? ` ${Math.round(result.recording.tempo)} BPM` : ""}` : "")
+                : view === "reference" || view === "arrangement" ? "" : session ? ` ${Math.round(session.tempo)} BPM` : ""}</span>
             </h1>
             {narrow && view === "mixcheck" && result && (
               <div className="cp-seg justify-self-start" role="group" aria-label="View">
@@ -101,8 +103,9 @@ export function AriaWindow() {
             </div>
           )}
 
-          {view !== "reference" && <KeyTracks />}
+          {(view === "home" || view === "mixcheck") && <KeyTracks />}
           {view === "home" ? <Home narrow={narrow} onOpen={openMixCheck} />
+            : view === "arrangement" ? <ArrangementScreen narrow={narrow} onReference={() => setView("reference")} />
             : view === "reference" ? <ReferenceScreen narrow={narrow} onOpen={openMixCheck} />
             : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />
@@ -194,6 +197,7 @@ const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView
       <nav className="cp-nav" aria-label="Tools">
         {item("home", "Home", <HomeIcon />)}
         {item("mixcheck", "Mix check", <MixIcon />, list.length ? <span className="ae-count">{list.length}</span> : null)}
+        {item("arrangement", "Arrangement", <ArrangementIcon />)}
         {item(null, "Live analyzer", <AnalyzerIcon />)}
         {item(null, "Groove match", <GrooveIcon />)}
         {item("reference", "Reference", <ReferenceIcon />)}
@@ -268,6 +272,103 @@ const Home = memo(function Home({ narrow, onOpen }: { narrow: boolean; onOpen: (
       </section>
 
       <WhereItHappens r={result} narrow={narrow} onPick={onOpen} />
+    </div>
+  );
+});
+
+/* ---------- Arrangement (build step 8b) ---------- */
+
+// One color per kind of part, the same in both songs, so your drop and their drop match at a glance
+const PART_COLOR: Record<string, string> = {
+  Intro: "var(--ink-faint)", Outro: "var(--ink-faint)", Break: "var(--track)", Bridge: "var(--trk-4)", Build: "var(--cool)", Drop: "var(--trk-0)",
+};
+const LABEL_COLOR = ["var(--trk-1)", "var(--trk-0)", "var(--trk-2)", "var(--trk-3)", "var(--trk-4)", "var(--trk-5)"];
+const partColor_ = (p: Part) => (p.name ? PART_COLOR[p.name] : LABEL_COLOR[(p.label.charCodeAt(0) - 65) % LABEL_COLOR.length]);
+const partName = (p: Part) => p.name ?? `Part ${p.label}`;
+
+/** A song's parts as blocks on a bar scale shared by both lanes */
+function Lane({ title, song, total, highlight }: { title: string; song: SongParts; total: number; highlight?: (p: Part) => boolean }) {
+  return (
+    <div className="grid gap-2">
+      <span className="truncate text-[13px] text-ink-muted" title={title}>{title}</span>
+      <div className="relative h-14">
+        {song.sections.map((p) => {
+          const left = ((p.start_bar - 1) / total) * 100, width = (p.bars / total) * 100, c = partColor_(p);
+          return (
+            <div key={p.start_bar} title={`${partName(p)}: bars ${p.start_bar} to ${p.start_bar + p.bars - 1}`}
+                 className="absolute inset-y-0 overflow-hidden rounded-[10px] px-2 py-1.5"
+                 style={{ left: `calc(${left}% + 1.5px)`, width: `calc(${width}% - 3px)`, background: `color-mix(in srgb, ${c} 26%, var(--card-2))`,
+                          boxShadow: highlight?.(p) ? `inset 0 0 0 1.5px ${c}` : `inset 0 0 0 1px color-mix(in srgb, ${c} 45%, transparent)` }}>
+              <div className="truncate text-[12.5px] font-medium text-ink">{partName(p)}</div>
+              {p.bars / total >= 0.07 && <div className="truncate font-mono text-[10.5px] text-ink-muted">{p.bars} bars</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Arrangement: the song's parts, yours above the reference's. One button, here only (Ian): Hear the whole song. */
+const ArrangementScreen = memo(function ArrangementScreen({ narrow, onReference }: { narrow: boolean; onReference: () => void }) {
+  const arr = useAriaSel((s) => s.arrangement), hearing = useAriaSel((s) => s.hearing), ref = useAriaSel(referenceOf);
+  const busy = !!hearing && hearing.step !== "error";
+  const share = hearing?.total ? Math.min(1, (hearing.done ?? 0) / hearing.total) : 0;
+  const mine = arr?.mine && !arr.mine.error ? arr.mine : null;
+  const theirs = arr?.ref && !arr.ref.error ? arr.ref : null;
+  const total = Math.max(mine?.bars ?? 0, theirs?.bars ?? 0, 1);
+
+  // Listening, or nothing heard yet
+  if (busy || !mine) {
+    return (
+      <div className="cp-bento">
+        <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 14 }}>
+          <span className="cp-cap">Your song</span>
+          <div className="relative h-14 overflow-hidden rounded-[10px] border border-dashed" style={{ borderColor: "var(--track)" }}>
+            {busy && <div className="absolute inset-y-0 left-0 transition-[width] duration-300 ease-linear" style={{ width: `${share * 100}%`, background: "color-mix(in srgb, var(--trk-0) 22%, transparent)" }} />}
+            {busy && hearing?.step === "record" && <div className="absolute inset-y-0 w-px bg-ink" style={{ left: `${share * 100}%` }} />}
+          </div>
+          {busy ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="cp-meta" role="status">{hearing!.text}</span>
+              {hearing!.step === "record" && <button className="cp-btn cp-btn-ghost cp-btn-sm ml-auto" onClick={stopHearing}>Stop</button>}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="cp-meta" style={hearing?.step === "error" || arr?.mine.error ? { color: "var(--hot)" } : undefined}>
+                {hearing?.step === "error" ? hearing.text : arr?.mine.error ?? "Aria plays your song from the start once, about as long as the song. Nothing in it changes."}</span>
+              <button className="cp-btn cp-btn-primary cp-btn-sm ml-auto" onClick={hearSong}>Hear the whole song</button>
+            </div>
+          )}
+        </section>
+      </div>
+    );
+  }
+
+  const mineNames = new Set(mine.sections.map((p) => p.name).filter(Boolean));
+  return (
+    <div className="cp-bento">
+      <section className={cn("cp-tile cp-card", span(narrow, 12))} style={{ gap: 18 }}>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-[14px] font-medium text-ink">{mine.sections.length} parts</span>
+          <span className="font-mono text-[11px] text-ink-faint">{mine.names_by ? "named by Muse Spark" : mine.names_error}</span>
+        </div>
+        <Lane title="Your song" song={mine} total={total} />
+        {theirs ? <Lane title={theirs.song ?? "Your reference"} song={theirs} total={total} highlight={(p) => !!p.name && mineNames.has(p.name)} />
+          : <button className="justify-self-start text-[13px] text-ink-muted underline-offset-2 hover:underline" onClick={onReference}>
+              {ref ? "Reading your reference's parts" : "Pick a reference song to see its parts here"}</button>}
+        {/* the bar ruler */}
+        <div className="relative h-3">
+          {Array.from({ length: Math.floor((total - 1) / 16) + 1 }, (_, k) => k * 16).map((b) => (
+            <span key={b} className="absolute -translate-x-1/2 font-mono text-[10px] text-ink-faint first:translate-x-0" style={{ left: `${(b / total) * 100}%` }}>{b + 1}</span>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={addArrangementMarkers}>Add {mine.sections.length} markers to Live</button>
+          <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={hearSong}>Hear it again</button>
+        </div>
+      </section>
+      <p className={cn("cp-meta", span(narrow, 12))}>Every Mix check now knows which part it heard{theirs ? ", and compares it with the same part of your reference" : ""}.</p>
     </div>
   );
 });
@@ -526,7 +627,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
         <Rise i={3}>
           <section className="cp-tile cp-card" style={{ gap: 10 }}>
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="text-[14px] font-medium text-ink" title="Both songs at the same loudness. Blue is where the reference is fuller, gold where yours is.">Against your reference</span>
+              <span className="text-[14px] font-medium text-ink" title="Both songs at the same loudness. Blue is where the reference is fuller, gold where yours is.">{r.reference.part ? `Against their ${r.reference.part}` : "Against your reference"}</span>
               <div className="ml-auto min-w-0"><RefLegend name={r.reference.name} /></div>
             </div>
             <RefChart r={r.reference} height={narrow ? 340 : 220} zones={list.map((p, i) => zoneOf(p, i + 1))} onZone={(n) => setOpen(n - 1)} />

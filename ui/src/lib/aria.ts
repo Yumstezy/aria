@@ -28,9 +28,16 @@ export interface Finding {
   band?: string;
   stands_out_db?: number;
 }
+/** One part of a song (Arrangement, build step 8b). name comes from Muse Spark, or null with the letter shown. */
+export interface Part { name: string | null; label: string; start_bar: number; bars: number; start_sec: number; end_sec: number; energy_db: number; rise_db_per_bar: number; confidence: number }
+export interface SongParts { tempo: number | null; bars: number; sections: Part[]; names_by: string | null; names_error: string | null; error: string | null; song?: string }
+export interface Arrangement { mine: SongParts; ref: SongParts | null; at: number }
+
 /** The comparison with the producer's reference song (build step 8). diff_db is the mix minus the reference. */
 export interface RefCompare {
   name: string; path: string; error: string | null;
+  /** The reference's part compared, when the song's parts are known (Arrangement) */
+  part?: string | null;
   bands: { name: string; lo: number; hi: number; diff_db: number | null }[];
   /** Both songs at the same loudness, sixth octaves, dB: the picture of where each is fuller */
   curve: { hz: number[]; mine: number[]; ref: number[] } | null;
@@ -53,6 +60,8 @@ export interface Result {
   advice: { summary: string; notes: Note[] } | null;
   advice_error: string | null;
   start_bar?: number;
+  /** The part of the song this check heard, once Arrangement knows the parts */
+  part?: string;
   /** Only when the check ran past the song's last bar: the bars after it were silence */
   song_end_bar?: number;
   chain?: { on_main: boolean; track: string; after: string[] };
@@ -108,6 +117,9 @@ interface State {
   voice: { state: "idle" | "starting" | "listening" | "hearing"; error: string | null };
   /** The change Undo will undo next, from the bridge: { exchange, done | suggestion, index }. None after a reload. */
   undoNext: { i: number; kind: "d" | "s"; k: number } | null;
+  /** The song's parts (Arrangement), and how hearing the whole song is going */
+  arrangement: Arrangement | null;
+  hearing: Progress | null;
   /** Where the window is, as the bridge placed it */
   layout: { mode: "full" | "left" | "right"; side: "left" | "right" } | null;
 }
@@ -129,7 +141,7 @@ export const inMax = typeof window !== "undefined" && !!window.max?.outlet;
 let state: State = {
   ask: { open: typeof location !== "undefined" && new URLSearchParams(location.search).get("ask") === "1", pending: null, log: [] },
   engine: { state: "starting", text: "Starting Aria" },
-  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null }, undoNext: null, layout: null,
+  progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null }, undoNext: null, layout: null, arrangement: null, hearing: null,
 };
 
 // Dark (Night) unless the producer picked Light. Inside Live the bridge saves the choice and puts it in
@@ -261,6 +273,8 @@ export function connect() {
     on<{ theme: Theme }>("theme", (t) => { applyTheme(t.theme); set({ theme: t.theme }); });
     on<Session>("session", (x) => set({ session: x }));
     on<{ busy: boolean; text: string }>("ears", (e) => set({ ears: e }));
+    on<Arrangement>("arrangement", (a) => set({ arrangement: a, hearing: null }));
+    on<Progress>("arrangement_progress", (p) => set({ hearing: p }));
     // The mapped key: hold to talk, let go to send. Only the popped-out chat listens, so it records once.
     if (new URLSearchParams(location.search).get("view") === "chat") on<{ down: boolean }>("voice_key", (k) => voiceKey(k.down));
     if (new URLSearchParams(location.search).get("view") === "chat") on("focus_ask", () => { arrive(); set({ askFocus: state.askFocus + 1 }); });
@@ -288,6 +302,16 @@ export async function checkMix() {
     set({ error: e instanceof TypeError ? "The engine is not running." : (e as Error).message, progress: null });
   }
 }
+
+// ---------- Arrangement (build step 8b) ----------
+
+/** Play the song from bar 1 to its end once, so Aria can find its parts. Only the Arrangement tab offers it (Ian). */
+export function hearSong() {
+  if (send("hear_song")) set({ hearing: { step: "start", text: "Going to bar 1" } });
+  else notice("Hearing the whole song needs Aria inside Live.");
+}
+export const stopHearing = () => send("stop_hearing");
+export const addArrangementMarkers = () => send("arrangement_markers");
 
 // ---------- Reference song (build step 8) ----------
 
