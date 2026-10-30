@@ -4,14 +4,14 @@
 // for display only; the engine's numbers stay as measured.
 import { useMemo, useRef, useState, type PointerEvent } from "react";
 import { motion } from "motion/react";
-import { describe, partColor, partNames, soundName, type Finding, type Spectra } from "@/lib/aria";
+import { describe, hz, hzRange, partColor, partNames, soundName, type Finding, type Spectra } from "@/lib/aria";
 import { ChartTooltip } from "@/components/ui/chart-tooltip";
 import { BANDS } from "@/lib/problems";
 
 // Short names for the tooltip, so it stays small
 const SHORT: Record<string, string> = { vocals: "Vocal", other: "Synths", bass: "Bass", drums: "Drums", mix: "Mix" };
 
-const W = 640, H = 270, PAD_B = 24, PAD_T = 34, LO = 30, HI = 16000, FLOOR_DB = -60;
+const W = 640, H = 270, PAD_B = 24, PAD_T = 34, LO = 30, HI = 16000, FLOOR_DB = -60, PIN_GAP = 24;
 const TICKS = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
 
 const X = (hz: number) => ((Math.log10(hz) - Math.log10(LO)) / (Math.log10(HI) - Math.log10(LO))) * W;
@@ -47,9 +47,13 @@ export function Waves({ spectra, findings, split, onZone }: {
   const zones = findings.map((f) => {
     const point = f.kind === "resonance" || f.kind === "harsh";
     const lo = point ? f.hz! * 0.92 : f.hz_range[0], hi = point ? f.hz! * 1.08 : f.hz_range[1];
-    const amount = f.kind === "masking" ? `${f.gap_db!.toFixed(0)} dB` : f.kind === "bass_click" ? "clicks" : f.kind === "clash" ? "clash" : `+${f.size_db!.toFixed(0)} dB`;
-    return { f, lo: Math.max(LO, lo), hi: Math.min(HI, hi), where: point ? hzShort(Math.round(f.hz!)) + " Hz" : `${hzShort(Math.round(f.hz_range[0]))}–${hzShort(Math.round(f.hz_range[1]))} Hz`, amount };
+    const amount = f.kind === "masking" ? `${f.gap_db!.toFixed(0)} dB` : f.kind === "bass_click" ? "clicks" : f.kind === "clash" ? "" : `+${f.size_db!.toFixed(0)} dB`;
+    const zlo = Math.max(LO, lo), zhi = Math.min(HI, hi);
+    return { f, lo: zlo, hi: zhi, pin: (X(zlo) + X(zhi)) / 2, where: point ? hz(f.hz!) : hzRange(f.hz_range), amount };
   });
+  // Pins on wide, overlapping zones would sit on each other: keep them a pin apart, left to right
+  [...zones].sort((a, b) => a.pin - b.pin).forEach((z, i, all) => { if (i) z.pin = Math.max(z.pin, all[i - 1].pin + PIN_GAP); });
+  zones.forEach((z) => { z.pin = Math.min(z.pin, W - 11); });
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<{ i: number; left: number; top: number } | null>(null);
 
@@ -100,8 +104,8 @@ export function Waves({ spectra, findings, split, onZone }: {
         {zones.map((z, i) => (
           <g key={i} className="cursor-pointer [&:hover>rect]:opacity-35" onClick={() => onZone(z.f)}>
             <rect x={X(z.lo)} y={PAD_T - 6} width={Math.max(6, X(z.hi) - X(z.lo))} height={H - PAD_B - PAD_T + 6} fill="var(--hot)" opacity={0.22} />
-            <circle cx={(X(z.lo) + X(z.hi)) / 2} cy={14} r={10} fill="var(--hot)" />
-            <text x={(X(z.lo) + X(z.hi)) / 2} y={18} textAnchor="middle" fill="var(--tile-core)" className="text-[11px] font-bold">{i + 1}</text>
+            <circle cx={z.pin} cy={14} r={10} fill="var(--hot)" />
+            <text x={z.pin} y={18} textAnchor="middle" fill="var(--tile-core)" className="text-[11px] font-bold">{i + 1}</text>
           </g>
         ))}
 
@@ -124,7 +128,7 @@ export function Waves({ spectra, findings, split, onZone }: {
             <div key={b.name} className="flex min-w-0 flex-col items-center gap-0.5 overflow-hidden whitespace-nowrap py-1 text-center"
                  style={{ width: `${((X(hi) - X(lo)) / W) * 100}%`, borderLeft: i ? "1px solid var(--hairline)" : undefined }}>
               <span className="text-[11px] font-semibold leading-3 text-ink-muted">{b.name}</span>
-              <span className="font-mono text-[9.5px] leading-3 text-ink-faint">{hzShort(b.lo)}–{hzShort(b.hi)}</span>
+              <span className="font-mono text-[9.5px] leading-3 text-ink-faint">{i === BANDS.length - 1 ? `${hzShort(b.lo)}+` : `${hzShort(b.lo)}–${hzShort(b.hi)}`}</span>
             </div>
           );
         })}
@@ -132,7 +136,7 @@ export function Waves({ spectra, findings, split, onZone }: {
 
       {hover && (
         <ChartTooltip x={hover.left} y={hover.top}
-          title={spectra.hz[hover.i] >= 1000 ? `${(spectra.hz[hover.i] / 1000).toFixed(1)} kHz` : `${spectra.hz[hover.i]} Hz`}
+          title={hz(spectra.hz[hover.i])}
           rows={names.slice().reverse().map((n) => {
             const v = (n === "mix" ? spectra.mix : spectra.parts[n]!)[hover.i];
             return { label: SHORT[n] ?? soundName(n), value: v <= FLOOR_DB ? "silent" : `${v.toFixed(0)} dB`, color: getComputedStyle(svgRef.current!).getPropertyValue(color(n).slice(4, -1)) };
@@ -147,7 +151,7 @@ export function Waves({ spectra, findings, split, onZone }: {
                     className="inline-flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-xs font-semibold"
                     style={{ background: "color-mix(in srgb, var(--on-tile) 12%, transparent)", color: "var(--on-tile)" }}>
               <i className="grid size-[18px] place-items-center rounded-full text-[10px] font-bold not-italic" style={{ background: "var(--hot)", color: "var(--tile-core)" }}>{i + 1}</i>
-              {describe(z.f).name} · {z.where} · {z.amount}
+              {describe(z.f).name} · {z.where}{z.amount && ` · ${z.amount}`}
             </button>
           ))}
         </div>

@@ -420,11 +420,14 @@ const SOUND: Record<string, string> = { vocals: "Vocal", bass: "Bass", drums: "D
 export const shortName = (s: string, max = 24) => (s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s);
 export const soundName = (s: string) => SOUND[s] || shortName(s);
 
-export function hz(v: number) { return v >= 1000 ? `${(v / 1000).toFixed(1)} kHz` : `${Math.round(v)} Hz`; }
+// One way to write a frequency everywhere: 890 Hz, 1.1 kHz, 2 kHz. "to" between two ends, as in the copy rules.
+const kilo = (v: number) => String(Math.round(v / 100) / 10);
+const under1k = (v: number) => (v >= 100 ? Math.round(v / 10) * 10 : Math.round(v));
+export function hz(v: number) { return v >= 1000 ? `${kilo(v)} kHz` : `${under1k(v)} Hz`; }
 export function hzRange([lo, hi]: [number, number]) {
-  if (lo >= 1000) return `${lo / 1000}–${hi / 1000} kHz`;
-  if (hi >= 1000) return `${lo} Hz–${hi / 1000} kHz`;
-  return `${lo}–${hi} Hz`;
+  if (lo >= 1000) return `${kilo(lo)} to ${kilo(hi)} kHz`;
+  if (hi >= 1000) return `${under1k(lo)} Hz to ${kilo(hi)} kHz`;
+  return `${under1k(lo)} to ${under1k(hi)} Hz`;
 }
 
 /** What it is, where in frequency, how much, and a sentence describing the measurement. */
@@ -433,7 +436,8 @@ const SPLIT_ORDER = ["drums", "bass", "other", "vocals"];
 const TRACK_COLORS = ["var(--part-vocals)", "var(--part-other)", "var(--part-bass)", "var(--cool)", "var(--part-drums)", "var(--watch)"];
 export function partNames(spectra: Spectra): string[] {
   const all = Object.keys(spectra.parts).filter((n) => spectra.parts[n]);
-  return all.every((n) => SPLIT_ORDER.includes(n)) ? SPLIT_ORDER.filter((n) => all.includes(n)) : all;
+  // The producer's tracks in name order, so each keeps its color from one check to the next
+  return all.every((n) => SPLIT_ORDER.includes(n)) ? SPLIT_ORDER.filter((n) => all.includes(n)) : all.sort((a, b) => a.localeCompare(b));
 }
 export function partColor(n: string, i: number) { return SPLIT_ORDER.includes(n) || n === "mix" ? `var(--part-${n})` : TRACK_COLORS[i % TRACK_COLORS.length]; }
 
