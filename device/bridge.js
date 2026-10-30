@@ -467,15 +467,26 @@ async function hearSong() {
     await ensureEngine();
     let live = await askLive("state", "live_state");
     if (!(live.song_end > 0)) throw new UserError("Aria couldn't find where your song ends. Put your clips in the Arrangement and try again.");
+    // Always from bar 1 (Ian). Jumping while Live plays lands a moment later than the state reads back (build step
+    // 1.6): on Oct 29 the first press recorded from bar 66. So: stop, go to bar 1, play, and wait until Live
+    // really is near bar 1 before recording.
     toUI("arrangement_progress", { step: "start", text: "Going to bar 1" });
-    await askLive("jump", "jump_done", 1);
-    live = await askLive("state", "live_state");
-    if (!live.playing) {
-      const started = waitForPlaying(LIVE_TIMEOUT_MS);
-      toLive("play");
-      await started;
-      live = await askLive("state", "live_state");
+    if (live.playing) {
+      const stopped = new Promise((resolve) => { waiters.live_playing = (on) => { if (!on) { delete waiters.live_playing; resolve(); } }; });
+      toLive("stop_song");
+      await Promise.race([stopped, sleep(LIVE_TIMEOUT_MS)]);
+      delete waiters.live_playing;
     }
+    await askLive("jump", "jump_done", 1);
+    const playing = waitForPlaying(LIVE_TIMEOUT_MS);
+    toLive("play");
+    await playing;
+    for (let i = 0; i < 20; i++) {
+      live = await askLive("state", "live_state");
+      if (live.song_beat < live.beats_per_bar) break;
+      await sleep(100);
+    }
+    if (live.song_beat >= live.beats_per_bar) throw new UserError("Live didn't go back to bar 1. Stop the song, press Hear the whole song again.");
     const startBeat = live.song_beat, endBeat = live.song_end;
     const ms = Math.round((endBeat - startBeat) * 60000 / live.tempo) + 500;
     const lastBar = Math.ceil(endBeat / live.beats_per_bar);
