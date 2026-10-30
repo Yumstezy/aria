@@ -36,7 +36,7 @@ Done means a real Check mix in Live shows real measurements and real Muse Spark 
 This is a hard rule for code, tests, UI and the video.
 
 - The engine reports only what it measured from real audio. If it can't measure something, it says so and returns null. It never fills in a plausible number.
-- With no reference track, the engine compares nothing and calls nothing too bright or too quiet. Comparisons need a reference.
+- With no reference track, the engine compares only against real rated mixes: the mixes people rated good in `ml/data/features.csv` (Oct 30, `engine/aria_engine/typical.py`), shown as "more than most good mixes", never "too bright" or "too quiet". Anything else needs a reference.
 - Muse Spark gets only measured numbers, and its prompt says to use only those. Validate its JSON. If the call fails or there's no key, show "no advice" and the reason. Never fall back to canned advice text.
 - The UI never shows example numbers outside a development mode clearly labeled as such. The numbers in `design/screens/` are illustrations for layout only. Don't copy them into code as data.
 - Tests may generate test tones. Those stay in tests and never reach the app.

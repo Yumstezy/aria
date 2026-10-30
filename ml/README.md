@@ -7,7 +7,8 @@ You're building the part of Aria that can say how finished an EDM mix sounds, ev
 - **Data:** 99 rated mixes from the shared Drive (good 30, mid 36, bad 33), in 71 song and producer groups.
 - **Official result** (`results/train-report.md`): the best model scores 0.49 on songs it never saw, against 0.45 for "just look at loudness" (0.33 is a coin toss). It wins only 66% of test rounds and fails the shuffle test (p = 0.70), so **by the ship rule, nothing ships yet.**
 - **Side experiment** (`results/no-loudness-experiment.md`, added after the official run): with loudness taken out, tone and stereo alone still separate the tiers better than chance. See "Side experiments" below.
-- **Open:** where the mixes and their ratings came from, and permission to train on them (several are released or bootleg tracks by other artists).
+- **Permission (answered by Ian, Oct 30):** the mixes were given to the team or released by their artists for free download for us to use.
+- **In the app (Oct 30):** the classifier doesn't ship, but the good-rated mixes' band balance does, as Aria's "against good mixes" comparison when no reference song is picked (`engine/aria_engine/typical.py`). It measures exactly as `detail.py` does and only reads `data/features.csv`.
 
 ## What's in this folder
 

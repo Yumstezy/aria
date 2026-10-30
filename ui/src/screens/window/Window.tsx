@@ -13,7 +13,7 @@ import { GlowCard, type Accent } from "@/components/ui/glow-card";
 import { RefChart, RefLegend, THEIRS, YOURS } from "@/components/ref-chart";
 import { ProblemThumb } from "@/components/problem-thumb";
 import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
-         ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
+         ReferenceIcon, RingIcon, SunIcon, SwapIcon, GoodMixIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { addArrangementMarkers, barsLabel, checkMix, clearReference, hearSong, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
          partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Part, type RefCompare, type Result, type SongParts } from "@/lib/aria";
@@ -247,7 +247,7 @@ const Home = memo(function Home({ narrow, onOpen, go }: { narrow: boolean; onOpe
   const result = useAriaSel((s) => s.result), progress = useAriaSel((s) => !!s.progress);
   const arr = useAriaSel((s) => s.arrangement), ref = useAriaSel(referenceOf);
   const list = result ? problemsOf(result) : [];
-  const accentOf = (p: Problem): Accent => (p.findings[0].kind === "reference" ? ((p.findings[0].diff_db ?? 0) > 0 ? "gold" : "blue") : "hot");
+  const accentOf = (p: Problem): Accent => (compared(p) ? (refColor(p) === YOURS ? "gold" : "blue") : "hot");
   const chip = { width: 36, height: 36, borderRadius: 11 };
   return (
     <div className="grid gap-10 pt-2">
@@ -268,7 +268,7 @@ const Home = memo(function Home({ narrow, onOpen, go }: { narrow: boolean; onOpe
                 <span className="ae-kind" style={chip}>{iconFor(p)}</span>
                 <b className="mt-4 text-[16.5px] font-medium leading-snug">{p.name}</b>
                 <span className="ae-mono mt-1">{p.where}</span>
-                <span className="ae-mono mt-auto pt-3" style={{ color: p.findings[0].kind === "reference" ? refColor(p) : "var(--hot)" }}>{amountText(p)}</span>
+                <span className="ae-mono mt-auto pt-3" style={{ color: compared(p) ? refColor(p) : "var(--hot)" }}>{amountText(p)}</span>
               </GlowCard>
             </button>
           ))}
@@ -564,8 +564,10 @@ const KINDS: { kind: Kind; name: string; icon: ReactNode }[] = [
 const zoneOf = (p: Problem, n: number) => ({ n, lo: Math.min(...p.findings.map((f) => f.hz_range[0])), hi: Math.max(...p.findings.map((f) => f.hz_range[1])),
   where: `${p.name}, ${p.where}, ${amountText(p)}` });
 /** Louder than the reference is gold (yours is fuller), quieter is blue (theirs is) */
-const refColor = (p: Problem) => ((p.findings[0].diff_db ?? 0) > 0 ? YOURS : THEIRS);
-const iconFor = (p: Problem) => p.findings[0].kind === "reference" ? <ReferenceIcon style={{ color: refColor(p) }} />
+const refColor = (p: Problem) => ((p.findings[0].kind === "typical" ? p.findings[0].outside_db ?? 0 : p.findings[0].diff_db ?? 0) > 0 ? YOURS : THEIRS);
+const compared = (p: Problem) => p.findings[0].kind === "reference" || p.findings[0].kind === "typical";
+const iconFor = (p: Problem) => p.findings[0].kind === "typical" ? <GoodMixIcon style={{ color: refColor(p) }} />
+  : p.findings[0].kind === "reference" ? <ReferenceIcon style={{ color: refColor(p) }} />
   : KINDS.find((x) => x.kind === (p.name === "Mud" ? "buildup" : p.findings[0].kind))!.icon;
 
 /** Before the first check: the Simple view's layout greyed out. Its shapes say what will appear; no sentences. */
@@ -594,6 +596,32 @@ const EmptyCheck = memo(function EmptyCheck({ narrow }: { narrow: boolean }) {
     </div>
   );
 });
+
+/** Each band, centred on the good mixes' middle: the grey bar is where 8 in 10 of them sit, the dot is yours, gold
+    when you're past it (more than most) and blue when under. One scale for all bands, ±8 dB around the middle. */
+function GoodMixRows({ rows, narrow }: { rows: NonNullable<Result["typical"]>["bands"]; narrow: boolean }) {
+  const SPAN = 8, x = (d: number) => `${((Math.max(-SPAN, Math.min(SPAN, d)) + SPAN) / (2 * SPAN)) * 100}%`;
+  return (
+    <div className="grid gap-2.5">
+      {rows.map((b) => {
+        const d = b.value_db - b.median_db, over = b.value_db > b.range_db[1], under = b.value_db < b.range_db[0];
+        const c = b.outside ? (over ? YOURS : THEIRS) : "var(--ink)";
+        return (
+          <div key={b.name} className="grid items-center gap-3" style={{ gridTemplateColumns: `${narrow ? "5.5rem" : "7rem"} minmax(0, 1fr) 4.5rem` }} title={`${b.name}, ${hz(b.lo)} to ${hz(b.hi)}: yours ${b.value_db} dB of the mix, good mixes ${b.range_db[0]} to ${b.range_db[1]} dB`}>
+            <span className="truncate text-[13px] text-ink-muted">{b.name}</span>
+            <span className="relative h-4">
+              <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-hairline" />
+              <span className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full" style={{ left: x(b.range_db[0] - b.median_db), right: `calc(100% - ${x(b.range_db[1] - b.median_db)})`, background: "var(--track)" }} />
+              <span className="absolute top-0 h-4 w-px bg-ink-faint" style={{ left: x(0) }} />
+              <span className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: x(d), background: c, boxShadow: "0 0 0 2px var(--card)" }} />
+            </span>
+            <span className="ae-mono text-right" style={{ color: b.outside ? c : undefined }}>{Math.abs(d) < 0.05 ? "0.0" : `${d > 0 ? "+" : "−"}${Math.abs(d).toFixed(1)}`} dB</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 const EASE = [0.32, 0.72, 0, 1] as const;
 
@@ -641,7 +669,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
                   <span className="cp-cap">Fix first</span>
                   <span style={{ fontSize: narrow ? 17 : 22, lineHeight: narrow ? "22px" : "28px", fontWeight: 500, letterSpacing: "-.01em" }}>{first.name}</span>
                   <span className="ae-mono">{first.where}</span>
-                  <span className="ae-mono" style={{ color: first.findings[0].kind === "reference" ? refColor(first) : "var(--hot)" }}>{amountText(first)}</span>
+                  <span className="ae-mono" style={{ color: compared(first) ? refColor(first) : "var(--hot)" }}>{amountText(first)}</span>
                   <div className="mt-auto flex gap-1.5 pt-2">
                     <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={() => fixWithMuse(first)}>Fix it</button>
                     {!narrow && <button className="cp-btn cp-btn-ghost cp-btn-sm" onClick={() => jumpTo(first.bar)}>Hear it</button>}
@@ -675,6 +703,22 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
           </Rise>
         )}
       </div>
+
+      {!r.reference && r.typical && !r.typical.error && r.typical.bands.length > 0 && (
+        <Rise i={3}>
+          <section className="cp-tile cp-card" style={{ gap: 12 }}>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="text-[14px] font-medium text-ink" title="Each band's share of your mix, against EDM mixes people rated good. The grey bar is where 8 in 10 of them sit.">Against good mixes</span>
+              <span className="font-mono text-[11px] text-ink-faint">{r.typical.mixes} rated good by people · dB from their middle</span>
+              <span className="ml-auto inline-flex items-center gap-3 text-[12px] text-ink-muted">
+                <span className="inline-flex items-center gap-1.5"><span className="h-2 w-5 rounded-full" style={{ background: "var(--track)" }} />good mixes</span>
+                <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: YOURS }} />yours</span>
+              </span>
+            </div>
+            <GoodMixRows rows={r.typical.bands} narrow={narrow} />
+          </section>
+        </Rise>
+      )}
 
       {r.reference && !r.reference.error && r.reference.curve && (
         <Rise i={3}>
