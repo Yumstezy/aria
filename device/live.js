@@ -97,6 +97,27 @@ function trackList() {
   });
 }
 
+// Which of these tracks have clips playing between two beats (Ian, Oct 29: a quiet vocal isn't a silent one, so ask
+// Live). Muted tracks and muted clips don't count. A track with no Arrangement clips at all (a group, or Session
+// clips only) is null: Live can't say, and the engine goes by the audio. q = URI-encoded {names, start, end}.
+function clips_playing(encoded) {
+  if (!ensureSong()) { send("clips_playing", {}); return; }
+  const q = JSON.parse(decodeURIComponent(encoded));
+  const out = {};
+  ids(song.get("tracks")).forEach(function (id) {
+    const t = new LiveAPI("id " + id), name = String(one(t, "name"));
+    if (q.names.indexOf(name) < 0) return;
+    if (one(t, "mute") === 1) { out[name] = false; return; }
+    const clips = ids(t.get("arrangement_clips"));
+    if (!clips.length) { out[name] = null; return; }
+    out[name] = clips.some(function (cid) {
+      const c = new LiveAPI("id " + cid);
+      return one(c, "end_time") > q.start && one(c, "start_time") < q.end && one(c, "muted") !== 1;
+    });
+  });
+  send("clips_playing", out);
+}
+
 // Clips on a track, Arrangement first; Session only when Arrangement has none (so a long set stays quick).
 // An Ear on a track with no clips would only record silence.
 function clipCount(t) {

@@ -306,7 +306,7 @@ function sendUndoNext() {
 // ---------- live.js ----------
 
 // Reading the whole set takes longer on big projects than one change does
-const LIVE_SLOW = { live_state: 8000, ears_removed: 8000 };
+const LIVE_SLOW = { live_state: 8000, ears_removed: 8000, clips_playing: 8000 };
 function askLive(command, reply, ...args) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -335,7 +335,7 @@ Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete wai
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
 Max.addHandler("device_done", (s) => { const w = waiters.device_done; delete waiters.device_done; if (w) w(decode(s)); });
-for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done"]) {
+for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done", "clips_playing"]) {
   Max.addHandler(reply, (s) => { const w = waiters[reply]; delete waiters[reply]; if (w) w(decode(s)); });
 }
 Max.addHandler("ears_removed", (s) => { const w = waiters.ears_removed; delete waiters.ears_removed; if (w) w(decode(s)); });
@@ -413,15 +413,28 @@ async function checkMix() {
     }
 
     // Each Ear's recording, by its track's name (a second track with the same name gets " 2")
-    const tracks = {};
-    for (const ear of earFiles || []) {
+    const tracks = {}, earNameOf = {};
+    const earNames = earFiles || [];
+    for (const ear of earNames) {
       if (!fs.existsSync(ear.file) || fs.statSync(ear.file).size < 1024) continue;
       let name = ear.name, n = 2;
       while (tracks[name]) name = `${ear.name} ${n++}`;
       tracks[name] = ear.file;
+      earNameOf[name] = ear.name;
     }
     earFiles = null;
     const keyTracks = Object.keys(tracks).length >= 2;
+    // Which of those tracks had clips playing in these bars, by Live's word: a quiet vocal is playing, a track
+    // with nothing in these bars is silent, whatever its recording sounds like
+    let tracksPlaying = null;
+    if (keyTracks) {
+      try {
+        const byName = await askLive("clips_playing", "clips_playing",
+          encode({ names: (earNames || []).map((e) => e.name), start: live.song_beat, end: live.song_beat + BARS * live.beats_per_bar }));
+        tracksPlaying = {};
+        for (const [shown, orig] of Object.entries(earNameOf)) tracksPlaying[shown] = byName[orig] === undefined ? null : byName[orig];
+      } catch (e) { tracksPlaying = null; }   // Live didn't answer: the engine goes by the audio
+    }
 
     toUI("progress", { step: "analyze", text: keyTracks ? `Comparing ${Object.keys(tracks).length} tracks and asking Muse Spark`
       : referenceNow() ? `Comparing with ${referenceNow().name} and asking Muse Spark` : "Splitting your mix and asking Muse Spark" });
@@ -431,7 +444,8 @@ async function checkMix() {
     const refPart = ref && parts.theirs ? { reference_window: [parts.theirs.start_sec, parts.theirs.end_sec], reference_part: parts.theirs.name } : {};
     const res = await request("POST", "/mix/analyze",
       { mix_path: file, start_beat: live.song_beat, tempo: live.tempo, bars: BARS, beats_per_bar: live.beats_per_bar,
-        ...(keyTracks ? { tracks } : {}), ...(ref ? { reference_path: ref.path, reference_name: ref.name, ...refPart } : {}) }, ANALYZE_TIMEOUT_MS);
+        ...(keyTracks ? { tracks, ...(tracksPlaying ? { tracks_playing: tracksPlaying } : {}) } : {}),
+        ...(ref ? { reference_path: ref.path, reference_name: ref.name, ...refPart } : {}) }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
     }

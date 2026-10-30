@@ -44,6 +44,20 @@ PRESENT_DB = 20.0      # and overall within this of the whole mix, or it isn't i
                        # mix, faint synth bleed, and was reported "buried". Real vocals in the muddy and
                        # good mixes sat 4 to 16 dB under.
 COVER_DB = 3.0         # another sound at least this much louder covers it
+TRACK_AUDIBLE_DB = 60.0  # the producer's own tracks have no bleed: a quiet vocal still plays in its range
+SILENT_DBFS = -60.0    # the producer's own tracks (relative=False): only this quiet counts as silent (Ian, Oct 29: a
+                       # quiet vocal 20 dB under the mix was called "silent" and never checked for being buried)
+
+
+def _present(name, sound, own_level, mix_level, relative, playing):
+    """Is this sound really in this part of the song? Live's word first (clips playing in these bars), then: split
+    mode, within PRESENT_DB of the mix (fainter is Demucs bleed); the producer's own tracks, anything above silence."""
+    if playing and playing.get(name) is not None:
+        return bool(playing[name])
+    if relative:
+        return own_level >= mix_level - PRESENT_DB
+    x = np.asarray(sound, dtype=np.float64)
+    return 20 * np.log10(np.sqrt(np.mean(x ** 2)) + 1e-12) > SILENT_DBFS
 MIN_SHARE = 0.5        # covered for at least this share of the time it plays there
 TOP_N = 3
 
@@ -76,7 +90,7 @@ def _range_levels(sig, rate, n_fft, hop):
     return t, levels, 10 * np.log10(p.sum(axis=0) + 1e-12)
 
 
-def masking(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, relevant=None):
+def masking(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, relevant=None, relative=True, playing=None):
     """sounds: {name: signal}. relevant: {name: set of ranges} to check, or None for all.
     Returns findings, strongest first."""
     names = list(sounds)
@@ -95,7 +109,7 @@ def masking(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, releva
     findings = []
     for victim in names:
         own_level = 10 * np.log10(np.mean(10 ** (levels_total[victim][loud] / 10)) + 1e-12)
-        if own_level < mix_level - PRESENT_DB:
+        if not _present(victim, sounds[victim], own_level, mix_level, relative, playing):
             continue  # not in this part of the song (or only bleed from other sounds)
         typical = {r: np.median(levels[victim][r][loud]) for r in RANGES}
         strongest = max(typical.values())
@@ -105,7 +119,7 @@ def masking(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, releva
             if typical[r] < strongest - MATTERS_DB:
                 continue  # this range isn't where this sound lives
             mine = levels[victim][r]
-            plays = loud & (mine >= mine[loud].max() - ACTIVE_DB) & (mine >= mix_range[r] - AUDIBLE_DB)
+            plays = loud & (mine >= mine[loud].max() - ACTIVE_DB) & (mine >= mix_range[r] - (AUDIBLE_DB if relative else TRACK_AUDIBLE_DB))
             if plays.sum() < 4:
                 continue
             best = None
@@ -152,7 +166,7 @@ def _band_levels(sig, rate):
         10 * np.log10(p.sum(axis=0) + 1e-12)
 
 
-def clashes(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0):
+def clashes(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, relative=True, playing=None):
     """Pairs of sounds that fight in the same narrow bands. Next-door bands that both clash merge
     into one range. Ranked by how long they fight and how loud they are there. Strongest first."""
     names = list(sounds)
@@ -226,7 +240,7 @@ def space(sounds, rate):
 
     out = {}
     for n, total in totals:
-        if 10 * np.log10(np.mean(10 ** (total[loud] / 10)) + 1e-12) < mix_level - PRESENT_DB:
+        if not _present(n, sounds[n], 10 * np.log10(np.mean(10 ** (total[loud] / 10)) + 1e-12), mix_level, True, None):   # split mode only
             out[n] = None
             continue
         typical = {r: np.median(levels[n][r][loud]) for r in RANGES}
@@ -246,7 +260,7 @@ def space(sounds, rate):
 SPECTRUM_LO, SPECTRUM_HI, SPECTRUM_STEPS_PER_OCT = 30.0, 16000.0, 6
 
 
-def spectra(sounds, rate):
+def spectra(sounds, rate, relative=True, playing=None):
     """Each sound's average spectrum, for the window's picture of where every part sits.
 
     About 1/6-octave points from 30 Hz to 16 kHz, averaged over the moments the mix is
@@ -283,7 +297,7 @@ def spectra(sounds, rate):
     parts = {}
     for n in names:
         level = 10 * np.log10(np.mean(power[n].sum(axis=0)[loud]) + 1e-12)
-        parts[n] = None if level < mix_level - PRESENT_DB else [round(float(v - top), 1) for v in curve(power[n])]
+        parts[n] = [round(float(v - top), 1) for v in curve(power[n])] if _present(n, sounds[n], level, mix_level, relative, playing) else None
     return {"hz": [round(float(c)) for c in centres], "mix": [round(float(v - top), 1) for v in mix_curve], "parts": parts}
 
 

@@ -81,6 +81,7 @@ With no reference, the engine compares nothing. It returns what it measured and 
 - `width` is the side share of the band's energy: 0 is mono, 1 is all side.
 - `advice` is `null` when there's no key, the call fails, or nothing valid comes back. `advice_error` then says why in plain words. There is no fallback text.
 - Validation drops any advice note that cites a number not in `measured` or the request, or that says "too X" without a reference.
+- `tracks_playing` (key tracks mode, Oct 29): `{track name: true | false | null}`, Live's word on whether each track had unmuted clips in the checked bars (null: no Arrangement clips at all, so Live can't say). For the producer's own tracks, silent means `false` here or, when null, near-digital silence (under -60 dBFS); a quiet track is still drawn and checked for being buried. The 20 dB-under-the-mix rule stays for split mode, where it filters Demucs bleed.
 - `reference_path` (build step 8, as built Oct 29): see "With a reference" below.
 
 ### With a reference (build step 8, as built Oct 29)
