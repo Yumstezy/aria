@@ -3,6 +3,7 @@
 // splits them on spaces or commas. In a normal browser (development) it calls the engine directly.
 import { useSyncExternalStore } from "react";
 import { startRecording, stopRecording, transcribe } from "@/lib/voice";
+import { problemsOf as problemsOfResult } from "@/lib/problems";   // used only inside functions, so the import cycle is fine
 
 export const ENGINE = "http://127.0.0.1:8765";
 
@@ -132,7 +133,15 @@ interface State {
   layout: { mode: "full" | "left" | "right"; side: "left" | "right" } | null;
   /** Groove match (build step 9): the two loops, the last match, and how it's going */
   groove: GrooveState;
+  /** What happened to each problem of this check after Fix it (Oct 30), by problemKey. None: still to fix. */
+  fixes: Record<string, FixState>;
 }
+
+/** changed: Muse made a change for it (not heard yet). fixed: Check again measured its range FIXED_DB or more lower.
+    still: Check again found it barely changed, so it's back in To fix. */
+export interface FixState { state: "changed" | "fixed" | "still"; what: string; at?: number; change_db?: number | null }
+export const FIXED_DB = -3;
+export const problemKey = (p: { name: string; where: string }) => `${p.name}|${p.where}`;
 
 export interface GrooveClip { name: string; path: string; track_name: string; track_id: number; arrangement: boolean; start_beat: number | null }
 export interface GrooveTiming { avg_ms: number | null; max_ms: number | null; hits: { sec: number; offset_ms: number }[]; missing?: number }
@@ -161,6 +170,7 @@ let state: State = {
   engine: { state: "starting", text: "Starting Aria" },
   progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null }, undoNext: null, layout: null, arrangement: null, hearing: null, beforeAfter: null, rechecking: null,
   groove: { moving: null, anchor: null, placed: null, result: null, error: null, busy: null },
+  fixes: {},
 };
 
 // Dark (Night) unless the producer picked Light. Inside Live the bridge saves the choice and puts it in
@@ -269,7 +279,7 @@ export function connect() {
     on<{ state: EngineState; text: string }>("engine", (e) => set({ engine: e, ...(e.state === "error" ? { error: e.text }
       : e.state === "up" && state.engine.state === "error" && state.error === state.engine.text ? { error: null } : {}) }));
     on<Progress>("progress", (p) => set({ progress: p, error: null }));
-    on<Result>("mix_result", (r) => set({ result: known(r), progress: null, error: null, beforeAfter: null }));   // a new check: a new "before"
+    on<Result>("mix_result", (r) => set({ result: known(r), progress: null, error: null, beforeAfter: null, fixes: {} }));   // a new check: a new "before", nothing fixed yet
     on<{ text: string }>("error", (e) => set({ error: e?.text || "Something went wrong.", progress: null }));
     on<{ bar: number; name: string }>("marker_done", (m) => set({ marker: m }));
     on<{ request: string | null }>("ask_pending", (p) => {
@@ -283,7 +293,8 @@ export function connect() {
       // The answer to what's pending is in: clear pending in the same update, so the thread never blinks
       // Only a new entry counts: the same request asked twice (Fix it on one problem again) mustn't match the old answer
       const answered = state.ask.pending !== null && log.length > state.ask.log.length && log[log.length - 1].request === state.ask.pending;
-      set({ ask: { ...state.ask, log, ...(answered ? { pending: null } : {}) } });
+      const fixes = fixesAfter(log, log.length > state.ask.log.length ? log[log.length - 1] : null);
+      set({ ask: { ...state.ask, log, ...(answered ? { pending: null } : {}) }, fixes });
       if (answered) askQueued();
     });
     on<{ i: number; kind: "d" | "s"; k: number } | null>("undo_next", (u) => set({ undoNext: u ?? null }));
@@ -300,7 +311,7 @@ export function connect() {
       moving: g.moving ?? null, anchor: g.anchor ?? null, placed: g.placed ?? null, busy: null, error: g.error ?? null,
       // A new loop to fix starts fresh; Undo takes the matched loop away; otherwise the last result stays
       result: g.result ?? (g.undone || (g.moving?.path !== state.groove.moving?.path) ? null : state.groove.result) } }));
-    on<BeforeAfter>("before_after", (b) => set({ beforeAfter: b, rechecking: null }));
+    on<BeforeAfter>("before_after", (b) => set({ beforeAfter: b, rechecking: null, fixes: fixesHeard(b) }));
     on<Progress>("before_after_progress", (p) => set({ rechecking: p }));
     on<number[]>("analyzer", (frame) => analyzerListeners.forEach((l) => l(frame)));
     // The mapped key: hold to talk, let go to send. Only the popped-out chat listens, so it records once.
@@ -493,8 +504,49 @@ export const stopListening = () => { if (send("stop_listening")) set({ ears: { b
 
 /** Fix it: Muse gets the problem in plain words and makes the change in Live, with Undo. The change is on
     the track for the whole song, not just the bars that were checked, so the request doesn't name bars. */
+// Fix it requests waiting for their answer: request text -> the problem's key
+const fixing = new Map<string, string>();
 export function fixIt(p: { name: string; short: string; where: string }) {
-  askMuse(`Fix this for the whole song: ${p.name} (${p.where}). ${p.short}`);
+  const text = `Fix this for the whole song: ${p.name} (${p.where}). ${p.short}`;
+  fixing.set(text, problemKey(p));
+  askMuse(text);
+}
+/** Check again said it barely changed: ask for a stronger fix of the same problem */
+export function fixAgain(p: { name: string; short: string; where: string }, changeDb: number | null) {
+  const text = `That didn't do enough: ${p.name} (${p.where}) changed ${changeDb === null ? "an unknown amount" : `${changeDb > 0 ? "+" : ""}${changeDb.toFixed(1)} dB`} after the last fix. Fix it again, a bit stronger.`;
+  fixing.set(text, problemKey(p));
+  askMuse(text);
+}
+
+// After Fix it (Oct 30, Ian: fixed problems "stay in the way"): a Fix it answer with a change that went through marks
+// its problem changed; a change that was undone puts the problem back in To fix.
+function fixesAfter(log: Exchange[], newest: Exchange | null): Record<string, FixState> {
+  const fixes = { ...state.fixes };
+  if (newest && fixing.has(newest.request)) {
+    const key = fixing.get(newest.request)!;
+    fixing.delete(newest.request);
+    const did = newest.done.filter((d) => d.ok && !d.undone);
+    if (did.length) fixes[key] = { state: "changed", what: did.map((d) => d.text).join(" "), at: newest.at };
+  }
+  for (const [key, f] of Object.entries(fixes)) {
+    const x = f.at ? log.find((e) => e.at === f.at) : null;
+    if (x && x.done.filter((d) => d.ok).every((d) => d.undone)) delete fixes[key];
+  }
+  return fixes;
+}
+
+// Check again measured each problem's range: 3 dB or more lower is fixed, otherwise it's back in To fix
+function fixesHeard(b: BeforeAfter): Record<string, FixState> {
+  const fixes = { ...state.fixes }, r = state.result;
+  if (!r) return fixes;
+  for (const c of b.problems) {
+    const f = r.clarity.findings[c.index];
+    const p = f && problemsOfResult(r).find((x) => x.findings.includes(f));
+    const key = p && problemKey(p);
+    if (!key || !fixes[key]) continue;
+    fixes[key] = { ...fixes[key], state: c.change_db !== null && c.change_db <= FIXED_DB ? "fixed" : "still", change_db: c.change_db };
+  }
+  return fixes;
 }
 export const clearHistory = () => { if (!send("clear_history")) set({ ask: { ...state.ask, log: [] } }); };
 export const openAsk = () => { if (!send("open_ask")) window.open("../window/index.html?ask=1", "aria-window"); };

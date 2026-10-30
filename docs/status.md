@@ -19,6 +19,10 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 - **Groove match, first try in Live (Ian, 13:59):** clip placed and matched. Fixed after: Original / Matched switched forever (live.js's reply had the request's name); "190 ms off" (after-measurement paired hits with neighbours; now each hit's own sound is found again where it was put); every hit read 13 ms late on low drums (attack finder stopped at a dip in the level). On Ian's tribal loop at 165 BPM: before 6.1 ms off on average, 12.2 at worst; after 0, all 66 found; half strength gives half. The chart folds every bar into one row of 16ths. Check again in Live: Original / Matched switches once per press.
 
+- **After Fix it (Ian, 14:40: fixed problems "stay in the way", no fix prompts on Before and after):** a problem Muse made a change for leaves To fix for a "N done" group at the bottom of the list (closed; each row says what was done, Undo while it's the next undo). Check again marks it Fixed when its range is 3 dB or more lower, otherwise it's back in To fix with "Still there" and Fix it again. Before and after rows say Fixed, Fix it again or Fix it. Counts (To fix, side menu, Home) count only what's left. Check in Live: Fix it on one problem, the count drops and "1 done" appears; Check again; Fixed or Fix it again.
+- **Ask Muse fixes (14:30):** Drum Buss Drive is a percentage (was refused as a gain jump); Utility Mono stays off unless asked (and "Mono Bass" no longer switches Mono); "vOCAL" vs "VOCAL" picks the exact one.
+- **Vocal sync, engine done** (`POST /groove/vocal`): tempo from the file name or measured (Ian's 148 BPM vocal stem reads 74, counted 148), beat 1, warp markers. Device and screen next. Beat 1 from a vocal alone can be a beat off (on his stem it picked beat 4): the screen will let the producer move it.
+
 **Bug queue**
 - Home's kind cards (GlowCard): hovering lags a little, and since the cards fill half the page, scrolling over them feels sticky (Ian, Oct 30, 12:35).
 

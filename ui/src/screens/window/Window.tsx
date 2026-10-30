@@ -19,6 +19,7 @@ import { KINDS, KindMark, findingIcon, rangeOf } from "@/components/problem-mark
 import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
+import { FIXED_DB, fixAgain, problemKey, undoLast, type Exchange, type FixState } from "@/lib/aria";
 import { ANALYZER_HZ, addArrangementMarkers, barsLabel, checkMix, clearReference, editArrangement, hearSong, onAnalyzer, recheck, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
          partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Part, type RefCompare, type Result, type SongParts } from "@/lib/aria";
 import { cn } from "@/lib/utils";
@@ -179,7 +180,7 @@ function LayoutMenu({ mode, chatOut }: { mode: "full" | "left" | "right"; chatOu
     many problems it's in. Docked, it's icons only. Every planned tool is listed (Ian); the unbuilt ones are dimmed and say coming soon when tapped. */
 const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView: (v: View) => void; narrow: boolean }) {
   const theme = useAriaSel((s) => s.theme), askOpen = useAriaSel((s) => s.ask.open), result = useAriaSel((s) => s.result);
-  const list = result ? problemsOf(result) : [];
+  const list = useTodo(result);
   const spectra = result?.clarity.spectra, names = spectra ? partNames(spectra) : [];
   const tracksMode = (result?.clarity.mode as string) === "tracks";
   const silent = spectra && tracksMode ? Object.keys(spectra.parts).filter((k) => !spectra.parts[k]) : [];
@@ -254,7 +255,7 @@ const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView
 const Home = memo(function Home({ narrow, onOpen, go }: { narrow: boolean; onOpen: () => void; go: (v: View) => void }) {
   const result = useAriaSel((s) => s.result), progress = useAriaSel((s) => !!s.progress);
   const arr = useAriaSel((s) => s.arrangement), ref = useAriaSel(referenceOf);
-  const list = result ? problemsOf(result) : [];
+  const list = useTodo(result);
   const accentOf = (p: Problem): Accent => (compared(p) ? (refColor(p) === YOURS ? "gold" : "blue") : "hot");
   const chip = { width: 36, height: 36, borderRadius: 11 };
   return (
@@ -622,6 +623,7 @@ const EmptyCheck = memo(function EmptyCheck({ narrow }: { narrow: boolean }) {
     after in gold, and how much each problem's range changed. */
 function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
   const ba = useAriaSel((s) => s.beforeAfter), busy = useAriaSel((s) => s.rechecking), progress = useAriaSel((s) => !!s.progress);
+  const fixes = useAriaSel((s) => s.fixes);
   const list = problemsOf(r);
   const working = !!busy && busy.step !== "error";
   const share = busy?.total ? Math.min(1, (busy.done ?? 0) / busy.total) : 0;
@@ -647,7 +649,7 @@ function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
             <RefChart r={{ name: "Before", path: "", error: null, bands: [], curve: ba.curve }} height={narrow ? 300 : 170}
                       zones={list.map((p, i) => zoneOf(p, i + 1))} />
             <div className="grid gap-1.5">
-              {ba.problems.map((c) => {
+              {ba.problems.filter((c) => list.some((x) => x.findings.some((f) => r.clarity.findings.indexOf(f) === c.index))).map((c) => {
                 const p = list.findIndex((x) => x.findings.some((f) => r.clarity.findings.indexOf(f) === c.index));
                 const name = p >= 0 ? list[p].name : `Problem ${c.index + 1}`;
                 const down = (c.change_db ?? 0) < -0.4, up = (c.change_db ?? 0) > 0.4;
@@ -656,7 +658,13 @@ function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
                     {p >= 0 && <MarkOf p={list[p]} size={22} />}
                     <span className="truncate text-ink">{name}</span>
                     <span className="ae-mono ml-auto" style={{ color: down ? "var(--good)" : up ? "var(--hot)" : undefined }}>
-                      {c.change_db === null ? "not measured" : `${c.change_db > 0 ? "+" : c.change_db < 0 ? "−" : ""}${Math.abs(c.change_db).toFixed(1)} dB ${down ? "less" : up ? "more" : "same"}`}</span>
+                      {c.change_db === null ? "not measured" : `${fmtDb(c.change_db)} ${down ? "less" : up ? "more" : "same"}`}</span>
+                    {/* What to do next (Ian, Oct 30: "there's no fix prompts"): fixed, try again stronger, or fix it */}
+                    {p >= 0 && (c.change_db !== null && c.change_db <= FIXED_DB
+                      ? <span className="w-[92px] text-right text-[12.5px]" style={{ color: "var(--good)" }}>Fixed</span>
+                      : fixes[problemKey(list[p])]
+                        ? <button className="cp-btn cp-btn-sm w-[92px] justify-center" onClick={() => fixAgainWithMuse(list[p], c.change_db)}>Fix it again</button>
+                        : <button className="cp-btn cp-btn-sm w-[92px] justify-center" onClick={() => fixWithMuse(list[p])}>Fix it</button>)}
                   </div>
                 );
               })}
@@ -777,11 +785,21 @@ function Rise({ i, className, children }: { i: number; className?: string; child
 
 const amountText = (p: Problem) => (p.amount.unit.startsWith("%") ? `${p.amount.value}%` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`);
 const fixWithMuse = (p: Problem) => { fixIt(p); setAskOpen(true); };
+const fixAgainWithMuse = (p: Problem, change: number | null) => { fixAgain(p, change); setAskOpen(true); };
+
+/** To fix and done (Oct 30, Ian: fixed problems "stay in the way"): a problem Muse made a change for leaves To fix;
+    one Check again found barely changed ("still") comes back. */
+function splitFixes(list: Problem[], fixes: Record<string, FixState>) {
+  const f = (p: Problem) => fixes[problemKey(p)];
+  return { todo: list.filter((p) => !f(p) || f(p).state === "still"), done: list.filter((p) => f(p) && f(p).state !== "still") };
+}
+const useTodo = (r: Result | null) => { const fixes = useAriaSel((s) => s.fixes); return r ? splitFixes(problemsOf(r), fixes).todo : []; };
 
 /** Mix check, Simple (Ember, Oct 29): three small cards (how many, fix first with its picture, who Aria heard),
     then the picture beside a short numbered list. A row opens to Muse's words and the buttons. */
 const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; open: number; setOpen: (i: number) => void; narrow: boolean }) {
-  const list = problemsOf(r);
+  const fixes = useAriaSel((s) => s.fixes), undoNext = useAriaSel((s) => s.undoNext), askLog = useAriaSel((s) => s.ask.log);
+  const { todo: list, done } = splitFixes(problemsOf(r), fixes);
   const first = list[0];
   const spectra = r.clarity.spectra, names = spectra ? partNames(spectra) : [];
   // A mark on the chart or in To fix (Ian, Oct 30): open that problem's explanation, close the others, and bring it
@@ -827,8 +845,18 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
             ) : (
               <div className="flex flex-col gap-1">
                 <span className="cp-cap">This check</span>
-                <span style={{ fontSize: 22, fontWeight: 500 }}>Nothing sticks out</span>
-                <span className="text-[13px] text-ink-muted">{r.advice?.summary ?? "Check another part of the song next."}</span>
+                {/* Everything changed isn't the same as nothing found: say what's left to do (hear it again) */}
+                {done.length ? (
+                  <>
+                    <span style={{ fontSize: 22, fontWeight: 500 }}>{done.every((p) => fixes[problemKey(p)]?.state === "fixed") ? "All fixed" : `${done.length} changed`}</span>
+                    <span className="text-[13px] text-ink-muted">{done.every((p) => fixes[problemKey(p)]?.state === "fixed") ? "Check another part of the song next." : "Check the same bars again to hear if it worked."}</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ fontSize: 22, fontWeight: 500 }}>Nothing sticks out</span>
+                    <span className="text-[13px] text-ink-muted">{r.advice?.summary ?? "Check another part of the song next."}</span>
+                  </>
+                )}
               </div>
             )}
           </section>
@@ -873,12 +901,12 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
               <div className="ml-auto">{legend}</div>
             </div>
             {spectra
-              ? <Waves spectra={spectra} findings={r.clarity.findings} split={r.clarity.mode !== "master"} bare
+              ? <Waves spectra={spectra} findings={list.flatMap((p) => p.findings)} split={r.clarity.mode !== "master"} bare
                        onZone={(f) => show(list.findIndex((p) => p.findings.includes(f)))} />
               : <p className="cp-meta">The picture appears after the next Check mix.</p>}
           </section>
         </Rise>}
-        {list.length > 0 && (
+        {(list.length > 0 || done.length > 0) && (
           <Rise i={4}>
             <section className="cp-tile cp-card" style={{ paddingTop: 4, paddingBottom: 4, gap: 0 }}>
               {list.map((p, i) => (
@@ -898,11 +926,17 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
                     {open === i && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.22, ease: EASE }} className="overflow-hidden">
                         <div className="grid gap-2.5 pb-3.5 pl-[38px]">
+                          {fixes[problemKey(p)]?.state === "still" && (
+                            <p className="m-0 text-[12.5px]" style={{ color: "var(--hot)" }}>
+                              Still there after the fix: {fmtDb(fixes[problemKey(p)].change_db ?? null)}. Muse can try a stronger fix.</p>
+                          )}
                           <p className="m-0 text-[13.5px] text-ink">{p.short}</p>
                           {p.notes.map((note, k) => <p key={k} className="m-0 text-[12.5px] leading-[18px] text-ink-muted">{note.text}</p>)}
                           <span className="ae-mono">{barsOf(p)}</span>
                           <div className="flex gap-1.5">
-                            <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={() => fixWithMuse(p)}>Fix it</button>
+                            {fixes[problemKey(p)]?.state === "still"
+                              ? <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={() => fixAgainWithMuse(p, fixes[problemKey(p)].change_db ?? null)}>Fix it again</button>
+                              : <button className="cp-btn cp-btn-primary cp-btn-sm" onClick={() => fixWithMuse(p)}>Fix it</button>}
                             <button className="cp-btn cp-btn-sm" onClick={() => jumpTo(p.bar)}>Hear it in Live</button>
                           </div>
                         </div>
@@ -911,6 +945,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
                   </AnimatePresence>
                 </div>
               ))}
+              {done.length > 0 && <DoneGroup done={done} fixes={fixes} undoAt={undoNext ? askLog[undoNext.i]?.at : undefined} />}
             </section>
           </Rise>
         )}
@@ -918,6 +953,40 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
     </div>
   );
 });
+
+const fmtDb = (v: number | null) => (v === null ? "not measured" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)} dB`);
+
+/** The problems Muse made a change for, out of the way at the bottom of the list (Ian, Oct 30): one line that opens
+    to a check per problem and what was done. Fixed once Check again measured its range FIXED_DB lower; Undo while the
+    change is the next one Undo would take back. */
+function DoneGroup({ done, fixes, undoAt }: { done: Problem[]; fixes: Record<string, FixState>; undoAt?: Exchange["at"] }) {
+  const [shown, setShown] = useState(false);
+  const fixed = done.filter((p) => fixes[problemKey(p)]?.state === "fixed").length;
+  return (
+    <div className="border-t border-hairline">
+      <button className="flex w-full items-center gap-2.5 py-2.5 text-left text-[13px] text-ink-muted" aria-expanded={shown} onClick={() => setShown(!shown)}>
+        <span className="grid size-[22px] place-items-center rounded-full" style={{ background: "color-mix(in srgb, var(--good) 18%, transparent)", color: "var(--good)" }}><CheckIcon style={{ width: 12, height: 12 }} /></span>
+        {done.length} done{fixed ? `, ${fixed} confirmed fixed` : ""}
+        <BackIcon className="ml-auto" style={{ width: 12, height: 12, transform: shown ? "rotate(90deg)" : "rotate(180deg)", transition: "transform 160ms" }} />
+      </button>
+      {shown && done.map((p) => {
+        const f = fixes[problemKey(p)];
+        return (
+          <div key={problemKey(p)} className="grid items-center gap-2.5 pb-2.5" style={{ gridTemplateColumns: "22px minmax(0, 1fr) auto" }}>
+            <span className="grid size-[22px] place-items-center opacity-70"><MarkOf p={p} size={20} /></span>
+            <span className="min-w-0">
+              <span className="block truncate text-[13px] text-ink">{p.name}</span>
+              <span className="block truncate text-[11.5px] text-ink-faint" title={f.what}>
+                {f.state === "fixed" ? `${fmtDb(f.change_db ?? null)} in its range, heard again` : `${f.what} Check again to hear it.`}</span>
+            </span>
+            {f.at !== undefined && f.at === undoAt ? <button className="cp-btn cp-btn-sm" onClick={undoLast}>Undo</button>
+              : <span className="ae-mono" style={{ color: f.state === "fixed" ? "var(--good)" : undefined }}>{f.state === "fixed" ? "Fixed" : "Changed"}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 /** One measured number as a bar on a fixed scale, with the number beside it. Missing: "Not measured", no bar. */
 function Meter({ label, value, unit, lo, hi, color = "var(--ink-muted)", why, mark, dot }: {
@@ -1014,7 +1083,7 @@ function MinTab() {
 /** While Ask Muse is popped out: the main window shrinks to what needs fixing. Tap a row to hear it. */
 function Compact() {
   const { result, progress, error } = useAria();
-  const list = result ? problemsOf(result) : [];
+  const list = useTodo(result);
   return (
     <div className="cp-stage is-flush">
       <section className="cp-tile cp-compact h-full" style={{ gap: 10 }}>
