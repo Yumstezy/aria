@@ -135,8 +135,9 @@ interface State {
 }
 
 export interface GrooveClip { name: string; path: string; track_name: string; track_id: number; arrangement: boolean; start_beat: number | null }
-export interface GrooveTiming { avg_ms: number | null; max_ms: number | null; hits: { sec: number; offset_ms: number }[] }
+export interface GrooveTiming { avg_ms: number | null; max_ms: number | null; hits: { sec: number; offset_ms: number }[]; missing?: number }
 export interface GrooveResult { before: GrooveTiming; after: GrooveTiming; in_time: boolean; hits: number; hits_moved: number; out_path: string;
+  grid?: { step_sec: number; beat1_sec: number; steps_per_bar: number };
   follow: string; strength: number; nudge_ms: number }
 export interface GrooveState { moving: GrooveClip | null; anchor: GrooveClip | null; placed: { track_id: number; orig_id: number; playing: "before" | "after" } | null;
   result: GrooveResult | null; error: string | null; busy: string | null }

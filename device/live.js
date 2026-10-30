@@ -941,8 +941,8 @@ function groove_place(encoded) {
 function groove_ab(encoded) {
   const q = JSON.parse(decodeURIComponent(encoded));
   const list = ids(song.get("tracks"));
-  if (list.indexOf(q.orig_id) < 0 || list.indexOf(q.track_id) < 0) { send("groove_ab", { ok: false, text: "One of the two tracks isn't there any more." }); return; }
+  if (list.indexOf(q.orig_id) < 0 || list.indexOf(q.track_id) < 0) { send("groove_ab_done", { ok: false, text: "One of the two tracks isn't there any more." }); return; }
   new LiveAPI("id " + q.orig_id).set("mute", q.play === "before" ? 0 : 1);
   new LiveAPI("id " + q.track_id).set("mute", q.play === "before" ? 1 : 0);
-  send("groove_ab", { ok: true, play: q.play });
+  send("groove_ab_done", { ok: true, play: q.play });
 }

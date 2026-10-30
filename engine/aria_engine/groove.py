@@ -9,6 +9,7 @@ from pathlib import Path
 
 import numpy as np
 import soundfile as sf
+from scipy.ndimage import maximum_filter1d
 
 IN_TIME_MS = 5.0
 STEPS_PER_BEAT = 4          # the straight grid is 16ths
@@ -16,6 +17,8 @@ PRE_SEC = 0.003             # a slice starts this long before its hit, in the qu
 FADE_SEC = 0.002
 MAX_MOVE_STEPS = 0.45       # a hit is paired with a target less than about half a 16th away; further is a different note
 MIN_GAP_SEC = 0.03          # hits closer than this are one hit
+FIND_AGAIN_SEC = 0.02       # after the move, a hit is looked for this close to where it was put
+MATCH_MIN = 0.6             # and counts as found when its sound matches at least this well (correlation, 0 to 1)
 
 
 def _mono(audio):
@@ -26,7 +29,9 @@ def _mono(audio):
 def onsets(audio, rate):
     """Each hit's start in seconds. Found where the level jumps (over 10 ms, against the 10 ms before, in 1 ms steps,
     at least 9 dB and within 40 dB of the loudest hit), then pinned to where the attack begins: walking back from the
-    hit's peak to where its level falls under a third of that peak (1 ms smoothing)."""
+    hit's peak to where its level falls under a third of that peak. The level for that walk is the loudest sample in
+    the last 10 ms: a plain smoothed level dips at every cycle of a low drum, and the walk stopped at a dip 13 ms into
+    the hit (Ian's tribal loop, Oct 30, every hit read 13 ms late)."""
     x = _mono(audio)
     if not np.any(x):
         return []
@@ -34,6 +39,8 @@ def onsets(audio, rate):
     x = np.r_[np.zeros(pad), x]
     ms = max(1, int(0.001 * rate))
     env = np.convolve(np.abs(x), np.ones(ms) / ms, mode="same")
+    hold_n = int(0.01 * rate)
+    hold = np.roll(maximum_filter1d(np.abs(x), size=hold_n), hold_n // 2)   # the loudest of the last 10 ms
     hop, span = ms, 10
     frames = env[: len(env) // hop * hop].reshape(-1, hop).mean(axis=1)
     db = 20 * np.log10(frames + 1e-9)
@@ -48,8 +55,9 @@ def onsets(audio, rate):
             r = k * hop
             lo, hi = max(0, r - int(0.015 * rate)), min(len(env), r + int(0.03 * rate))
             peak = lo + int(np.argmax(env[lo:hi]))
+            top = hold[peak]
             i = peak
-            while i > lo and env[i] > env[peak] / 3:
+            while i > lo and hold[i] > top / 3:
                 i -= 1
             t = max(0.0, (i - pad) / rate)
             if not out or t - out[-1] >= MIN_GAP_SEC:
@@ -86,6 +94,37 @@ def _offsets(times, targets):
             "hits": [{"sec": round(g, 4), "offset_ms": round(m, 1)} for (_, g), m in zip(pairs, ms)]}
 
 
+def _after(x, y, rate, times, shifts, targets, nudge):
+    """The new file measured again. Each hit's own sound (its first 30 ms, from the original) is looked
+    for in the new file within FIND_AGAIN_SEC of where it was put, by cross-correlation; where it matches best is
+    where it is now. Finding hits from scratch in the new file was unreliable (Ian, Oct 30: a soft hit after a ringing
+    one wasn't found, and a neighbour's time made it "190 ms off"). A hit whose sound isn't there (match under
+    MATCH_MIN) is left out and counted in "missing", never given someone else's time."""
+    x, y = _mono(x), _mono(y)
+    post, reach = int(0.03 * rate), int(FIND_AGAIN_SEC * rate)
+    found, goal, missing = [], [], 0
+    for t, d, g in zip(times, shifts, targets):
+        if g is None:
+            continue
+        i = int(round(t * rate))
+        seg = x[i:i + post]
+        put = i + int(round(d * rate))
+        lo, hi = max(0, put - reach), min(len(y), put + post + reach)
+        area = y[lo:hi]
+        if len(seg) < 8 or len(area) < len(seg) or not np.any(seg):
+            missing += 1
+            continue
+        corr = np.correlate(area, seg, mode="valid")
+        energy = np.sqrt(np.convolve(area ** 2, np.ones(len(seg)), mode="valid") * np.sum(seg ** 2)) + 1e-12
+        k = int(np.argmax(corr / energy))
+        if corr[k] / energy[k] < MATCH_MIN:
+            missing += 1
+            continue
+        found.append((lo + k) / rate)
+        goal.append(g + nudge)
+    return {**_offsets(found, goal), "missing": missing}
+
+
 def _move(x, rate, times, shifts):
     """The audio with each hit's slice moved by its shift (seconds). Slices keep their order; a slice that moves later
     leaves a short silence before it, one that moves earlier cuts the tail before it (with a fade)."""
@@ -100,9 +139,13 @@ def _move(x, rate, times, shifts):
         seg = x[s:e].copy()
         stop = new_starts[k + 1] if k + 1 < len(new_starts) else n    # the next slice's new start cuts this one
         seg = seg[:max(0, min(len(seg), stop - ns))]
+        # The fade in covers only the quiet gap before the hit, never the hit (a hit at 0 s has no gap)
+        fin = min(fade, max(0, int(round(times[k] * rate)) - s))
+        ramp = lambda n, up: (np.linspace(0, 1, n) if up else np.linspace(1, 0, n))[:, None] if seg.ndim == 2 else (np.linspace(0, 1, n) if up else np.linspace(1, 0, n))
         if len(seg) > 2 * fade:
-            seg[:fade] *= np.linspace(0, 1, fade)[:, None] if seg.ndim == 2 else np.linspace(0, 1, fade)
-            seg[-fade:] *= np.linspace(1, 0, fade)[:, None] if seg.ndim == 2 else np.linspace(1, 0, fade)
+            if fin:
+                seg[:fin] *= ramp(fin, True)
+            seg[-fade:] *= ramp(fade, False)
         a, b = max(0, ns), min(n, ns + len(seg))
         if b > a:
             out[a:b] += seg[a - ns:b - ns]
@@ -138,17 +181,10 @@ def match(moving_path, anchor, tempo, strength=1.0, nudge_ms=0.0, beat1_sec=None
     out_path = out_dir / f"{Path(moving_path).stem} (matched).wav"
     sf.write(str(out_path), moved, rate, subtype="PCM_24")
 
-    # Measured again from the new file, against the same targets (moved by the nudge)
-    after_times = onsets(moved, rate)
-    after_targets = []
-    for g in targets:
-        if g is None:
-            continue
-        near = min(after_times, key=lambda a: abs(a - (g + nudge)), default=None)
-        after_targets.append((near, g + nudge))
-    after = _offsets([a for a, _ in after_targets], [g for _, g in after_targets])
     before = _offsets(times, targets)
-    return {"before": before, "after": after,
-            "in_time": after["max_ms"] is not None and after["max_ms"] <= IN_TIME_MS,
+    after = _after(audio, moved, rate, times, shifts, targets, nudge)
+    return {"before": before, "after": after, "grid": {"step_sec": round(step, 5), "beat1_sec": b1, "steps_per_bar": 4 * STEPS_PER_BEAT},
+            # "Every hit within 5 ms" needs every hit heard again
+            "in_time": after["max_ms"] is not None and after["max_ms"] <= IN_TIME_MS and after["missing"] == 0,
             "hits": len(times), "hits_moved": sum(1 for t, g in zip(times, targets) if g is not None and abs(g - t) * 1000 > 1.0),
             "out_path": str(out_path)}
