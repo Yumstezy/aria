@@ -116,6 +116,10 @@ function VocalPicture({ v }: { v: VocalSync }) {
   );
 }
 
+// "Ab minor (G# minor)": a flat key with its sharp name too, as key sites write it
+const SHARP: Record<string, string> = { Db: "C#", Eb: "D#", Gb: "F#", Ab: "G#", Bb: "A#" };
+const keyName = (k: string) => { const [note, mode] = k.split(" "); const alt = SHARP[note]; return alt ? `${k} (${alt.replace("#", "♯")} ${mode})` : k.replace("#", "♯"); };
+
 /** Vocal sync (Oct 30, redone after Ian's try: "unwarp it and find the original key and BPM, then sync it to the
     kick"): the vocal is read from its file as it was recorded, its original tempo and key shown, and Sync puts its
     beat 1 on the kick at the nearest bar and stretches it so its beats land on the kicks after (Live's own warping,
@@ -128,6 +132,8 @@ function VocalPanel({ narrow }: { narrow: boolean }) {
   const typed = Number(tempoText) >= 40 && Number(tempoText) <= 300 ? Number(tempoText) : null;
   const ours = v && v.tempo_source === "you" ? v.tempo : null;
   const fmt = (t: number) => (Number.isInteger(t) ? `${t}` : t.toFixed(1));
+  // Other tempos it could be, one tap each: Aria's next readings, and the song's own (for a vocal from this project)
+  const others = v ? [...v.readings.map((x) => x.bpm), v.song_tempo].filter((b, i, a) => Math.abs(b - v.tempo) > 0.4 && a.findIndex((c) => Math.abs(c - b) < 0.4) === i) : [];
   const kickNote = !g.kick ? "No kick picked: Live's grid" : v?.sync.kick_found ? `Beat 1 on the kick at bar ${v.sync.bar}${v.sync.kick_offset_ms ? `, ${Math.abs(v.sync.kick_offset_ms)} ms ${v.sync.kick_offset_ms > 0 ? "after" : "before"} Live's grid` : ""}`
     : v ? `No kick near bar ${v.sync.bar}: Live's grid` : "";
   return (
@@ -140,9 +146,19 @@ function VocalPanel({ narrow }: { narrow: boolean }) {
         <section className="cp-tile cp-card" style={{ gap: 12 }}>
           <div className="grid gap-0.5">
             <span className="cp-cap">Original</span>
-            <span className="text-[24px] font-medium">{fmt(v.tempo)} BPM{v.key ? ` · ${v.key}` : ""}</span>
+            <span className="text-[24px] font-medium">{fmt(v.tempo)} BPM</span>
+            {v.key && <span className="text-[16px] text-ink">{keyName(v.key)}</span>}
             <span className="cp-meta">tempo {v.tempo_source === "file name" ? "from the file name" : v.tempo_source === "you" ? "as you set it" : "measured"}{v.beats_tempo !== v.tempo ? `, counted as ${fmt(v.beats_tempo)}` : ""} · plays at {fmt(v.song_tempo)} once synced</span>
           </div>
+          {others.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[12.5px] text-ink-muted">Not it? Try</span>
+              {others.map((b) => (
+                <button key={b} className="cp-btn cp-btn-sm" disabled={busy} onClick={() => vocalAnalyze(b, v.beat_shift)}>
+                  {Math.abs(b - v.song_tempo) < 0.01 ? `your song's ${fmt(b)}` : fmt(b)}</button>
+              ))}
+            </div>
+          )}
           <VocalPicture v={v} />
           <span className="cp-meta">{kickNote}</span>
           <div className="flex flex-wrap items-center gap-2">
