@@ -709,13 +709,17 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
           <section className="cp-tile cp-card" style={{ gap: 12 }}>
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="text-[14px] font-medium text-ink" title="Each band's share of your mix, against EDM mixes people rated good. The grey bar is where 8 in 10 of them sit.">Against good mixes</span>
-              <span className="font-mono text-[11px] text-ink-faint">{r.typical.mixes} rated good by people · dB from their middle</span>
+              <span className="font-mono text-[11px] text-ink-faint">{r.typical.mixes} rated good by people{r.typical.curve ? "" : " · dB from their middle"}</span>
+              {r.typical.curve ? <div className="ml-auto min-w-0"><RefLegend name="Typical good mix" /></div> : (
               <span className="ml-auto inline-flex items-center gap-3 text-[12px] text-ink-muted">
                 <span className="inline-flex items-center gap-1.5"><span className="h-2 w-5 rounded-full" style={{ background: "var(--track)" }} />good mixes</span>
                 <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: YOURS }} />yours</span>
-              </span>
+              </span>)}
             </div>
-            <GoodMixRows rows={r.typical.bands} narrow={narrow} />
+            {r.typical.curve
+              ? <RefChart r={{ name: "Typical good mix", path: "", error: null, bands: [], curve: r.typical.curve }} range={r.typical.curve} height={narrow ? 340 : 220}
+                          zones={list.map((p, i) => zoneOf(p, i + 1))} onZone={(n) => setOpen(n - 1)} />
+              : <GoodMixRows rows={r.typical.bands} narrow={narrow} />}
           </section>
         </Rise>
       )}

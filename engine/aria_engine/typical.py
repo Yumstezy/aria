@@ -15,6 +15,7 @@ from scipy.signal import stft
 from aria_engine import clarity
 
 DATA = Path(__file__).resolve().parents[2] / "ml" / "data" / "features.csv"
+CURVES = Path(__file__).resolve().parents[2] / "ml" / "data" / "curves.csv"   # ml/curves.py: each rated mix's EQ curve
 # The same bands, names and edges as ml/detail.py BALANCE
 BANDS = [("sub", "Sub", 30, 60), ("low", "Bass", 60, 120), ("lowmid", "Low mids", 120, 400), ("mid", "Mids", 400, 1000),
          ("himid", "Upper mids", 1000, 2500), ("presence", "Presence", 2500, 5000), ("brilliance", "Highs", 5000, 10000),
@@ -44,6 +45,24 @@ def _load(path=DATA):
 GOOD = _load()
 
 
+def _load_curve(path=CURVES):
+    """The good-rated mixes' EQ curves (ml/curves.py), as the middle and the range 8 in 10 sit in at each twelfth
+    octave. None until the curves have been measured."""
+    try:
+        rows = [r for r in csv.DictReader(open(path)) if r.get("label") == "good"]
+    except OSError:
+        return None
+    cols = [c for c in (rows[0].keys() if rows else []) if c.startswith("hz_")]
+    if len(rows) < 10 or not cols:
+        return None
+    v = np.array([[float(r[c]) if r[c] else np.nan for c in cols] for r in rows])
+    lo, med, hi = np.nanpercentile(v, [LOW_PCT, 50, HIGH_PCT], axis=0)
+    return {"hz": [int(c[3:]) for c in cols], "good": med.round(1).tolist(), "lo": lo.round(1).tolist(), "hi": hi.round(1).tolist(), "mixes": len(rows)}
+
+
+GOOD_CURVE = _load_curve()
+
+
 def balance(audio, rate):
     """Each band's share of the 30 Hz to 16 kHz total, in dB, the way ml/detail.py measures it."""
     x = np.asarray(audio, dtype=np.float64)
@@ -63,8 +82,21 @@ def balance(audio, rate):
     return out
 
 
-def compare(audio, rate, bars=None, good=None):
-    """The checked bars against the good-rated mixes. Returns {mixes, bands, findings, error}."""
+def _curve(audio, rate, good_curve):
+    """Your EQ curve next to the good mixes' (for the picture), measured as ml/curves.py measures them."""
+    from aria_engine import reference
+    spec = reference._spectrum(np.asarray(audio, dtype=np.float64), rate)
+    if spec is None or not good_curve:
+        return None
+    mine = reference._levels(spec, np.array(good_curve["hz"], dtype=float), 12, rate)
+    keep = [i for i, m in enumerate(mine) if np.isfinite(m) and np.isfinite(good_curve["good"][i])]
+    return {"hz": [good_curve["hz"][i] for i in keep], "mine": [round(float(mine[i]), 1) for i in keep],
+            "ref": [good_curve["good"][i] for i in keep], "lo": [good_curve["lo"][i] for i in keep], "hi": [good_curve["hi"][i] for i in keep],
+            "mixes": good_curve["mixes"]}
+
+
+def compare(audio, rate, bars=None, good=None, good_curve=None):
+    """The checked bars against the good-rated mixes. Returns {mixes, bands, findings, curve, error}."""
     good = good or GOOD
     if not good:
         return {"mixes": 0, "bands": [], "findings": [], "error": "The rated mixes' data isn't on this Mac."}
@@ -84,4 +116,5 @@ def compare(audio, rate, bars=None, good=None):
                 f["bars"] = bars
             findings.append(f)
     findings.sort(key=lambda f: (f["outside_db"] < 0, -abs(f["outside_db"])))   # louder than good mixes first
-    return {"mixes": good["mixes"], "bands": bands, "findings": findings[:MAX_FINDINGS], "error": None}
+    return {"mixes": good["mixes"], "bands": bands, "findings": findings[:MAX_FINDINGS], "error": None,
+            "curve": _curve(audio, rate, good_curve or GOOD_CURVE)}

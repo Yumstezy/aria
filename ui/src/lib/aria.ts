@@ -50,7 +50,9 @@ export interface Result {
   recording: { path: string; start_beat: number | null; tempo: number | null; bars: number | null };
   reference?: RefCompare | null;
   /** Without a reference song: each band against the good-rated mixes (ml/data), where 8 in 10 of them sit */
-  typical?: { mixes: number; error: string | null; bands: { name: string; lo: number; hi: number; value_db: number; median_db: number; range_db: [number, number]; outside: boolean }[] } | null;
+  typical?: { mixes: number; error: string | null; bands: { name: string; lo: number; hi: number; value_db: number; median_db: number; range_db: [number, number]; outside: boolean }[];
+    /** Once ml/curves.py has measured the rated mixes: your EQ curve, the good mixes' middle (ref) and their range */
+    curve?: { hz: number[]; mine: number[]; ref: number[]; lo: number[]; hi: number[]; mixes: number } | null } | null;
   measured: {
     integrated_lufs: number | null; true_peak_dbtp: number | null;
     bands_db: Record<string, number | null>; width: Record<string, number | null>;
