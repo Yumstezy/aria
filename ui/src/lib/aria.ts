@@ -42,6 +42,8 @@ export interface Result {
   advice: { summary: string; notes: Note[] } | null;
   advice_error: string | null;
   start_bar?: number;
+  /** Only when the check ran past the song's last bar: the bars after it were silence */
+  song_end_bar?: number;
   chain?: { on_main: boolean; track: string; after: string[] };
 }
 export interface Progress { step: string; text: string; detail?: string; done?: number; total?: number }

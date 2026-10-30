@@ -14,11 +14,19 @@ Test files from the debug, not committed, still to delete (Ian to OK): `device/A
 
 **Done after that (Oct 29, evening): no more words where a picture works.** Home lost the Get started card and the tool tiles; before a check it shows the six kinds of problem as icons and Check mix, after one the count, the problem icons and the real spectrum. Name my tracks is one switch with an ear. The empty Mix check has no sentences. PNGs of every screen (from Ian's real 20:10 check, his Ask Muse history) are in `~/Desktop/Aria screens Oct 29/` for the group. Manual check for Ian: Open window in Live, look at Home before and after a check.
 
+**Roadmap decision (Ian, Oct 29 night):** skip "Prove the fix" and the test-mix checkpoint (Step 7) for now; they come back once there's a reference or the model to test against. Order: the small fixes (done, below), the Ember polish, then Step 8 (Reference track).
+
+**Small fixes done (Oct 29 night), to check in Live** (remove and re-add Aria on Main so live.js reloads):
+- No Ear on a muted track or one with no clips: mute a key track (say Bass), turn Name my tracks on. It shouldn't get an Ear.
+- Past the end of the song: put the playhead 8 bars before the last clip ends and press Check. The window says "Your song ends at bar N, so the last 8 bars were silence." With the playhead after the last clip, Check refuses and says to move into the song.
+- Undo with nothing left: press Undo twice after one change. The second press shows a passing note in the header, not a line in the chat.
+- Check mix advice has no em or en dashes (a dash between numbers becomes "to"). Ask Muse replies already had this.
+- The bird is on the device on Main, between the light and "Aria".
+
 **Then continue the polish (Ian, Oct 29: "lets move on to other features ui/ux and polishing everything else up"):**
 - The Ember look is in for Mix check, Simple (commit 89558f3, `DESIGN.md` "Ember direction"). Ian hasn't seen it in Live yet because of the blocker; he liked the mockup and said "the glow may be too much", so it has no glow.
 - Next screens in the Ember style: Home, Ask Muse, Detailed, the empty state before a first check, the compact view.
-- Small known fixes: don't put an Ear on a silent track (Ian's "vOCAL"); the bird on the Lamp device; say plainly when a check ran past the end of the song.
-- Then "Prove the fix" (re-check the same bars after Fix it, loudness-matched before and after), then the demo script.
+- "Prove the fix" is parked (Ian, Oct 29). After the Ember polish: Step 8, Reference track.
 - Checkpoint (Step 7) is parked until the model: 1 of 3, see below.
 
 ## Where we are (Oct 29, evening)

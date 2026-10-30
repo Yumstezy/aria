@@ -127,7 +127,7 @@ export function Waves({ spectra, findings, split, onZone, bare }: {
       <div className="flex" aria-label="Frequency ranges">
         {BANDS.map((b, i) => {
           const lo = Math.max(LO, b.lo), hi = Math.min(HI, b.hi);
-          const range = i === BANDS.length - 1 ? `${hzShort(b.lo)}+` : `${hzShort(b.lo)}–${hzShort(b.hi)}`;
+          const range = i === BANDS.length - 1 ? `${hzShort(b.lo)}+` : `${hzShort(b.lo)} to ${hzShort(b.hi)}`;
           return (
             <div key={b.name} className="flex min-w-0 flex-col items-center gap-0.5 overflow-hidden whitespace-nowrap py-1 text-center" title={`${b.name}: ${range} Hz`}
                  style={{ width: `${((X(hi) - X(lo)) / W) * 100}%`, borderLeft: i ? "1px solid var(--hairline)" : undefined }}>

@@ -127,6 +127,12 @@ def _valid_fix(fix, finding):
     return {"type": "eq_band", "freq_hz": round(freq), "gain_db": round(gain, 1), "q": round(q, 1)}
 
 
+def _plain(text):
+    """No em or en dashes in anything the producer reads: between numbers it's "to", elsewhere a comma."""
+    text = re.sub(r"(\d)\s*[\u2013\u2014]\s*(\d)", r"\1 to \2", text)
+    return re.sub(r"\s*[\u2013\u2014]\s*", ", ", text).strip()
+
+
 def validate(raw, measured, context, findings, has_reference=False):
     """Return (advice, error). Drops any note that cites a number we didn't measure,
     judges without a reference, or points at a finding that doesn't exist."""
@@ -158,12 +164,12 @@ def validate(raw, measured, context, findings, has_reference=False):
             continue
         short = n.get("short")
         short = short.strip() if isinstance(short, str) and len(short.split()) <= SHORT_WORDS and ok(short) else None
-        notes.append({"finding": i, "kind": n["kind"], "short": short, "text": n["text"].strip(), "fix": fix})
+        notes.append({"finding": i, "kind": n["kind"], "short": short and _plain(short), "text": _plain(n["text"]), "fix": fix})
 
     fix_numbers = {round(abs(v), 2) for n in notes for v in (n["fix"] or {}).values() if isinstance(v, (int, float))}
     if not ok(data["summary"], fix_numbers | {-x for x in fix_numbers}):
         return None, "Muse Spark's summary used a number or a comparison we didn't measure."
-    return {"summary": data["summary"].strip(), "notes": notes}, None
+    return {"summary": _plain(data["summary"]), "notes": notes}, None
 
 
 def advise(measured, context, findings=None, client=None):

@@ -120,3 +120,13 @@ def test_short_line_is_kept_when_short_and_dropped_when_long():
                                   {"finding": 1, "kind": "harsh", "short": long, "text": "Hits poke out.", "fix": None}]})
     assert advice["notes"][0]["short"] == "A ringing note in the low mids"
     assert advice["notes"][1]["short"] is None
+
+
+def test_dashes_are_taken_out_of_what_the_producer_reads():
+    advice, error = advise({"summary": "A note rings — cut it first.",
+                            "notes": [{"finding": 0, "kind": "resonance", "short": "Ringing – low mids",
+                                       "text": "It sits at 329–349 Hz — a narrow cut helps.", "fix": None}]})
+    assert error is None
+    assert advice["summary"] == "A note rings, cut it first."
+    assert advice["notes"][0]["short"] == "Ringing, low mids"
+    assert advice["notes"][0]["text"] == "It sits at 329 to 349 Hz, a narrow cut helps."

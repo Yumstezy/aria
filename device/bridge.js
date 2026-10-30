@@ -228,7 +228,12 @@ function remote(cmd) {
 const ROLES = [["kick", /kick/i], ["bass", /bass|\bsub\b|808/i], ["vocal", /vocal|vox|voice/i],
                ["lead", /lead|synth|pluck|arp/i], ["pad", /pad|chord|keys/i], ["drums", /drum|perc|snare|clap|hat/i]];
 
-function pickKeyTracks(tracks) {
+// A muted track, or one with no clips, would only give its Ear silence (Ian's empty "vOCAL", Oct 29). Groups hold
+// no clips themselves, so they always count. clips is missing from an older live.js: count those as playing.
+const mightPlay = (t) => !t.muted && (t.group || t.clips === undefined || t.clips > 0);
+
+function pickKeyTracks(allTracks) {
+  const tracks = allTracks.filter(mightPlay);
   const roles = (t) => ROLES.filter(([, re]) => re.test(t.name)).map(([r]) => r);
   const single = new Set(tracks.filter((t) => roles(t).length === 1).flatMap(roles));
   const picked = [];
@@ -377,6 +382,11 @@ async function checkMix() {
     Max.post(`check_mix: tempo ${live.tempo}, beat ${live.song_beat}, chain ${JSON.stringify(live.chain)}`);
     const ms = Math.round(BARS * live.beats_per_bar * 60000 / live.tempo);
     const startBar = Math.floor(live.song_beat / live.beats_per_bar) + 1;
+    // The song's last bar (the one the last note or audio ends in), when Live says. Past it is only silence.
+    const songEndBar = live.song_end > 0 ? Math.ceil(live.song_end / live.beats_per_bar) : null;
+    if (songEndBar && startBar > songEndBar) {
+      throw new UserError(`The playhead is past the end of your song (bar ${songEndBar}). Move it into the song and check again.`);
+    }
     fs.mkdirSync(REC_DIR, { recursive: true });
     const file = path.join(REC_DIR, `mix-${Date.now()}.aif`);
 
@@ -420,7 +430,8 @@ async function checkMix() {
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
     }
-    lastResult = { ...res.json, start_bar: startBar, chain: live.chain };
+    lastResult = { ...res.json, start_bar: startBar, chain: live.chain,
+                   ...(songEndBar && startBar + BARS - 1 > songEndBar ? { song_end_bar: songEndBar } : {}) };
     toUI("mix_result", lastResult);
     pushSession();
   } catch (e) {
@@ -821,6 +832,8 @@ Max.addHandler("undo", () => serial(async () => {
   let out;
   try { out = await askLive("undo", "undo_done"); } catch (e) { out = { ok: false, text: e.message }; }
   const top = changeStack[changeStack.length - 1];
+  // Nothing of Aria's left to undo: a passing note in the header, not a line in the chat each press
+  if (!out.ok && !top) { toUI("notice", { text: out.text }); sendUndoNext(); return; }
   if (out.ok) undoneTop();
   // The note goes on the exchange whose change was undone
   const i = top ? askLog.findIndex((x) => x.at === top.at) : -1;

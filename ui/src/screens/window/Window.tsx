@@ -48,6 +48,10 @@ export function AriaWindow() {
   // The one setup step that can go wrong after install: Aria hears only what comes before it on Main
   const chain = session?.chain;
   const placeWarning = chain && !chain.on_main ? "Put Aria on Main" : chain?.after.length ? "Move Aria last on Main" : null;
+  // The check ran off the end of the song: say so, so the empty last bars aren't a mystery
+  const silentBars = result?.song_end_bar && result.start_bar ? result.start_bar + (result.recording.bars || 16) - 1 - result.song_end_bar : 0;
+  const pastEnd = view === "mixcheck" && silentBars > 0
+    ? `Your song ends at bar ${result!.song_end_bar}, so ${silentBars === 1 ? "the last bar was" : `the last ${silentBars} bars were`} silence.` : null;
 
   return (
     <div className={cn("cp-stage", narrow && "is-flush")} style={narrow ? undefined : { height: "100vh", minHeight: 0 }}>
@@ -85,10 +89,11 @@ export function AriaWindow() {
               </div>
             )}
           </header>
-          {(status || engine.state !== "up" || placeWarning) && (
+          {(status || engine.state !== "up" || placeWarning || pastEnd) && (
             <div className="cp-row flex-wrap" role="status">
               {engine.state !== "up" && <span className={cn("cp-tag", engine.state === "starting" ? "cp-tag-idle" : "cp-tag-hot")}>{engine.state === "starting" ? "Starting Aria" : "Engine not running"}</span>}
               {placeWarning && <span className="cp-tag cp-tag-hot" title="Aria only hears what comes before it on the Main track.">{placeWarning}</span>}
+              {pastEnd && <span className="cp-meta">{pastEnd}</span>}
               {status && <span className="cp-meta" style={error ? { color: "var(--hot)" } : undefined}>{status}</span>}
             </div>
           )}

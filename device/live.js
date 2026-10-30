@@ -82,6 +82,7 @@ function state() {
     beats_per_bar: beatsPerBar(),
     playing: one(song, "is_playing") === 1,
     song_beat: one(song, "current_song_time"),
+    song_end: one(song, "last_event_time"),   // where the last note or audio in the Arrangement ends, in beats
     chain: chain(),
     markers: markerList(),
     tracks: trackList()
@@ -91,9 +92,17 @@ function state() {
 function trackList() {
   return ids(song.get("tracks")).map(function (id, i) {
     const t = new LiveAPI("id " + id);
-    return { name: String(one(t, "name")), index: i, group: one(t, "is_foldable") === 1,
+    return { name: String(one(t, "name")), index: i, group: one(t, "is_foldable") === 1, muted: one(t, "mute") === 1, clips: clipCount(t),
              devices: ids(t.get("devices")).map(function (d) { return String(one(new LiveAPI("id " + d), "name")); }) };
   });
+}
+
+// Clips on a track, Arrangement first; Session only when Arrangement has none (so a long set stays quick).
+// An Ear on a track with no clips would only record silence.
+function clipCount(t) {
+  const arr = ids(t.get("arrangement_clips")).length;
+  if (arr) return arr;
+  return ids(t.get("clip_slots")).filter(function (id) { return one(new LiveAPI("id " + id), "has_clip") === 1; }).length;
 }
 
 // Third-party plugins on a track, with the knob names Live shows for them (Muse sets knobs by these)

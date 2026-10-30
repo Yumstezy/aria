@@ -1,6 +1,7 @@
-// The device on Main (Ian picked "Lamp", Oct 28): a status light with one word, Check and Ask side by side,
+// The device on Main (Ian picked "Lamp", Oct 28): a status light, the bird, and one word, Check and Ask side by side,
 // Open window below. Flat greys and amber like a stock Live device; the pop-out window keeps Aria's own look.
 // 150 x 169. The bottom row is Live's own "Ask key" control (device/tools/make_aria_amxd.py), for a mapped key.
+import { Mark } from "@/components/brand";
 import { checkMix, openChat, openWindow, useAriaSel } from "@/lib/aria";
 import { problemsOf } from "@/lib/problems";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,8 @@ export function Strip() {
     <div className="aria-strip flex flex-col" style={{ width: 150, height: 169, padding: 9, gap: 7, boxSizing: "border-box" }}>
       <div className="flex items-center gap-1.5" style={{ height: 16 }} title={why}>
         <span className={cn("aria-lamp", lamp)} />
-        <b className="text-[11px]">Aria</b>
+        <Mark size={13} />
+        <b className="-ml-0.5 text-[11px]">Aria</b>
         <span className="ml-auto truncate text-[9.5px] font-semibold" style={{ color: lamp === "is-busy" ? "var(--live-amber)" : lamp === "is-hot" ? "var(--live-lamp-hot)" : "var(--live-dim)" }}>{word}</span>
       </div>
       <div className="flex" style={{ gap: 5 }}>
