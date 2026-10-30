@@ -12,7 +12,7 @@ import re
 
 from openai import OpenAI, OpenAIError
 
-KINDS = {"resonance", "buildup", "harsh", "masking", "bass_click", "clash"}
+KINDS = {"resonance", "buildup", "harsh", "masking", "bass_click", "clash", "reference"}
 TIMEOUT_SEC = 20
 SHORT_WORDS = 12          # the one-line version shown before the full note
 MAX_TOKENS = 1500
@@ -22,6 +22,10 @@ Q_RANGE = (0.3, 12.0)
 
 # Without a reference there is nothing to compare against, so these verdicts are off limits.
 COMPARISON = re.compile(r"\btoo (bright|dark|dull|quiet|loud|wide|narrow|thin|muddy|harsh|boomy|light|heavy)\b", re.I)
+# With a reference the comparison is the point: the no-verdicts rule becomes "compare with that song, by name".
+NO_REFERENCE_RULE = """- There is no reference track. Never say "too bright", "too muddy" or similar. Say what sticks out and by how much."""
+REFERENCE_RULE = """- The producer picked a reference song. Compare with it by name, in plain words first: "Your low mids are fuller than
+  <name>", then "+4.3 dB from 400 to 630 Hz" as the detail. Only for differences in the JSON."""
 # Numbers the advice may cite besides measured values: 0 dBTP, band edges in Hz and kHz.
 CONSTANTS = {0.0, 250.0, 2.0, 2000.0}
 
@@ -44,9 +48,15 @@ You get JSON:
     at the same moments, within "diff_db" of each other, so neither stands clear, for "share" of the time both play
     there. "louder" is the one slightly on top. Fix in words: cut one of the two in that range (usually the one that
     matters less there), sidechain one to the other, or move one in the stereo field. "fix" is null.
+  - "reference" (only when the producer picked a reference song): against that song, loudness matched, the range
+    "hz_range" around "hz" is "diff_db" louder (positive) or quieter (negative). "shape" "stretch" means it stands
+    "stands_out_db" apart from the frequencies around it, like a boosted instrument; "band" means the whole named
+    "band" is off. Fix when positive: an EQ cut inside the range ("fix" as for resonance, gain no deeper than diff_db).
+    When negative: bring that range up on the part that should carry it, in words, "fix" null.
   In key tracks mode, "masked" and "by" are the producer's track names, not split sounds. Use them as they are.
   "bars" is [first, last]. "share" and "clicky_share" are fractions (0.97 means 97 percent).
 - "measured": loudness and band levels, for background.
+- "reference": null, or the song the producer compares with: its "name" and each band's "diff_db" against it.
 
 Rules:
 - Use only numbers from the JSON. Never invent a number.
@@ -65,7 +75,7 @@ Rules:
 
 Answer with JSON only:
 {"summary": "one sentence, the most useful thing to know",
- "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click|clash", "short": "at most 10 words", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
+ "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click|clash|reference, copied from the finding", "short": "at most 10 words", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
 
 
 def _numbers(text):
@@ -110,12 +120,13 @@ def _in_measured_range(n, findings):
 
 # An EQ cut on the master only helps a problem that lives in the master itself. A buried
 # vocal or a clicking bass in split mode isn't fixable by cutting the whole mix.
-EQ_FIXABLE = {"resonance", "harsh", "buildup"}
+EQ_FIXABLE = {"resonance", "harsh", "buildup"}   # and "reference" when it's louder than the reference (a cut helps)
 
 
 def _valid_fix(fix, finding):
     """An eq_band cut inside the finding's frequency range and the action menu's limits."""
-    if not isinstance(fix, dict) or fix.get("type") != "eq_band" or finding.get("kind") not in EQ_FIXABLE:
+    cuttable = finding.get("kind") in EQ_FIXABLE or (finding.get("kind") == "reference" and finding.get("diff_db", 0) > 0)
+    if not isinstance(fix, dict) or fix.get("type") != "eq_band" or not cuttable:
         return None
     try:
         freq, gain, q = float(fix["freq_hz"]), float(fix["gain_db"]), float(fix["q"])
@@ -172,8 +183,9 @@ def validate(raw, measured, context, findings, has_reference=False):
     return {"summary": _plain(data["summary"]), "notes": notes}, None
 
 
-def advise(measured, context, findings=None, client=None):
-    """Ask Muse Spark for clarity advice on measured findings. Returns (advice, error)."""
+def advise(measured, context, findings=None, client=None, reference=None):
+    """Ask Muse Spark for clarity advice on measured findings. Returns (advice, error).
+    reference: {"name", "bands"} when the producer picked a reference song (build step 8)."""
     findings = findings or []
     key = os.environ.get("MODEL_API_KEY", "").strip()
     if client is None and not key:
@@ -183,14 +195,14 @@ def advise(measured, context, findings=None, client=None):
         client = OpenAI(api_key=key, base_url=os.environ.get("MUSE_BASE_URL", "https://api.meta.ai/v1"),
                         timeout=TIMEOUT_SEC, max_retries=1)
     model = os.environ.get("MUSE_MODEL", "muse-spark-1.3")
-    payload = {**context, "reference": None, "findings": findings,
+    payload = {**context, "reference": reference, "findings": findings,
                "measured": {k: v for k, v in measured.items() if k != "unmeasured"}}
 
     try:
         res = client.chat.completions.create(
             model=model, max_tokens=MAX_TOKENS, reasoning_effort="minimal",
             response_format={"type": "json_object"},
-            messages=[{"role": "system", "content": PROMPT},
+            messages=[{"role": "system", "content": PROMPT.replace(NO_REFERENCE_RULE, REFERENCE_RULE) if reference else PROMPT},
                       {"role": "user", "content": json.dumps(payload)}])
     except OpenAIError as e:
         return None, f"Muse Spark is unavailable right now ({type(e).__name__})."
@@ -198,4 +210,6 @@ def advise(measured, context, findings=None, client=None):
     raw = res.choices[0].message.content if res.choices else None
     if not raw:
         return None, "Muse Spark returned an empty reply."
+    if reference:   # its band differences are measured numbers the advice may cite
+        return validate(raw, measured, {**context, "reference_bands": [b["diff_db"] for b in reference["bands"]]}, findings, has_reference=True)
     return validate(raw, measured, context, findings)

@@ -130,3 +130,26 @@ def test_dashes_are_taken_out_of_what_the_producer_reads():
     assert advice["summary"] == "A note rings, cut it first."
     assert advice["notes"][0]["short"] == "Ringing, low mids"
     assert advice["notes"][0]["text"] == "It sits at 329 to 349 Hz, a narrow cut helps."
+
+
+REF_FINDING = {"kind": "reference", "shape": "stretch", "hz": 500, "hz_range": [355, 707], "diff_db": 4.3, "stands_out_db": 3.2, "bars": [49, 64]}
+
+
+def test_with_a_reference_muse_compares_and_may_cut_the_stretch():
+    advice, error = muse.advise(MEASURED, CONTEXT, findings=[REF_FINDING], client=reply({
+        "summary": "Your low mids are fuller than control.wav, +4.3 dB around 500 Hz.",
+        "notes": [{"finding": 0, "kind": "reference", "text": "This range is 4.3 dB above the reference. Try a 3 dB cut.",
+                   "fix": {"type": "eq_band", "freq_hz": 500, "gain_db": -3, "q": 1.4}}]}),
+        reference={"name": "control.wav", "bands": [{"name": "Mids", "lo": 400, "hi": 1000, "diff_db": 2.7}]})
+    assert error is None
+    assert advice["notes"][0]["fix"] == {"type": "eq_band", "freq_hz": 500, "gain_db": -3.0, "q": 1.4}
+
+
+def test_a_quieter_than_reference_stretch_gets_no_cut():
+    quiet = {**REF_FINDING, "diff_db": -3.5}
+    advice, _ = muse.advise(MEASURED, CONTEXT, findings=[quiet], client=reply({
+        "summary": "Around 500 Hz is 3.5 dB under the reference.",
+        "notes": [{"finding": 0, "kind": "reference", "text": "Bring that range up on the synths, 3.5 dB under.",
+                   "fix": {"type": "eq_band", "freq_hz": 500, "gain_db": -3, "q": 1.4}}]}),
+        reference={"name": "control.wav", "bands": []})
+    assert advice["notes"][0]["fix"] is None

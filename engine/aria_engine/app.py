@@ -11,7 +11,7 @@ import numpy as np
 from pydantic import BaseModel
 import soundfile as sf
 
-from aria_engine import __version__, analysis, ask, clarity, muse, split, stems, voice
+from aria_engine import __version__, analysis, ask, clarity, muse, reference, split, stems, voice
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 # When the code this engine runs was last changed. The bridge compares it with the files on disk
@@ -156,12 +156,39 @@ def find_tracks(paths, rate, audio, timing):
     return master
 
 
+@app.post("/reference")
+async def reference_keep(request: Request, name: str = "reference.wav"):
+    """A reference song dropped on the window (build step 8): the raw file in the body. Kept on this Mac
+    under ~/Library/Application Support/Aria/references, so later checks can name it by path."""
+    raw = await request.body()
+    if not raw or len(raw) > MAX_FILE_BYTES:
+        raise HTTPException(400, "Send the song as the request body.")
+    try:
+        path, seconds = reference.keep(raw, name)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"path": str(path), "name": Path(name).name, "seconds": seconds}
+
+
+def compare_with(ref_path, audio, rate, bars):
+    """The reference block of a result, and its findings for the problem list."""
+    path = Path(ref_path).expanduser()
+    if not path.is_file():
+        raise HTTPException(400, f"The reference song isn't at {path} any more. Drop it on the window again.")
+    try:
+        ref_audio, ref_rate = reference.read(path)
+    except (RuntimeError, sf.LibsndfileError) as e:
+        raise HTTPException(400, f"Can't read the reference {path.name}: {e}")
+    out = reference.compare(audio, rate, ref_audio, ref_rate)
+    for f in out["findings"]:
+        if bars:
+            f["bars"] = bars
+    return {"name": path.name, "path": str(path), **out}
+
+
 @app.post("/mix/analyze")
 def mix_analyze(req: MixRequest):
     path = _audio_file(req.mix_path)
-    if req.reference_path:
-        # Reference comparison arrives in build step 4. Say so instead of ignoring it.
-        raise HTTPException(501, "Comparing with a reference isn't built yet.")
 
     try:
         audio, rate = sf.read(str(path), always_2d=True, dtype="float64")
@@ -174,15 +201,23 @@ def mix_analyze(req: MixRequest):
     else:
         found = find_clarity(audio, rate, req.tempo, req.start_beat, req.beats_per_bar or 4.0)
 
+    # With a reference, what stands out against it leads the list: the producer asked for that comparison
+    ref = compare_with(req.reference_path, audio, rate, found.get("bars")) if req.reference_path else None
+    if ref and ref["findings"]:
+        found["findings"] = (ref["findings"] + found["findings"])[:SPLIT_TOP_N + 1]
+
     context = {k: v for k, v in {"bars": req.bars, "tempo": req.tempo}.items() if v is not None}
     if "all" in measured["unmeasured"]:
         advice, advice_error = None, "Nothing to advise on: " + measured["unmeasured"]["all"]
+    elif ref:
+        advice, advice_error = muse.advise(measured, context, findings=found["findings"],
+                                           reference={"name": ref["name"], "bands": ref["bands"]})
     else:
         advice, advice_error = muse.advise(measured, context, findings=found["findings"])
 
     return {
         "recording": {"path": str(path), "start_beat": req.start_beat, "tempo": req.tempo, "bars": req.bars},
-        "reference": None,
+        "reference": ref and {k: ref[k] for k in ("name", "path", "bands", "curve", "error")},
         "measured": measured,
         "clarity": found,
         "advice": advice,

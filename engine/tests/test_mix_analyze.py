@@ -54,10 +54,18 @@ def test_non_audio_path_is_refused():
     assert res.status_code == 400
 
 
-def test_reference_is_not_silently_ignored(tmp_path):
+def test_a_reference_is_compared_not_ignored(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODEL_API_KEY", "")
     path = write(tmp_path / "mix.wav", sine(1000, 0.5), sine(1000, 0.5))
-    res = client.post("/mix/analyze", json={"mix_path": path, "reference_path": path})
-    assert res.status_code == 501
+    body = client.post("/mix/analyze", json={"mix_path": path, "reference_path": path}).json()
+    assert body["reference"]["name"] == "mix.wav"
+    assert all(abs(b["diff_db"]) < 0.1 for b in body["reference"]["bands"] if b["diff_db"] is not None)
+
+
+def test_a_missing_reference_is_a_clear_400(tmp_path):
+    path = write(tmp_path / "mix.wav", sine(1000, 0.5), sine(1000, 0.5))
+    res = client.post("/mix/analyze", json={"mix_path": path, "reference_path": "/nope/ref.mp3"})
+    assert res.status_code == 400 and "reference" in res.json()["detail"].lower()
 
 
 def test_split_mode_puts_stem_findings_first(tmp_path, monkeypatch):

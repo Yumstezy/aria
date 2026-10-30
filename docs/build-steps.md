@@ -142,14 +142,15 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
 
 Pass: 3 of 3 test mixes pass, Step 6 passes, and the decision is written in `docs/status.md`.
 
-## Step 8. Reference and sections (Nov 1)
+## Step 8. Reference compare (re-scoped by Ian, Oct 29)
 
-- Optional comparison with a reference track. The engine finds sections in both: beat grid with librosa, boundaries snapped to 4 bar phrases, and chroma repetition so a louder repeat of the intro stays "intro".
-- The Reference screen shows both lanes. Sections are editable: rename, move an edge by 1 or 4 bars, merge, split, reset, or use Live markers instead.
-- "Add markers to Live" writes named cue points at each section start.
-- Every Mix check chart reads the edited sections.
+Compare first (Ian, Oct 29: "we can test using a reference"). Sections in both songs, editable lanes and "Add markers to Live" come after, if there's time.
 
-Pass: on the reference, the markers appear in Live with the right names and bars, and editing a section changes the Mix check comparison.
+- The producer drops a song on the Aria window (Ian picked this over a track named Reference). The page sends the file to the engine, which keeps it on this Mac.
+- Every Mix check after that compares the 16 bars with the reference, loudness matched: each of the seven bands against it, and anything that stands out (a boosted instrument, a whole band off) as a problem with Fix it.
+- Muse compares with the song by name: "Your mids are fuller than <song>", then the numbers.
+
+Pass: with `test-pack/mixes/control.wav` as the reference, the planted boosts in A (around 200 Hz), B (around 3.2 kHz) and C (350 to 710 Hz) each come out as "more than the reference" with a cut inside the range, and control against itself finds nothing (`engine/tests/test_reference.py`). In Live: dropping a song on the window sets the reference, and the next Check mix shows the comparison and Muse's words about it, three times in a row.
 
 ## Step 9. Groove match (Nov 2, freeze at end of day)
 

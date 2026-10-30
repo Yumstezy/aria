@@ -75,6 +75,7 @@ engine/ (Python, FastAPI)
 ```
 
 - Send file paths, not audio. The engine is local, so the device writes a wav and sends its path.
+  - Two exceptions, both from the page straight to the engine: the Ask Muse mic (a short WAV), and a reference song dropped on the window (Ian, Oct 29), which the engine keeps under `~/Library/Application Support/Aria/references/`. Live's web view can't see a dropped file's path.
 - Only Mix check records the master. Groove match and Reference breakdown read the clips' own files through `Clip.file_path`.
 - Store the song position when recording starts, so every finding maps back to a bar.
 - Muse Spark never edits anything directly. It returns actions from a fixed menu (see contracts). The device checks each action, applies it, and keeps an undo.
