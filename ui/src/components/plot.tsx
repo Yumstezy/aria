@@ -58,28 +58,45 @@ export function Plot({ height, dbTicks, pins = [], onPin, children }: {
   placed.forEach((p, i) => { p.x = Math.max(p.x, 14, i ? placed[i - 1].x + 22 : 0); });
   for (let i = placed.length - 1; i >= 0; i--) placed[i].x = Math.min(placed[i].x, width - 14 - (placed.length - 1 - i) * 22);
   const shade = pins.find((p) => p.n === hot);
+  // Strips that overlap go on their own lines (greedy, left to right), so a wide problem can't swallow the others
+  const lanes: number[] = [], laneOf: Record<number, number> = {};
+  [...pins].sort((a, b) => a.lo - b.lo).forEach((p) => {
+    let k = lanes.findIndex((end) => end <= frac(p.lo) - 0.004);
+    if (k < 0) { k = lanes.length; lanes.push(0); }
+    lanes[k] = frac(p.hi); laneOf[p.n] = k;
+  });
+  // The numbers and strips sit in their own row above the drawing, so they never touch the curves at any width
+  const head = pins.length ? 28 + lanes.length * 5 : 0;
   return (
     <div ref={box} className="relative overflow-hidden rounded-[12px]" style={{ background: "color-mix(in srgb, var(--ground) 55%, transparent)", border: "1px solid var(--hairline)" }}>
-      {children}
-      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-        {shade && <div className="absolute inset-y-0" style={{ left: at(shade.lo), width: `${(frac(shade.hi) - frac(shade.lo)) * 100}%`, background: "color-mix(in srgb, var(--hot) 10%, transparent)" }} />}
-        {pins.map((p) => <div key={p.n} className="absolute h-[3px] rounded-full" style={{ top: 28, left: at(p.lo), width: `max(5px, ${(frac(p.hi) - frac(p.lo)) * 100}%)`, background: "var(--hot)", opacity: hot === null || hot === p.n ? 0.85 : 0.35 }} />)}
-        {/* the tilt, in the top corner when there's room and no problem number there */}
-        {width >= 420 && !placed.some((p) => p.x < 100) &&
-          <span className="absolute left-2 top-1.5 font-mono text-[10px] leading-3 text-ink-faint" title="Drawn tipped up 4.5 dB per octave, like Pro-Q. The numbers stay as measured.">+{TILT_DB_PER_OCT} dB/oct</span>}
-        {LABELS.map((f) => (
-          <span key={f} className="absolute bottom-1 -translate-x-1/2 font-mono text-[10px] leading-3 text-ink-faint" style={{ left: at(f) }}>{hzLabel(f)}</span>
-        ))}
-        {dbTicks.map((t, i) => (
-          <span key={i} className="absolute right-1 -translate-y-1/2 rounded px-0.5 font-mono text-[10px] leading-3 text-ink-faint"
-                style={{ top: `${(t.y / height) * 100}%`, background: "color-mix(in srgb, var(--ground) 75%, transparent)" }}>{t.label}</span>
-        ))}
+      {pins.length > 0 && (
+        <div className="relative" style={{ height: head }}>
+          {pins.map((p) => (
+            <div key={p.n} className="absolute h-[3px] rounded-full" style={{ top: 26 + laneOf[p.n] * 5, left: at(p.lo), width: `max(5px, ${(frac(p.hi) - frac(p.lo)) * 100}%)`,
+                 background: "var(--hot)", opacity: hot === null || hot === p.n ? 0.85 : 0.3 }} />
+          ))}
+          {placed.map((p) => (
+            <button key={p.n} className="ae-pin absolute top-1 -translate-x-1/2" title={p.title} onClick={() => onPin?.(p.n)}
+                    onPointerEnter={() => setHot(p.n)} onPointerLeave={() => setHot(null)}
+                    style={{ left: p.x, width: 18, height: 18, fontSize: 10 }}>{p.n}</button>
+          ))}
+        </div>
+      )}
+      <div className="relative">
+        {children}
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          {shade && <div className="absolute inset-y-0" style={{ left: at(shade.lo), width: `${(frac(shade.hi) - frac(shade.lo)) * 100}%`, background: "color-mix(in srgb, var(--hot) 10%, transparent)" }} />}
+          {/* the tilt, in the top corner when there's room */}
+          {width >= 420 && <span className="absolute left-2 top-1.5 font-mono text-[10px] leading-3 text-ink-faint" title="Drawn tipped up 4.5 dB per octave, like Pro-Q. The numbers stay as measured.">+{TILT_DB_PER_OCT} dB/oct</span>}
+          {LABELS.map((f) => (
+            <span key={f} className="absolute bottom-1 -translate-x-1/2 font-mono text-[10px] leading-3 text-ink-faint" style={{ left: at(f) }}>{hzLabel(f)}</span>
+          ))}
+          {dbTicks.map((t, i) => (
+            <span key={i} className="absolute right-1 -translate-y-1/2 rounded px-0.5 font-mono text-[10px] leading-3 text-ink-faint"
+                  style={{ top: `${(t.y / height) * 100}%`, background: "color-mix(in srgb, var(--ground) 75%, transparent)" }}>{t.label}</span>
+          ))}
+        </div>
       </div>
-      {placed.map((p) => (
-        <button key={p.n} className="ae-pin absolute top-1.5 -translate-x-1/2" title={p.title} onClick={() => onPin?.(p.n)}
-                onPointerEnter={() => setHot(p.n)} onPointerLeave={() => setHot(null)}
-                style={{ left: p.x, width: 18, height: 18, fontSize: 10 }}>{p.n}</button>
-      ))}
     </div>
   );
 }
