@@ -762,6 +762,12 @@ function undo() {
   } else if (u.kind === "tempo") {
     song.set("tempo", u.value);
     send("undo_done", { ok: true, text: "Tempo back to " + u.value + " BPM." });
+  } else if (u.kind === "groove") {
+    const at = ids(song.get("tracks")).indexOf(u.track_id);
+    if (at >= 0) song.call("delete_track", at);
+    const orig = new LiveAPI("id " + u.orig_id);
+    if (orig.id && Number(orig.id) !== 0) orig.set("mute", 0);
+    send("undo_done", { ok: true, text: "Removed the matched loop and unmuted \"" + u.orig_name + "\"." });
   } else if (u.kind === "marker_new") {
     // set_or_delete_cue toggles: move there, wait for Live to arrive, then press it to remove
     pendingRemoval = { beats: u.beats, bar: u.bar, name: u.name, from: one(song, "current_song_time"), wasPlaying: one(song, "is_playing") === 1 };
@@ -877,4 +883,66 @@ function route_sidechain(trackIndex, fromText) {
   const last = undoStack[undoStack.length - 1];
   if (last && last.kind === "device" && last.track === trackIndex && last.name === "Compressor") last.routing = { id: Number(comp.id), before: before };
   send("route_done", { ok: true, text: "The Compressor now listens to \"" + from + "\"." });
+}
+
+// ---------- Groove match (build step 9) ----------
+
+// The clip selected in Live (the one in the clip view): its file, its track and where it sits, so the bridge can send
+// the file to the engine and put the matched loop back in the same place. role is "moving" or "anchor".
+function selected_clip(role) {
+  if (!ensureSong()) { send("selected_clip", { role: role, error: "Live isn't ready yet." }); return; }
+  const c = new LiveAPI("live_set view detail_clip");
+  if (!c.id || Number(c.id) === 0) { send("selected_clip", { role: role, error: "Click the loop's clip in Live first, then press this again." }); return; }
+  if (one(c, "is_audio_clip") !== 1) { send("selected_clip", { role: role, error: "That's a MIDI clip. Groove match works on audio loops." }); return; }
+  // An Arrangement clip's parent is its track; a Session clip's is its clip slot, whose parent is the track
+  var parent = new LiveAPI("id " + ids(c.get("canonical_parent"))[0]);
+  const arrangement = parent.type === "Track";
+  if (!arrangement) parent = new LiveAPI("id " + ids(parent.get("canonical_parent"))[0]);
+  const trackId = Number(parent.id);
+  send("selected_clip", {
+    role: role, name: String(one(c, "name")), path: String(one(c, "file_path")), arrangement: arrangement,
+    track_id: trackId, track_index: ids(song.get("tracks")).indexOf(trackId), track_name: String(one(parent, "name")),
+    start_beat: arrangement ? one(c, "start_time") : null, start_marker: one(c, "start_marker"), end_marker: one(c, "end_marker"),
+    warping: one(c, "warping") === 1, sample_length: one(c, "sample_length"), sample_rate: one(c, "sample_rate"),
+    tempo: one(song, "tempo")
+  });
+}
+
+// The matched loop on a new track right under the original, at the same bar; the original track is muted, so it's
+// kept and A/B is switching which one plays. A new try replaces the last one. q = URI-encoded
+// {path, name, track_id, start_beat, warping, replace_track_id?}
+function groove_place(encoded) {
+  const q = JSON.parse(decodeURIComponent(encoded));
+  if (q.replace_track_id) {
+    const old = ids(song.get("tracks")).indexOf(q.replace_track_id);
+    if (old >= 0) song.call("delete_track", old);
+    for (var i = undoStack.length - 1; i >= 0; i--) if (undoStack[i].kind === "groove" && undoStack[i].track_id === q.replace_track_id) undoStack.splice(i, 1);
+  }
+  const at = ids(song.get("tracks")).indexOf(q.track_id);
+  if (at < 0) { send("groove_placed", { ok: false, text: "The loop's track isn't in the set any more." }); return; }
+  song.call("create_audio_track", at + 1);
+  const t = new LiveAPI("live_set tracks " + (at + 1));
+  t.set("name", q.name);
+  t.call("create_audio_clip", q.path, q.start_beat);
+  const clipId = ids(t.get("arrangement_clips"))[0];
+  if (clipId) {
+    const clip = new LiveAPI("id " + clipId);
+    clip.set("warping", q.warping ? 1 : 0);
+    clip.set("name", q.name);
+  }
+  const orig = new LiveAPI("id " + q.track_id);
+  orig.set("mute", 1);
+  undoStack.push({ kind: "groove", track_id: Number(t.id), orig_id: q.track_id, orig_name: String(one(orig, "name")) });
+  send("groove_placed", { ok: !!clipId, track_id: Number(t.id), orig_id: q.track_id,
+                          text: clipId ? "" : "Live didn't make the new clip. The matched file is saved; drag it in from the Aria groove folder." });
+}
+
+// A/B: play the original or the matched loop. q = URI-encoded {orig_id, track_id, play: "before" | "after"}
+function groove_ab(encoded) {
+  const q = JSON.parse(decodeURIComponent(encoded));
+  const list = ids(song.get("tracks"));
+  if (list.indexOf(q.orig_id) < 0 || list.indexOf(q.track_id) < 0) { send("groove_ab", { ok: false, text: "One of the two tracks isn't there any more." }); return; }
+  new LiveAPI("id " + q.orig_id).set("mute", q.play === "before" ? 0 : 1);
+  new LiveAPI("id " + q.track_id).set("mute", q.play === "before" ? 1 : 0);
+  send("groove_ab", { ok: true, play: q.play });
 }

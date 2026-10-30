@@ -335,7 +335,7 @@ Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete wai
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
 Max.addHandler("device_done", (s) => { const w = waiters.device_done; delete waiters.device_done; if (w) w(decode(s)); });
-for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done", "clips_playing"]) {
+for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done", "clips_playing", "selected_clip", "groove_placed", "groove_ab"]) {
   Max.addHandler(reply, (s) => { const w = waiters[reply]; delete waiters[reply]; if (w) w(decode(s)); });
 }
 Max.addHandler("ears_removed", (s) => { const w = waiters.ears_removed; delete waiters.ears_removed; if (w) w(decode(s)); });
@@ -662,6 +662,73 @@ async function recheck() {
   }
 }
 
+// ---------- Groove match (build step 9) ----------
+// Pick the loop to fix and, optionally, the loop to follow, from the clip selected in Live. The engine moves the
+// hits; the matched loop goes on a new track under the original (muted, kept), and a new try replaces the last one.
+let groove = { moving: null, anchor: null, placed: null };
+const GROOVE_TEMPO_SLACK = 0.03;   // a warped loop's file must be within 3% of whole bars at the song's tempo
+
+function grooveState(extra) { toUI("groove_state", { moving: groove.moving, anchor: groove.anchor, placed: groove.placed, ...extra }); }
+
+Max.addHandler("groove_pick", (s) => serial(async () => {
+  const { role } = decode(s);
+  try {
+    const c = await askLive("selected_clip", "selected_clip", role === "anchor" ? "anchor" : "moving");
+    if (c.error) throw new UserError(c.error);
+    if (!c.path || !fs.existsSync(c.path)) throw new UserError("Aria can't find that clip's file. Consolidate it in Live (Cmd+J) and pick it again.");
+    if (role !== "anchor" && !c.arrangement) throw new UserError("Groove match puts the new loop in the Arrangement. Drag your loop there, click it, and pick it again.");
+    // A warped loop plays at the song's tempo whatever its file is; the grid is only right when the file is too
+    const fileSec = c.sample_rate ? c.sample_length / c.sample_rate : null, barSec = 4 * 60 / c.tempo;
+    if (c.warping && fileSec && Math.abs(fileSec / barSec - Math.round(fileSec / barSec)) > GROOVE_TEMPO_SLACK * Math.max(1, fileSec / barSec)) {
+      throw new UserError(`"${c.name}" isn't at ${Math.round(c.tempo)} BPM in its file. Consolidate it in Live (Cmd+J) and pick it again.`);
+    }
+    groove[role === "anchor" ? "anchor" : "moving"] = c;
+    if (role !== "anchor") groove.placed = null;
+    grooveState();
+  } catch (e) {
+    grooveState({ error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
+  }
+}));
+
+Max.addHandler("groove_run", (s) => serial(async () => {
+  const { follow, strength = 1, nudge_ms = 0 } = decode(s);
+  const m = groove.moving, a = follow === "loop" ? groove.anchor : null;
+  try {
+    if (!m) throw new UserError("Pick the loop to fix first.");
+    if (follow === "loop" && !a) throw new UserError("Pick the loop to follow first.");
+    await ensureEngine();
+    toUI("groove_progress", { text: "Finding every hit" });
+    const live = await askLive("state", "live_state");
+    // Beat 1 is where the clip starts playing in its file; a warped clip's start marker is in beats
+    const beat1 = (c) => (c && c.warping ? (c.start_marker || 0) * 60 / live.tempo : 0);
+    const res = await request("POST", "/groove/match", {
+      moving_path: m.path, anchor: a ? { kind: "loop", path: a.path } : { kind: "straight" }, tempo: live.tempo,
+      strength, nudge_ms, beat1_sec: { moving: beat1(m), anchor: beat1(a) } }, ANALYZE_TIMEOUT_MS);
+    if (res.status !== 200) throw new UserError((res.json && res.json.detail) || `The engine couldn't match it (HTTP ${res.status}).`);
+    toUI("groove_progress", { text: "Putting the new loop under the original" });
+    const replace = groove.placed && groove.placed.track_id;
+    const placed = await askLive("groove_place", "groove_placed", encode({
+      path: res.json.out_path, name: `${m.track_name} (matched)`, track_id: m.track_id, start_beat: m.start_beat,
+      warping: m.warping, replace_track_id: replace || null }));
+    if (replace) { const k = changeStack.findIndex((x) => x.groove); if (k >= 0) changeStack.splice(k, 1); }
+    if (placed.ok) { groove.placed = { track_id: placed.track_id, orig_id: placed.orig_id, playing: "after" }; changeStack.push({ at: null, kind: "d", k: 0, groove: true }); sendUndoNext(); }
+    grooveState({ result: { ...res.json, follow: a ? a.name || a.track_name : "Straight", strength, nudge_ms }, error: placed.ok ? null : placed.text });
+  } catch (e) {
+    grooveState({ error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
+  }
+}));
+
+// A/B: switch which of the two tracks plays
+Max.addHandler("groove_ab", (s) => serial(async () => {
+  const { play } = decode(s);
+  if (!groove.placed) return;
+  try {
+    const out = await askLive("groove_ab", "groove_ab", encode({ orig_id: groove.placed.orig_id, track_id: groove.placed.track_id, play }));
+    if (out.ok) groove.placed = { ...groove.placed, playing: play };
+    grooveState({ error: out.ok ? null : out.text });
+  } catch (e) { grooveState({ error: e.message }); }
+}));
+
 // ---------- messages from the UI ----------
 
 Max.addHandler("ready", async () => {
@@ -981,12 +1048,12 @@ async function listDevices(trackName) {
   return { reply: `"${t.name}" has ${result.devices.length} devices. ${lines.join(". ")}. Full list saved for Claude.`, file };
 }
 
-let asking = false;
+// A request that comes in while Muse is still on the last one waits its turn in the queue (Ian, Oct 30: dropping it
+// left the window loading for an answer that never came)
 Max.addHandler("ask", (s) => {
   let text;
   try { text = decode(s).text; } catch (e) { return; }
-  if (asking || !text) return;
-  asking = true;
+  if (!text) return;
   return serial(() => runAsk(text));
 });
 
@@ -999,7 +1066,6 @@ async function runAsk(text) {
     } catch (e) {
       askLog.push({ request: text, reply: null, done: [], suggestions: [], problems: [], error: e.message, notes: [], at: Date.now() });
     }
-    asking = false;
     toUI("ask_pending", { request: null });
     logChanged();
     return;
@@ -1029,7 +1095,6 @@ async function runAsk(text) {
   } finally {
     logChanged();                                   // the answer first, then pending clears: no blink
     toUI("ask_pending", { request: null });
-    asking = false;
   }
 }
 
@@ -1074,6 +1139,7 @@ Max.addHandler("undo", () => serial(async () => {
   // Nothing of Aria's left to undo: a passing note in the header, not a line in the chat each press
   if (!out.ok && !top) { toUI("notice", { text: out.text }); sendUndoNext(); return; }
   if (out.ok) undoneTop();
+  if (out.ok && top && top.groove) { groove.placed = null; grooveState({ undone: true }); }
   // The note goes on the exchange whose change was undone
   const i = top ? askLog.findIndex((x) => x.at === top.at) : -1;
   addNote(out.text, i >= 0 ? i : askLog.length - 1);

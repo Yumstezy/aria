@@ -270,7 +270,8 @@ export function connect() {
     // The bridge owns the history (saved on this Mac) and sends all of it on every change.
     on<Exchange[]>("ask_log", (log) => {
       // The answer to what's pending is in: clear pending in the same update, so the thread never blinks
-      const answered = state.ask.pending !== null && log.length > 0 && log[log.length - 1].request === state.ask.pending;
+      // Only a new entry counts: the same request asked twice (Fix it on one problem again) mustn't match the old answer
+      const answered = state.ask.pending !== null && log.length > state.ask.log.length && log[log.length - 1].request === state.ask.pending;
       set({ ask: { ...state.ask, log, ...(answered ? { pending: null } : {}) } });
       if (answered) askQueued();
     });
