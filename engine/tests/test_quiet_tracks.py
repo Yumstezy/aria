@@ -39,3 +39,14 @@ def test_true_silence_is_still_silent():
     sounds = mix_with_quiet_vocal()
     sounds["vOCAL"] = np.zeros_like(sounds["vOCAL"])
     assert stems.spectra(sounds, RATE, relative=False)["parts"]["vOCAL"] is None
+
+
+def test_a_vocal_that_sings_half_the_time_isnt_buried_where_it_has_nothing():
+    """Ian, Oct 30: "vOCAL buried, 30 Hz to 1 kHz, -42.7 dB". The vocal sang in some bars only, so its typical
+    level was silence in every range and the bass range counted as where it lives."""
+    sounds = mix_with_quiet_vocal(vocal_db=-10)
+    half = np.zeros_like(sounds["vOCAL"]); half[len(half) // 2:] = 1
+    sounds["vOCAL"] = sounds["vOCAL"] * half                              # sings in the second half only, 300 Hz to 3 kHz
+    sounds["Bass"] = 0.9 * band_noise(40, 150, seed=4)
+    found = stems.masking(sounds, RATE, tempo=TEMPO, start_beat=0.0, relative=False, playing={"vOCAL": True})
+    assert not [f for f in found if f["masked"] == "vOCAL" and f["hz_range"][1] <= 150], found
