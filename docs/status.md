@@ -9,6 +9,8 @@ Updated at the end of each session: what passed, what's next, any blocker.
 - **Song end** (590e3da): the last clip that plays, not Live's last_event_time (which said bar 185 on a song ending near 49).
 - **Live analyzer**: glides at the screen's rate (d26e6d6). Ian asked what the grey line is (peaks) and wants the screen to explain itself; next.
 
+- **Intro runs to the first Break** (Ian: EDM intros are for DJs to mix in): THE WEEKEND now reads Intro 1 to 40, Break 41 to 48, Build, Drop, Break, Build, Drop, Drop, Outro (real Muse run). Check: Hear the whole song again; your song's Intro should reach its first break.
+
 **Bug queue**
 - Home's kind cards (GlowCard): hovering lags a little, and since the cards fill half the page, scrolling over them feels sticky (Ian, Oct 30, 12:35).
 

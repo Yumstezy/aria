@@ -191,3 +191,15 @@ def find(audio, rate, tempo=None, start_beat=0.0, beats_per_bar=4.0):
         })
     return {"tempo": round(float(tempo), 2), "first_downbeat_sec": None if first_sec is None else round(first_sec, 3),
             "bars": len(bars), "sections": sections, "error": None}
+
+
+def join_intro(parts):
+    """The named parts with the Intro parts at the start joined into one (muse.validate_section_names names everything
+    before the first break Intro). Its loudness and rise are the bar-weighted average of the parts it's made of."""
+    n = next((i for i, s in enumerate(parts) if s.get("name") != "Intro"), len(parts))
+    if n < 2:
+        return parts
+    head, total = parts[:n], sum(s["bars"] for s in parts[:n])
+    avg = lambda k: round(sum(s[k] * s["bars"] for s in head) / total, 2 if k == "rise_db_per_bar" else 1)
+    intro = {**head[0], "bars": total, "end_sec": head[-1]["end_sec"], "energy_db": avg("energy_db"), "rise_db_per_bar": avg("rise_db_per_bar")}
+    return [intro, *parts[n:]]
