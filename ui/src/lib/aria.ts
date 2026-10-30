@@ -130,7 +130,16 @@ interface State {
   rechecking: Progress | null;
   /** Where the window is, as the bridge placed it */
   layout: { mode: "full" | "left" | "right"; side: "left" | "right" } | null;
+  /** Groove match (build step 9): the two loops, the last match, and how it's going */
+  groove: GrooveState;
 }
+
+export interface GrooveClip { name: string; path: string; track_name: string; track_id: number; arrangement: boolean; start_beat: number | null }
+export interface GrooveTiming { avg_ms: number | null; max_ms: number | null; hits: { sec: number; offset_ms: number }[] }
+export interface GrooveResult { before: GrooveTiming; after: GrooveTiming; in_time: boolean; hits: number; hits_moved: number; out_path: string;
+  follow: string; strength: number; nudge_ms: number }
+export interface GrooveState { moving: GrooveClip | null; anchor: GrooveClip | null; placed: { track_id: number; orig_id: number; playing: "before" | "after" } | null;
+  result: GrooveResult | null; error: string | null; busy: string | null }
 
 export type Theme = "sky" | "night";
 /** About the set, from Live: shown in headers and the Get started steps */
@@ -150,6 +159,7 @@ let state: State = {
   ask: { open: typeof location !== "undefined" && new URLSearchParams(location.search).get("ask") === "1", pending: null, log: [] },
   engine: { state: "starting", text: "Starting Aria" },
   progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null }, undoNext: null, layout: null, arrangement: null, hearing: null, beforeAfter: null, rechecking: null,
+  groove: { moving: null, anchor: null, placed: null, result: null, error: null, busy: null },
 };
 
 // Dark (Night) unless the producer picked Light. Inside Live the bridge saves the choice and puts it in
@@ -284,6 +294,11 @@ export function connect() {
     on<{ busy: boolean; text: string }>("ears", (e) => set({ ears: e }));
     on<Arrangement>("arrangement", (a) => set({ arrangement: a, hearing: null }));
     on<Progress>("arrangement_progress", (p) => set({ hearing: p }));
+    on<{ text: string }>("groove_progress", (p) => set({ groove: { ...state.groove, busy: p.text, error: null } }));
+    on<Partial<GrooveState> & { undone?: boolean }>("groove_state", (g) => set({ groove: {
+      moving: g.moving ?? null, anchor: g.anchor ?? null, placed: g.placed ?? null, busy: null, error: g.error ?? null,
+      // A new loop to fix starts fresh; Undo takes the matched loop away; otherwise the last result stays
+      result: g.result ?? (g.undone || (g.moving?.path !== state.groove.moving?.path) ? null : state.groove.result) } }));
     on<BeforeAfter>("before_after", (b) => set({ beforeAfter: b, rechecking: null }));
     on<Progress>("before_after_progress", (p) => set({ rechecking: p }));
     on<number[]>("analyzer", (frame) => analyzerListeners.forEach((l) => l(frame)));
@@ -346,6 +361,16 @@ export function onAnalyzer(fn: (frame: number[]) => void) {
   return () => { analyzerListeners.delete(fn); if (!analyzerListeners.size) send("analyzer_off"); };
 }
 export const addArrangementMarkers = () => send("arrangement_markers");
+
+// ---------- Groove match (build step 9) ----------
+export function groovePick(role: "moving" | "anchor") {
+  if (!send("groove_pick", { role })) notice("Groove match needs Aria inside Live.");
+}
+export function grooveRun(follow: "straight" | "loop", strength: number, nudge_ms: number) {
+  if (send("groove_run", { follow, strength, nudge_ms })) set({ groove: { ...state.groove, busy: "Finding every hit", error: null } });
+  else notice("Groove match needs Aria inside Live.");
+}
+export const grooveAB = (play: "before" | "after") => send("groove_ab", { play });
 
 // ---------- Reference song (build step 8) ----------
 

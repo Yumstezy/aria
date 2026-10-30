@@ -13,6 +13,10 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 - **Checked in Live by Ian (Oct 30, 12:37):** the new build runs well (arrangement, markers, before and after, analyzer, marks). To polish later: navigation, and shorter explanations. The analyzer now has a legend (Now, Peaks, your reference).
 
+- **Groove match (build step 9), built, to check in Live.** Engine `POST /groove/match` (tests pass on generated hit loops), live.js and bridge (pick the selected clip, a new track with the matched clip under the original, original muted, A/B, Undo), and the screen (Loop to fix, Follow: Straight grid or Another loop, Strength, Nudge, the timing chart). Still to do: Muse explains the result and can set follow, strength and nudge (Ask Muse); "follow the reference song" waits. Needs from Ian: two real loops he owns that flam against each other (a hat loop and a perc loop) for the test pack and the demo.
+  Manual check (remove and re-add Aria on Main, live.js changed): put a hat loop in the Arrangement view, click its clip, Groove match, Use selected clip. Straight grid, Match it. Expected: a new track "<track> (matched)" right under it with the clip at the same bar, the original track muted, and the chart. Original / Matched switches which track plays. Undo removes the new track and unmutes the original. If "Live didn't make the new clip" shows, tell Claude. Then Another loop: click the perc loop's clip, Use selected clip, Match again: the earlier matched track is replaced, not added to.
+- **Ask Muse fixes:** the pop-up is at most about half the window; it opens at the newest message; requests queue instead of being dropped (the stuck "..." after an answer); Cmd+C/V/X/A work in its box. Check: paste text into Ask Muse with Cmd+V.
+
 **Bug queue**
 - Home's kind cards (GlowCard): hovering lags a little, and since the cards fill half the page, scrolling over them feels sticky (Ian, Oct 30, 12:35).
 
