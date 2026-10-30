@@ -82,7 +82,7 @@ function state() {
     beats_per_bar: beatsPerBar(),
     playing: one(song, "is_playing") === 1,
     song_beat: one(song, "current_song_time"),
-    song_end: one(song, "last_event_time"),   // where the last note or audio in the Arrangement ends, in beats
+    song_end: songEnd(),   // where the last clip that plays in the Arrangement ends, in beats
     chain: chain(),
     markers: markerList(),
     tracks: trackList()
@@ -116,6 +116,23 @@ function clips_playing(encoded) {
     });
   });
   send("clips_playing", out);
+}
+
+// Where the song ends, in beats: the end of the last Arrangement clip on a track that isn't muted, skipping muted
+// clips. Live's own last_event_time also counts automation and muted clips, so on Ian's song (Oct 30) it said bar 185
+// when the music stopped at bar 49, and Hear the whole song recorded 136 bars of silence. Falls back to it when no
+// track has Arrangement clips (Session clips only).
+function songEnd() {
+  var end = 0;
+  ids(song.get("tracks")).forEach(function (id) {
+    const t = new LiveAPI("id " + id);
+    if (one(t, "mute") === 1) return;
+    ids(t.get("arrangement_clips")).forEach(function (cid) {
+      const c = new LiveAPI("id " + cid);
+      if (one(c, "muted") !== 1) end = Math.max(end, one(c, "end_time"));
+    });
+  });
+  return end > 0 ? end : one(song, "last_event_time");
 }
 
 // Clips on a track, Arrangement first; Session only when Arrangement has none (so a long set stays quick).
