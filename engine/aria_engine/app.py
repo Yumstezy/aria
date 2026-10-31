@@ -339,6 +339,7 @@ class GrooveRequest(BaseModel):
     nudge_ms: float = 0.0
     beat1_sec: dict = {}
     out_dir: str | None = None
+    moving: dict | None = None          # the loop's clip in the song: {warp, start_beat, start_marker} (Oct 31)
 
 
 GROOVE_DIR = Path.home() / "Library" / "Application Support" / "Aria" / "groove"
@@ -356,7 +357,7 @@ def groove_match(req: GrooveRequest):
         raise HTTPException(400, "Tempo 40 to 300, strength 0 to 1, nudge -20 to 20 ms.")
     try:
         return groove.match(Path(req.moving_path).expanduser(), req.anchor, req.tempo, req.strength, req.nudge_ms,
-                            req.beat1_sec, req.out_dir or GROOVE_DIR)
+                            req.beat1_sec, req.out_dir or GROOVE_DIR, moving=req.moving)
     except (ValueError, RuntimeError, sf.LibsndfileError) as e:
         raise HTTPException(400, str(e))
 

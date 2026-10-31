@@ -707,7 +707,9 @@ Max.addHandler("groove_pick", (s) => serial(async () => {
     }
     // A warped loop plays at the song's tempo whatever its file is; the grid is only right when the file is too
     const fileSec = c.sample_rate ? c.sample_length / c.sample_rate : null, barSec = 4 * 60 / c.tempo;
-    if (c.warping && fileSec && Math.abs(fileSec / barSec - Math.round(fileSec / barSec)) > GROOVE_TEMPO_SLACK * Math.max(1, fileSec / barSec)) {
+    // With Live's warp markers Aria matches it as it's heard, whatever the file's tempo (Oct 31); only a warped clip
+    // without them can't be placed in the song
+    if (c.warping && (c.warp_markers || []).length < 2 && fileSec && Math.abs(fileSec / barSec - Math.round(fileSec / barSec)) > GROOVE_TEMPO_SLACK * Math.max(1, fileSec / barSec)) {
       throw new UserError(`"${c.name}" isn't at ${Math.round(c.tempo)} BPM in its file. Consolidate it in Live (Cmd+J) and pick it again.`);
     }
     groove[role === "anchor" ? "anchor" : "moving"] = c;
@@ -734,15 +736,18 @@ async function grooveRunNow({ follow, strength = 1, nudge_ms = 0 }) {
     const live = await askLive("state", "live_state");
     // Beat 1 is where the clip starts playing in its file; a warped clip's start marker is in beats
     const beat1 = (c) => (c && c.warping ? (c.start_marker || 0) * 60 / live.tempo : 0);
+    // Each clip as it sits and plays in the song: its warp markers, where it starts, from where in the file (Oct 31:
+    // a 140 BPM loop warped to 165 was matched in its own file time)
+    const place = (c) => (c && c.warping && (c.warp_markers || []).length >= 2 ? { warp: c.warp_markers, start_beat: c.start_beat, start_marker: c.start_marker } : { start_beat: c && c.start_beat });
     const res = await request("POST", "/groove/match", {
-      moving_path: m.path, anchor: a ? { kind: "loop", path: a.path } : { kind: "straight" }, tempo: live.tempo,
-      strength, nudge_ms, beat1_sec: { moving: beat1(m), anchor: beat1(a) } }, ANALYZE_TIMEOUT_MS);
+      moving_path: m.path, anchor: a ? { kind: "loop", path: a.path, ...place(a) } : { kind: "straight" }, tempo: live.tempo,
+      strength, nudge_ms, beat1_sec: { moving: beat1(m), anchor: beat1(a) }, moving: place(m) }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200) throw new UserError((res.json && res.json.detail) || `The engine couldn't match it (HTTP ${res.status}).`);
     toUI("groove_progress", { text: "Putting the new loop under the original" });
     const replace = groove.placed && groove.placed.track_id;
     const placed = await askLive("groove_place", "groove_placed", encode({
       path: res.json.out_path, name: `${m.track_name} (matched)`, track_id: m.track_id, start_beat: m.start_beat,
-      warping: m.warping, replace_track_id: replace || null }));
+      warping: m.warping, warp_markers: m.warp_markers || [], start_marker: m.start_marker, end_marker: m.end_marker, replace_track_id: replace || null }));
     if (replace) { const k = changeStack.findIndex((x) => x.groove); if (k >= 0) changeStack.splice(k, 1); }
     if (placed.ok) { groove.placed = { track_id: placed.track_id, orig_id: placed.orig_id, playing: "after" }; changeStack.push({ at: null, kind: "d", k: 0, groove: true }); sendUndoNext(); }
     grooveState({ result: { ...res.json, follow: a ? a.track_name || a.name : "Straight", strength, nudge_ms }, error: placed.ok ? null : placed.text });

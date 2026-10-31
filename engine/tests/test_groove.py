@@ -83,3 +83,19 @@ def test_follow_a_kick_that_plays_only_the_beats(tmp_path):
     assert out["hits_moved"] == 16 and out["in_time"]
     moved = groove.onsets(sf.read(out["out_path"])[0], RATE)
     assert all(abs((t - round((t - 0.010) / STEP) * STEP) - 0.010) < 0.002 for t in moved)
+
+
+def test_a_warped_loop_at_another_tempo(tmp_path):
+    """Ian, Oct 31: a 140 BPM bongo loop warped to a 165 song was matched against a 165 grid in its own file time and
+    came out off. With the clip's warp markers, the grid is the song's: the planted offsets, heard at 165, are fixed."""
+    file_tempo, song = 140.0, 165.0
+    fstep = 60 / file_tempo / 4
+    late = {1: 0.020, 6: -0.018, 11: 0.022}
+    times = [k * fstep + late.get(k, 0.0) for k in range(32)]
+    path = write(tmp_path / "Bongo loop 140BPM.wav", hits(times, 32 * fstep + 0.1, seed=4))
+    warp = [{"beat_time": float(b), "sample_time": b * 60 / file_tempo} for b in range(0, 9)]   # Live plays it at the song's tempo
+    out = groove.match(path, anchor={"kind": "straight"}, tempo=song, out_dir=tmp_path,
+                       moving={"warp": warp, "start_beat": 16.0, "start_marker": 0.0})
+    assert out["hits_moved"] == 3 and out["in_time"]
+    # heard at 165, a 22 ms slip in the 140 file is 22 * 140 / 165 ms
+    assert abs(out["before"]["max_ms"] - 22 * file_tempo / song) < 1.5

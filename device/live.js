@@ -921,7 +921,9 @@ function clipInfo(c, role) {
     track_id: trackId, track_index: ids(song.get("tracks")).indexOf(trackId), track_name: String(one(parent, "name")),
     start_beat: arrangement ? one(c, "start_time") : null, start_marker: one(c, "start_marker"), end_marker: one(c, "end_marker"),
     warping: one(c, "warping") === 1, sample_length: one(c, "sample_length"), sample_rate: one(c, "sample_rate"),
-    tempo: one(song, "tempo")
+    tempo: one(song, "tempo"),
+    // how Live plays the file at the song's tempo, so a loop at another tempo is matched as it's heard (Oct 31)
+    warp_markers: one(c, "warping") === 1 ? warpMarkers(c) : []
   };
 }
 
@@ -964,6 +966,10 @@ function groove_place(encoded) {
     const clip = new LiveAPI("id " + clipId);
     clip.set("warping", q.warping ? 1 : 0);
     clip.set("name", q.name);
+    // The same warp as the original (the matched file has the same length), so it plays at the song's tempo the way
+    // the original does, and from the same place in the file
+    if (q.warping && q.warp_markers && q.warp_markers.length >= 2) setWarp(clip, q.warp_markers, q.end_marker);
+    try { if (q.end_marker !== undefined) clip.set("end_marker", q.end_marker); if (q.start_marker !== undefined) clip.set("start_marker", q.start_marker); } catch (e) { }
   }
   const orig = new LiveAPI("id " + q.track_id);
   orig.set("mute", 1);

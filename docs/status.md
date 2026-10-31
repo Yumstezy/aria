@@ -4,6 +4,8 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 ## Oct 31
 
+- **Groove match on a warped loop (Ian, 12:41: Ask Muse's match "didn't put them on time"):** the loop was a 140 BPM bongo warped to 165, matched in its own file time on a 165 grid: 21 hits moved up to 39 ms the wrong way, and it still said In time. Now each clip's warp markers and place in the song go to the engine, which times everything as heard (song seconds); the matched clip gets the original's warp. Same bongo against the kick: 5.5 ms worst as heard, 14 hits nudged, all found. The button's "isn't at 165 BPM, consolidate it" refusal is gone for warped clips. Also: a failed match from Ask Muse no longer leaves the Groove screen locked.
+
 - **Ask Muse runs the newer tools (Ian, 12:28: "set my vocal test on time with my kick test" added a sidechain):** new tools `vocal_sync`, `groove_match`, `check_again`, `hear_song`, `add_part_markers`; timing words mean these, never sidechain; Muse asks which track when unsure. Real Muse Spark on Ian's track names: his sentence gave vocal_sync VOCAL TEST to KICK TEST; "put my vocal on beat" asked "VOCAL TEST or Vox 2?"; "tighten the loop wrong track to the kick test at 70%" gave groove_match at 0.7; "sidechain the bass to the kick test" is still a sidechain. The window switches to Groove match to show the result. Check in Live (re-add Aria): type or say those four.
 - **Minimized tab dragged the wrong way:** flipped.
 
