@@ -666,6 +666,13 @@ async function recheck() {
 
 // ---------- Groove match (build step 9) ----------
 
+// Ask Muse's groove or vocal step failed: the Groove screen must hear it too, or it stays "busy" with every button
+// off (Ian, Oct 31: after a match from Ask Muse he "can't select or press anything"). Then the reply says why.
+function grooveOver(e) {
+  grooveState({ error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
+  throw e;
+}
+
 // The Arrangement clip on a track, by the track's name, for Ask Muse ("sync my vocal test"): the clip under the
 // playhead, else the track's first audio clip. Throws a plain UserError when there isn't one.
 async function trackClip(name, role) {
@@ -1118,7 +1125,7 @@ async function apply(action, tracks = []) {
       serial(checkMix);   // queued: it starts once this answer's changes are done
       return { ok: true, text: "Mix check is next." };
     // The newer tools, asked for in words (Ian, Oct 31: "set my vocal test on time with my kick test" got a sidechain)
-    case "vocal_sync": {
+    case "vocal_sync": try {
       groove.vocal = await trackClip(a.vocal_track, "vocal");
       groove.kick = a.kick_track ? await trackClip(a.kick_track, "kick") : null;
       groove.vocalApplied = false;
@@ -1127,15 +1134,15 @@ async function apply(action, tracks = []) {
       const v = groove.vocalSync, src = v.tempo_source === "file name" ? "from its file name" : v.tempo_source === "you" ? "as you said" : "measured";
       return { ok: true, text: `Synced "${groove.vocal.track_name}" ${groove.kick && v.sync.kick_found ? `to the kick on "${groove.kick.track_name}" at bar ${v.sync.bar}` : "to Live's grid"}: ` +
                                `${v.tempo} BPM (${src})${v.key ? `, ${v.key}` : ""}, now playing at ${v.song_tempo}.` };
-    }
-    case "groove_match": {
+    } catch (e) { grooveOver(e); }
+    case "groove_match": try {
       groove.moving = await trackClip(a.track, "moving");
       groove.anchor = a.follow_track ? await trackClip(a.follow_track, "anchor") : null;
       groove.placed = null;
       const r = await grooveRunNow({ follow: a.follow_track ? "loop" : "straight", strength: a.strength ?? 1, nudge_ms: a.nudge_ms ?? 0 });
       return { ok: true, text: `Matched "${groove.moving.track_name}" ${groove.anchor ? `to "${groove.anchor.track_name}"` : "to the grid"}: worst hit ${r.before.max_ms ?? "?"} ms off, now ` +
                                `${r.after.max_ms ?? "?"} ms${r.in_time ? ", in time" : ""}. The new loop is on a track under it; the original is kept, muted.` };
-    }
+    } catch (e) { grooveOver(e); }
     case "check_again":
       if (!lastCheck) return { ok: false, text: "Run a Mix check first, then Aria can check the same bars again." };
       serial(recheck);

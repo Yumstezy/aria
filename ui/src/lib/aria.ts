@@ -319,7 +319,12 @@ export function connect() {
     on<Arrangement>("arrangement", (a) => set({ arrangement: a, hearing: null }));
     on<Progress>("arrangement_progress", (p) => set({ hearing: p }));
     on<{ view: string; mode?: string }>("show_view", (v) => set({ goto: { view: v.view, mode: v.mode, n: (state.goto?.n ?? 0) + 1 } }));
-    on<{ text: string }>("groove_progress", (p) => set({ groove: { ...state.groove, busy: p.text, error: null } }));
+    on<{ text: string }>("groove_progress", (p) => {
+      set({ groove: { ...state.groove, busy: p.text, error: null } });
+      // Never locked for good: a step that hears nothing back in 90 s frees the buttons
+      clearTimeout(grooveBusyTimer);
+      grooveBusyTimer = setTimeout(() => { if (state.groove.busy === p.text) set({ groove: { ...state.groove, busy: null, error: "That took too long. Try again." } }); }, 90000);
+    });
     on<Partial<GrooveState> & { undone?: boolean }>("groove_state", (g) => set({ groove: {
       moving: g.moving ?? null, anchor: g.anchor ?? null, placed: g.placed ?? null, busy: null, error: g.error ?? null,
       vocal: g.vocal ?? null, kick: g.kick ?? null, vocal_sync: g.vocal_sync ?? null, vocal_applied: !!g.vocal_applied,
@@ -442,6 +447,7 @@ export const referenceOf = (s: State) => s.session?.reference ?? (inMax ? null :
 
 export const setAskOpen = (open: boolean) => set({ ask: { ...state.ask, open } });
 
+let grooveBusyTimer: ReturnType<typeof setTimeout> | undefined;
 let queued: string | null = null;
 function askQueued() { const q = queued; queued = null; if (q) askMuse(q); }
 
