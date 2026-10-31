@@ -4,6 +4,8 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 ## Oct 31
 
+- **Home, full window (Ian, 12:50):** Reference (the comparison chart), Arrangement (the parts as colored blocks, or Hear the whole song) and a compact Live analyzer (loudness, width, spectrum) sit on Home, each with Open. Docked, Home keeps its two short cards. Plain cards (the glowing ones lag).
+
 - **Live analyzer: loudness, width, waveform (Ian, 12:50).** The device (rebuilt, 102 boxes) adds mid and side levels, each channel K-weighted (BS.1770 filters, 48 kHz coefficients) over 400 ms, and the peak per frame, after the 31 bands. The bridge sends width (side's share of mid plus side), momentary LUFS and the peak; the screen shows Loudness (last 3 s), Width (mono to wide) and an 8 s scrolling waveform. Checked with frames computed from Ian's 20:10 drop recording: -9.2 LUFS, the same as the engine's Mix check measured. Check in Live: re-add Aria (device changed), Live analyzer, play: the numbers move and the waveform scrolls.
 
 - **Groove match picture removed (Ian, 12:52: "just hard to understand... remove or completely rework"):** the result card is the headline (In time), the worst hit before and now in ms, how many hits moved, Original / Matched and Undo. The engine no longer builds a picture. Side menu reordered (Ian): Home, Mix check, Groove match, Reference, Arrangement, Live analyzer.

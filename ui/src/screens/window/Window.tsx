@@ -300,7 +300,7 @@ const Home = memo(function Home({ narrow, onOpen, go }: { narrow: boolean; onOpe
         </div>
       )}
 
-      <div className={cn("grid gap-3", narrow ? "grid-cols-1" : "grid-cols-2")}>
+      {!narrow ? <HomeTools go={go} /> : <div className="grid grid-cols-1 gap-3">
         <button className="text-left" onClick={() => go("arrangement")}>
           <GlowCard accent="gold" className="h-full">
             <div className="flex items-center gap-3"><span className="ae-kind is-idle" style={chip}><ArrangementIcon /></span><b className="text-[16.5px] font-medium">Arrangement</b></div>
@@ -314,10 +314,66 @@ const Home = memo(function Home({ narrow, onOpen, go }: { narrow: boolean; onOpe
             <p className="m-0 mt-3 truncate text-[14px] leading-relaxed text-ink-muted">{ref ? `Comparing with ${ref.name}` : "Pick a song you love, see how yours compares."}</p>
           </GlowCard>
         </button>
-      </div>
+      </div>}
     </div>
   );
 });
+
+/** Home, full window only (Ian, Oct 31): Reference, Arrangement and the Live analyzer on Home itself, each as it looks
+    on its own screen, small, with Open. Docked, Home keeps the two short cards. Plain cards, no glow (the glow lags). */
+function HomeTools({ go }: { go: (v: View) => void }) {
+  const result = useAriaSel((s) => s.result), arr = useAriaSel((s) => s.arrangement), ref = useAriaSel(referenceOf), hearing = useAriaSel((s) => s.hearing);
+  const head = (icon: ReactNode, title: string, view: View, extra?: ReactNode) => (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <span className="ae-kind is-idle" style={{ width: 30, height: 30 }}>{icon}</span>
+      <b className="text-[15px] font-medium">{title}</b>
+      {extra && <span className="min-w-0 truncate text-[12.5px] text-ink-muted">{extra}</span>}
+      <button className="cp-btn cp-btn-sm ml-auto" onClick={() => go(view)}>Open</button>
+    </div>
+  );
+  const parts = arr?.mine && !arr.mine.error ? arr.mine.sections : null;
+  const total = parts ? parts.reduce((n, p) => n + p.bars, 0) || 1 : 1;
+  return (
+    <div className="grid gap-3" style={{ gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 1fr)" }}>
+      <section className="cp-tile cp-card" style={{ gap: 10 }}>
+        {head(<ReferenceIcon />, "Reference", "reference", ref?.name)}
+        {result?.reference?.curve ? (
+          <>
+            <RefLegend name={result.reference.name} />
+            <RefChart r={result.reference} height={170} />
+          </>
+        ) : <p className="cp-meta m-0">{ref ? "Check your mix to compare it with this song." : "Pick a song you love to see how yours compares."}</p>}
+      </section>
+      <section className="cp-tile cp-card" style={{ gap: 12 }}>
+        {head(<ArrangementIcon />, "Arrangement", "arrangement", parts ? `${total} bars` : undefined)}
+        {parts ? (
+          <>
+            {/* the parts as blocks, sized by bars, in the Arrangement screen's colors */}
+            <div className="flex h-12 gap-[3px] overflow-hidden rounded-[10px]">
+              {parts.map((p, i) => (
+                <span key={i} title={`${partName(p)}, bars ${p.start_bar} to ${p.start_bar + p.bars - 1}`} className="relative min-w-[6px] rounded-[6px]"
+                      style={{ flex: p.bars, background: `color-mix(in srgb, ${partColor_(p)} 28%, transparent)`, boxShadow: `inset 0 3px 0 ${partColor_(p)}` }} />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+              {parts.map((p, i) => (
+                <span key={i} className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-muted">
+                  <span className="ae-dot" style={{ color: partColor_(p) }} />{partName(p)}<span className="font-mono text-[11px] text-ink-faint">{p.start_bar}</span>
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="grid gap-2">
+            <p className="cp-meta m-0">Aria hears your whole song once and names its parts.</p>
+            <div><button className="cp-btn cp-btn-sm" disabled={!!hearing && hearing.step !== "error"} onClick={hearSong}>{hearing && hearing.step !== "error" ? hearing.text : "Hear the whole song"}</button></div>
+          </div>
+        )}
+      </section>
+      <div style={{ gridColumn: "1 / -1" }}><LiveAnalyzer narrow={false} compact onOpen={() => go("analyzer")} /></div>
+    </div>
+  );
+}
 
 /* ---------- Arrangement (build step 8b) ---------- */
 
@@ -692,7 +748,7 @@ function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
     lines are written straight to the SVG, so a frame doesn't re-render React, and the dB scale only moves in 6 dB steps. */
 const RISE_S = 0.025, FALL_S = 0.15, PEAK_FALL_DB_S = 12;
 const WAVE_FRAMES = 160;   // 8 s at 20 frames a second
-function LiveAnalyzer({ narrow }: { narrow: boolean }) {
+function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: boolean; onOpen?: () => void }) {
   const result = useAriaSel((s) => s.result);
   const [playing, setPlaying] = useState(false);
   const [level, setLevel] = useState<number[] | null>(null);   // the live average, refreshed once a second, for the target line
@@ -702,7 +758,7 @@ function LiveAnalyzer({ narrow }: { narrow: boolean }) {
   const target = result?.reference?.curve ? { name: result.reference.name, hz: result.reference.curve.hz, v: result.reference.curve.ref }
     : null;
   const hz = ANALYZER_HZ.filter((h) => h <= 16000);
-  const W = 640, H = narrow ? 360 : 260, n = hz.length;
+  const W = 640, H = compact ? 170 : narrow ? 360 : 260, n = hz.length;
   const floor = top - 54;
   const X = (f: number) => plotX(f), Y = (db: number) => 8 + (1 - (Math.max(db, floor) - floor) / (top - floor)) * (H - 28);
   const draw = (vals: number[]) => vals.slice(0, n).map((v, i) => v + tilt(hz[i]));
@@ -775,9 +831,9 @@ function LiveAnalyzer({ narrow }: { narrow: boolean }) {
   }
   const ticks = dbTicksOf(-48, 12, (db) => Y(db + top - 3));
   return (
-    <div className="grid gap-3 pt-1">
+    <div className={cn("grid gap-3", !compact && "pt-1")}>
       {/* Loudness, width and the waveform of Main as it plays (Ian, Oct 31) */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.4fr)" }}>
+      {!compact && <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.4fr)" }}>
         <section className="cp-tile cp-card" style={{ gap: 2 }} title="Loudness as BS.1770 measures it, over about the last 3 seconds (LUFS).">
           <span className="cp-cap">Loudness</span>
           <span className="ae-big">{stats?.lufs ?? "–"}<span className="ml-1.5 text-[15px] text-ink-muted">LUFS</span></span>
@@ -799,8 +855,16 @@ function LiveAnalyzer({ narrow }: { narrow: boolean }) {
           </svg>
           <span className="cp-meta">last 8 s</span>
         </section>
-      </div>
+      </div>}
       <section className="cp-tile cp-card" style={{ gap: 12 }}>
+        {compact && (
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="ae-kind is-idle" style={{ width: 30, height: 30 }}><AnalyzerIcon /></span>
+            <b className="text-[15px] font-medium">Live analyzer</b>
+            <span className="font-mono text-[12px] text-ink-muted">{stats?.lufs ?? "–"} LUFS · width {stats?.width ?? "–"}%</span>
+            <button className="cp-btn cp-btn-sm ml-auto" onClick={onOpen}>Open</button>
+          </div>
+        )}
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-[14px] font-medium text-ink">{playing ? "Playing now" : "Play your song"}</span>
           {/* What each line is (Ian, Oct 30: "what is the grey line supposed to signify") */}
