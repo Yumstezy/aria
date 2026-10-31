@@ -34,7 +34,7 @@ def main(root, out):
     if not files:
         sys.exit(f"No audio found in {root}/good, {root}/mid or {root}/bad")
     predictor = initialize_predictor()
-    with open(out, "w", newline="") as f:
+    with open(out, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["file", "label", *[f"abx_{a.lower()}" for a in AXES]])
         for i, (path, tier) in enumerate(files, 1):

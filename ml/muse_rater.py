@@ -97,7 +97,7 @@ def main(csv_path):
     ]
     lines += [f"- {rows[j]['file']} ({rows[j]['label']}): {answers[j]['label']}, {answers[j].get('reason', '')}" for j in answered[:8]]
     (ROOT / "results").mkdir(exist_ok=True)
-    (ROOT / "results" / "muse-report.md").write_text("\n".join(lines) + "\n")
+    (ROOT / "results" / "muse-report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
 
 

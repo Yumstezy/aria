@@ -42,7 +42,7 @@ def main(root, out):
              if p.is_file() and p.suffix.lower() in AUDIO and p.name not in skip]
     if not files:
         sys.exit(f"No audio found in {root}/good, {root}/mid or {root}/bad")
-    with open(out, "w", newline="") as f:
+    with open(out, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["file", "label", "song", *[f"hz_{h}" for h in HZ]])
         for i, (path, tier) in enumerate(files, 1):

@@ -95,7 +95,7 @@ def main(csv_path):
 
     out = ML / "results" / "no-loudness-experiment.md"
     out.parent.mkdir(exist_ok=True)
-    out.write_text("\n".join(lines) + "\n")
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
 
 
