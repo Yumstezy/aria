@@ -98,6 +98,9 @@ def test_everything_before_the_first_break_is_the_intro():
     found = [{"label": x} for x in "ABCDAC"]
     names, err = muse.validate_section_names('{"names": ["Intro", "Drop", "Break", "Build", "Drop", "Outro"]}', found)
     assert names == ["Intro", "Intro", "Break", "Build", "Drop", "Outro"] and err is None
+    # A build before the first break: the intro stops there (Ian's song: Intro, Build, Drop, Drop, Break)
+    names, _ = muse.validate_section_names('{"names": ["Intro", "Build", "Drop", "Drop", "Break", "Drop", "Outro"]}', [{"label": x} for x in "ABCCDCE"])
+    assert names == ["Intro", "Build", "Drop", "Drop", "Break", "Drop", "Outro"]
     # No break at all: only the first part is the intro
     names, _ = muse.validate_section_names('{"names": ["Drop", "Build", "Drop", "Drop"]}', [{"label": x} for x in "ABAA"])
     assert names == ["Intro", "Build", "Drop", "Outro"]
