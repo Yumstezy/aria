@@ -8,4 +8,6 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": resolve(__dirname, "src") } },
   server: { port: 5180 },
+  // Two pages: the product page, and the judges' page at /judges (Oct 31)
+  build: { rollupOptions: { input: { main: resolve(__dirname, "index.html"), judges: resolve(__dirname, "judges/index.html") } } },
 });
