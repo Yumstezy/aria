@@ -181,12 +181,26 @@ export function AskInput({ autoFocus }: { autoFocus?: boolean }) {
     : voice.state === "hearing" ? "Muse is turning that into words…" : "Ask, or tell Muse what to change");
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => { if (autoFocus) input.current?.focus(); }, [autoFocus, askFocus]);
+  // Up and down walk through what you asked before, like a terminal (Ian, Oct 31): newest first, each request
+  // once, from the saved history. Down past the newest brings back what you were typing.
+  const past = useRef<{ at: number; draft: string }>({ at: -1, draft: "" });
+  const history = ask.log.map((x) => x.request).filter((r, i, a) => r && a.lastIndexOf(r) === i).reverse();
+  const recall = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((e.key !== "ArrowUp" && e.key !== "ArrowDown") || e.altKey || e.metaKey || !history.length) return;
+    e.preventDefault();
+    const p = past.current;
+    if (p.at === -1) p.draft = text;
+    p.at = e.key === "ArrowUp" ? Math.min(history.length - 1, p.at + 1) : p.at - 1;
+    if (p.at < 0) { p.at = -1; setText(p.draft); return; }
+    setText(history[p.at]);
+    requestAnimationFrame(() => { const el = input.current; if (el) el.setSelectionRange(el.value.length, el.value.length); });
+  };
   return (
-    <form className="cp-composer" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { askMuse(text); setText(""); } }}>
+    <form className="cp-composer" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { askMuse(text); setText(""); past.current = { at: -1, draft: "" }; } }}>
       <button type="button" className={cn("cp-icon-btn", voice.state === "listening" && "is-live")} aria-pressed={voice.state === "listening"}
               aria-label={voice.state === "listening" ? "Send what you said" : "Talk to Muse"} title={voice.state === "listening" ? "Send what you said" : "Talk to Muse"}
               disabled={voice.state === "hearing" || !!ask.pending} onClick={toggleVoice}><MicIcon /></button>
-      <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} aria-label="Ask Muse"
+      <input ref={input} value={text} onChange={(e) => { setText(e.target.value); past.current.at = -1; }} onKeyDown={recall} placeholder={placeholder} aria-label="Ask Muse"
              className={voice.error ? "placeholder:!text-hot" : undefined} />
       <button type="submit" className={cn("cp-icon-btn", text.trim() && "is-on")} disabled={!text.trim() || !!ask.pending} aria-label="Send"><SendIcon /></button>
     </form>
