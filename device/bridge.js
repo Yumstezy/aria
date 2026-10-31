@@ -846,25 +846,6 @@ Max.addHandler("groove_ab", (s) => serial(async () => {
   } catch (e) { grooveState({ error: e.message }); }
 }));
 
-// ---------- Aria's voice (Oct 31) ----------
-// Answers to spoken requests, read aloud with the Mac's own voice: Meta's Model API turns speech into text only
-// (Muse Voice Transcribe) and has no voice output. One at a time; a new answer or the mic starting stops it.
-let sayChild = null;
-function stopSpeaking() { if (sayChild) { try { sayChild.kill(); } catch (e) { } sayChild = null; } }
-Max.addHandler("speak", (s) => {
-  let text;
-  try { text = String(decode(s).text || "").replace(/\s+/g, " ").trim().slice(0, 600); } catch (e) { return; }
-  stopSpeaking();
-  if (!text) return;
-  try {
-    const child = spawn("/usr/bin/say", [text], { stdio: "ignore" });
-    child.on("exit", () => { if (sayChild === child) sayChild = null; });
-    child.on("error", () => { if (sayChild === child) sayChild = null; });
-    sayChild = child;
-  } catch (e) { /* no voice on this Mac: the answer is on screen */ }
-});
-Max.addHandler("speak_stop", () => stopSpeaking());
-
 // ---------- messages from the UI ----------
 
 Max.addHandler("ready", async () => {

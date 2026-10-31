@@ -4,6 +4,8 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 ## Oct 31
 
+- **Spoken replies removed (Ian, Oct 31: "get rid of the voice, it's not nice").** Answers show on screen only. Talking to Aria (the mic, Muse Voice Transcribe) stays. ElevenLabs is no longer planned. Ian: "everything is good and functional with the software".
+
 - **Live analyzer redone after Ian's references (13:01):** spectrum filled violet like iZotope (the gold "is kinda ugly"), at sixth octaves (55 bands, the device rebuilt: 155 boxes) so peaks show; Width is a polar stereo view (half circle L to R, a dot per sample pair from a 100 ms stereo buffer read by device/scope.js, red outside the 45 degree lines); the waveform is colored by where the sound is (red lows, orange mids, green highs, weighted like the spectrum is drawn). Loudness unchanged. Checked with frames and samples computed from Ian's drop. Check in Live (re-add Aria, the device changed): Live analyzer while playing; the dots move, the waveform scrolls in colors. If the width view stays empty, scope.js's buffer read is the part to look at.
 
 - **Home, full window (Ian, 12:50):** Reference (the comparison chart), Arrangement (the parts as colored blocks, or Hear the whole song) and a compact Live analyzer (loudness, width, spectrum) sit on Home, each with Open. Docked, Home keeps its two short cards. Plain cards (the glowing ones lag).
