@@ -691,6 +691,7 @@ function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
     gliding toward each frame like an analyzer's ballistics: up in about 25 ms, down in about 150 ms. The moving
     lines are written straight to the SVG, so a frame doesn't re-render React, and the dB scale only moves in 6 dB steps. */
 const RISE_S = 0.025, FALL_S = 0.15, PEAK_FALL_DB_S = 12;
+const WAVE_FRAMES = 160;   // 8 s at 20 frames a second
 function LiveAnalyzer({ narrow }: { narrow: boolean }) {
   const result = useAriaSel((s) => s.result);
   const [playing, setPlaying] = useState(false);
@@ -709,12 +710,23 @@ function LiveAnalyzer({ narrow }: { narrow: boolean }) {
   const geo = useRef({ line, draw, top, n, H, X });
   geo.current = { line, draw, top, n, H, X };
 
-  useEffect(() => onAnalyzer((f) => {
+  // Width, loudness and the waveform (Oct 31), after the 31 bands in each frame
+  const [stats, setStats] = useState<{ lufs: number | null; width: number | null } | null>(null);
+  const wave = useRef<number[]>([]), waveEl = useRef<SVGPathElement>(null), power = useRef<number | null>(null), widthAvg = useRef<number | null>(null);
+  useEffect(() => onAnalyzer((frame) => {
+    const f = frame.slice(0, ANALYZER_HZ.length), [width, lufs, peak] = frame.slice(ANALYZER_HZ.length);
     latest.current = f;
     avg.current = f.map((v, i) => (avg.current ? avg.current[i] * 0.97 + v * 0.03 : v));   // a few seconds' average
+    if (lufs !== undefined) {
+      // Loudness over about the last 3 s: the momentary readings' power, averaged (20 frames a second)
+      const p = lufs > -100 ? 10 ** ((lufs + 0.691) / 10) : 0;
+      power.current = power.current === null ? p : power.current * 0.983 + p * 0.017;
+      if (width !== null && width !== undefined) widthAvg.current = widthAvg.current === null ? width : widthAvg.current * 0.95 + width * 0.05;
+      wave.current = [...wave.current.slice(-(WAVE_FRAMES - 1)), peak ?? -120];
+    }
   }), []);
   useEffect(() => {
-    let raf = 0, last = performance.now(), lastLevel = 0;
+    let raf = 0, last = performance.now(), lastLevel = 0, lastStats = 0;
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
@@ -736,6 +748,17 @@ function LiveAnalyzer({ narrow }: { narrow: boolean }) {
       const want = Math.ceil((Math.max(-6, ...pk) + 3) / 6) * 6;
       if (want > g.top || want < g.top - 9) setTop(want);
       if (now - lastLevel > 1000) { lastLevel = now; setLevel(avg.current); setPlaying(true); }
+      // The waveform: the last WAVE_FRAMES peaks, newest on the right, mirrored, 0 dB at the edge and -48 dB at the line
+      if (waveEl.current && wave.current.length) {
+        const w = wave.current, h = (db: number) => Math.max(0, Math.min(1, (db + 48) / 48)) * 26;
+        const x = (i: number) => ((i + WAVE_FRAMES - w.length) / (WAVE_FRAMES - 1)) * 300;
+        waveEl.current.setAttribute("d", w.map((db, i) => `M${x(i).toFixed(1)},${(30 - h(db)).toFixed(1)}V${(30 + h(db)).toFixed(1)}`).join(""));
+      }
+      if (now - lastStats > 250) {
+        lastStats = now;
+        const p = power.current;
+        setStats({ lufs: p && p > 0 ? Math.round(10 * (-0.691 + 10 * Math.log10(p))) / 10 : null, width: widthAvg.current === null ? null : Math.round(widthAvg.current) });
+      }
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -752,7 +775,31 @@ function LiveAnalyzer({ narrow }: { narrow: boolean }) {
   }
   const ticks = dbTicksOf(-48, 12, (db) => Y(db + top - 3));
   return (
-    <div className="grid gap-4 pt-1">
+    <div className="grid gap-3 pt-1">
+      {/* Loudness, width and the waveform of Main as it plays (Ian, Oct 31) */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.4fr)" }}>
+        <section className="cp-tile cp-card" style={{ gap: 2 }} title="Loudness as BS.1770 measures it, over about the last 3 seconds (LUFS).">
+          <span className="cp-cap">Loudness</span>
+          <span className="ae-big">{stats?.lufs ?? "–"}<span className="ml-1.5 text-[15px] text-ink-muted">LUFS</span></span>
+          <span className="cp-meta">last 3 s</span>
+        </section>
+        <section className="cp-tile cp-card" style={{ gap: 6 }} title="How much of the sound is in the sides: the side's share of mid plus side. 0% is mono.">
+          <span className="cp-cap">Width</span>
+          <span className="ae-big">{stats?.width ?? "–"}<span className="ml-1 text-[15px] text-ink-muted">%</span></span>
+          <div className="relative h-1.5 rounded-full" style={{ background: "var(--well)" }}>
+            <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, (stats?.width ?? 0) * 2)}%`, background: "var(--cool)", transition: "width 240ms" }} />
+          </div>
+          <span className="flex justify-between font-mono text-[10px] text-ink-faint"><span>mono</span><span>wide</span></span>
+        </section>
+        <section className="cp-tile cp-card" style={{ gap: 6, gridColumn: narrow ? "1 / -1" : undefined }}>
+          <span className="cp-cap">Waveform</span>
+          <svg viewBox="0 0 300 60" preserveAspectRatio="none" className="block h-[60px] w-full" role="img" aria-label="Main's waveform, the last 8 seconds">
+            <line x1={0} x2={300} y1={30} y2={30} stroke="var(--hairline)" />
+            <path ref={waveEl} stroke={YOURS} strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
+          </svg>
+          <span className="cp-meta">last 8 s</span>
+        </section>
+      </div>
       <section className="cp-tile cp-card" style={{ gap: 12 }}>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-[14px] font-medium text-ink">{playing ? "Playing now" : "Play your song"}</span>

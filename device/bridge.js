@@ -609,9 +609,18 @@ function partsFor(startBar, bars) {
 let analyzerOn = false;
 Max.addHandler("analyzer_on", () => { analyzerOn = true; Max.outlet("an", 1); });
 Max.addHandler("analyzer_off", () => { analyzerOn = false; Max.outlet("an", 0); });
-Max.addHandler("analyzer_frame", (...rms) => {
+const AN_BANDS = 31;
+const dbOf = (x) => (x > 1e-6 ? Math.round(200 * Math.log10(x)) / 10 : -120);
+Max.addHandler("analyzer_frame", (...v) => {
   if (!analyzerOn || !windowLoaded) return;
-  Max.outlet("window", "analyzer", encode(rms.map((x) => (x > 1e-6 ? Math.round(200 * Math.log10(x)) / 10 : -120))));
+  // The bands in dB, then (Oct 31) width, loudness and the peak: width is the side's share of mid plus side (0 mono);
+  // loudness is BS.1770's momentary (400 ms) from the K-weighted channels, -0.691 + 10 log10(L^2 + R^2), in LUFS
+  const [mid, side, kl, kr, peak] = v.slice(AN_BANDS, AN_BANDS + 5).map(Number);
+  const extra = v.length >= AN_BANDS + 5 ? [
+    mid + side > 1e-6 ? Math.round(1000 * side / (mid + side)) / 10 : null,
+    kl * kl + kr * kr > 1e-12 ? Math.round(10 * (-0.691 + 10 * Math.log10(kl * kl + kr * kr))) / 10 : -120,
+    dbOf(peak)] : [];
+  Max.outlet("window", "analyzer", encode([...v.slice(0, AN_BANDS).map(dbOf), ...extra]));
 });
 
 // ---------- Arrangement edits (Oct 30): renamed parts and moved edges, kept for markers and checks ----------

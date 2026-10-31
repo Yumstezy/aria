@@ -28,6 +28,7 @@ STRIP_W, STRIP_H = 150.0, 169.0   # just the buttons, glassy and muted like Live
 WINDOW_W, WINDOW_H = 1200.0, 860.0
 CHAT_W, CHAT_H = 400.0, 620.0
 AN_BANDS = 31   # Live analyzer: third octaves from 31.25 Hz (31.25 x 1.2599^k)
+AN_EXTRA = 5    # then mid level, side level, K-weighted L and R (400 ms), peak since the last frame
 
 # The page the strip starts on, built into the device. The bridge swaps in the real strip about
 # 0.15 s after load, but its message goes through Max's queue, and that queue stops when Live's
@@ -124,7 +125,23 @@ def build():
         obj("an-order", "t b b", [800.0, 310.0, 40.0, 22.0], 1, 2, ["bang", "bang"]),
         *[obj(f"an-rms-{k}", "average~ 2048 rms", [600.0 + k * 36, 330.0, 34.0, 22.0], 1, 1, ["signal"]) for k in range(AN_BANDS)],
         *[obj(f"an-snap-{k}", "snapshot~", [600.0 + k * 36, 360.0, 34.0, 22.0], 2, 1, [""]) for k in range(AN_BANDS)],
-        obj("an-pack", "pack " + " ".join(["0."] * AN_BANDS), [600.0, 400.0, 400.0, 22.0], AN_BANDS, 1),
+        # Live analyzer extras (Oct 31, Ian: loudness, how wide, the waveform): mid and side levels; each channel
+        # K-weighted (BS.1770's two filters, 48 kHz coefficients) and averaged over 400 ms, for loudness; and the
+        # peak since the last frame. They go after the bands in the same frame.
+        obj("an-diff", "-~", [1000.0, 220.0, 40.0, 22.0], 2, 1, ["signal"]),
+        obj("an-side", "*~ 0.5", [1000.0, 250.0, 50.0, 22.0], 2, 1, ["signal"]),
+        obj("an-side-rms", "average~ 2048 rms", [1000.0, 330.0, 100.0, 22.0], 1, 1, ["signal"]),
+        obj("an-side-snap", "snapshot~", [1000.0, 360.0, 60.0, 22.0], 2, 1, [""]),
+        obj("an-mid-rms", "average~ 2048 rms", [1110.0, 330.0, 100.0, 22.0], 1, 1, ["signal"]),
+        obj("an-mid-snap", "snapshot~", [1110.0, 360.0, 60.0, 22.0], 2, 1, [""]),
+        *[o for ch in (0, 1) for o in (
+            obj(f"an-k1-{ch}", "biquad~ 1.53512485958697 -2.69169618940638 1.19839281085285 -1.69065929318241 0.73248077421585",
+                [1220.0 + ch * 220, 250.0, 210.0, 22.0], 6, 1, ["signal"]),
+            obj(f"an-k2-{ch}", "biquad~ 1. -2. 1. -1.99004745483398 0.99007225036621", [1220.0 + ch * 220, 280.0, 210.0, 22.0], 6, 1, ["signal"]),
+            obj(f"an-k-rms-{ch}", "average~ 19200 rms", [1220.0 + ch * 220, 330.0, 110.0, 22.0], 1, 1, ["signal"]),
+            obj(f"an-k-snap-{ch}", "snapshot~", [1220.0 + ch * 220, 360.0, 60.0, 22.0], 2, 1, [""]))],
+        obj("an-peak", "peakamp~", [1660.0, 330.0, 60.0, 22.0], 2, 1, [""]),
+        obj("an-pack", "pack " + " ".join(["0."] * (AN_BANDS + AN_EXTRA)), [600.0, 400.0, 400.0, 22.0], AN_BANDS + AN_EXTRA, 1),
         obj("an-prepend", "prepend analyzer_frame", [600.0, 430.0, 130.0, 22.0], 1, 1),
     ]
 
@@ -163,6 +180,12 @@ def build():
         wire("an-order", "an-snap-0", 0, 0),
         *[wire(f"an-snap-{k}", "an-pack", 0, k) for k in range(AN_BANDS)],
         wire("route-out", "an-metro", 6, 0), wire("an-metro", "an-order"),
+        # the extras: side (L-R)/2 and mid (the bank's mono) levels, K-weighted L and R, the peak of the mono
+        wire("in", "an-diff", 0, 0), wire("in", "an-diff", 1, 1), wire("an-diff", "an-side"), wire("an-side", "an-side-rms"), wire("an-side-rms", "an-side-snap"),
+        wire("an-half", "an-mid-rms"), wire("an-mid-rms", "an-mid-snap"), wire("an-half", "an-peak"),
+        *[w for ch in (0, 1) for w in (wire("in", f"an-k1-{ch}", ch, 0), wire(f"an-k1-{ch}", f"an-k2-{ch}"), wire(f"an-k2-{ch}", f"an-k-rms-{ch}"), wire(f"an-k-rms-{ch}", f"an-k-snap-{ch}"))],
+        *[wire("an-order", x, 1, 0) for x in ("an-mid-snap", "an-side-snap", "an-k-snap-0", "an-k-snap-1", "an-peak")],
+        *[wire(x, "an-pack", 0, AN_BANDS + i) for i, x in enumerate(("an-mid-snap", "an-side-snap", "an-k-snap-0", "an-k-snap-1", "an-peak"))],
         wire("an-pack", "an-prepend"), wire("an-prepend", "bridge"),
     ]
 
