@@ -769,6 +769,7 @@ function undo() {
   } else if (u.kind === "vocal") {
     const clip = vocalClip(u);
     if (clip) {
+      try { clip.set("end_marker", Math.max(u.before.end_marker, one(clip, "end_marker"))); } catch (e) { }
       setWarp(clip, u.before.markers);
       clip.set("warping", u.before.warping);
       try { clip.set("warp_mode", u.before.warp_mode); clip.set("end_marker", u.before.end_marker); clip.set("start_marker", u.before.start_marker); } catch (e) { }
@@ -986,11 +987,15 @@ function addWarp(clip, m) {
   catch (e) { try { clip.call("add_warp_marker", "beat_time", m.beat_time, "sample_time", m.sample_time); return true; } catch (e2) { return false; } }
 }
 
+// Live's markers out, these in, in order (each one near the last), then read back: Live can refuse a marker without an
+// error (Ian, Oct 31: it kept one of two and played the vocal at 60.73 BPM). Returns how many of them Live kept.
 function setWarp(clip, markers) {
   warpMarkers(clip).forEach(function (m) { try { clip.call("remove_warp_marker", m.beat_time); } catch (e) { } });
-  var ok = true;
-  markers.forEach(function (m) { if (!addWarp(clip, m)) ok = false; });
-  return ok;
+  markers.forEach(function (m) { addWarp(clip, m); });
+  const now = warpMarkers(clip);
+  return markers.filter(function (m) {
+    return now.some(function (n) { return Math.abs(n.beat_time - m.beat_time) < 0.01 && Math.abs(n.sample_time - m.sample_time) < 0.005; });
+  }).length;
 }
 
 // Put the vocal on the song's grid with Live's own warping: Complex Pro, Aria's two warp markers (beat 1 on a bar
@@ -1004,10 +1009,13 @@ function vocal_warp(encoded) {
                    start_marker: one(clip, "start_marker"), end_marker: one(clip, "end_marker") };
   clip.set("warping", 1);
   try { clip.set("warp_mode", 6); } catch (e) { }   // Complex Pro, for vocals
-  if (!setWarp(clip, q.markers)) {
+  try { clip.set("end_marker", Math.max(before.end_marker, q.end_marker)); } catch (e) { }   // room for every marker first
+  const kept = setWarp(clip, q.markers);
+  if (kept < q.markers.length) {
     setWarp(clip, before.markers);
     clip.set("warping", before.warping);
-    send("vocal_done", { ok: false, text: "Live didn't take Aria's warp markers. Nothing was changed." });
+    try { clip.set("warp_mode", before.warp_mode); clip.set("end_marker", before.end_marker); } catch (e) { }
+    send("vocal_done", { ok: false, text: "Live kept " + kept + " of Aria's " + q.markers.length + " warp markers, so Aria put the vocal back how it was." });
     return;
   }
   try { clip.set("end_marker", q.end_marker); clip.set("start_marker", q.start_marker); } catch (e) { }

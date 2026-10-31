@@ -182,7 +182,12 @@ def analyze(path, song_tempo, tempo=None, beat_shift=0, kick=None, place=None):
         # The kicks as seconds in the vocal's own file, for the picture: where each lands once synced
         sync["kicks_sec"] = [round(beat1 + (k - target) * spb, 4) for k in kicks if -8 <= k - target <= 24]
     beats = max(1, int((seconds - beat1) / spb))
-    markers = [{"beat_time": before, "sample_time": beat1}, {"beat_time": before + beats, "sample_time": round(beat1 + beats * spb, 6)}]
+    # A marker every four bars from beat 1 to the end, not just two far apart (Ian, Oct 31: Live kept only the first of
+    # two markers 470 beats apart and played the vocal at 60.73 BPM). Each beat lands on the song's grid (or kick).
+    every = 16
+    markers = [{"beat_time": round(before + k, 6), "sample_time": round(beat1 + k * spb, 6)} for k in range(0, beats + 1, every)]
+    if len(markers) < 2:
+        markers.append({"beat_time": round(before + beats, 6), "sample_time": round(beat1 + beats * spb, 6)})
     end = before + (seconds - beat1) / spb
     # The picture: the vocal's level from a bar before beat 1 to three bars after, in 10 ms steps, so the producer
     # sees where beat 1 sits and can move it by a beat

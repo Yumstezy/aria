@@ -59,9 +59,9 @@ def test_warp_markers_put_beat_one_on_a_bar(tmp_path):
     out = vocal.analyze(path, song_tempo=150)
     m = out["warp"]["markers"]
     assert m[0]["sample_time"] == out["first_beat_sec"] and m[0]["beat_time"] % 4 == 0
-    # 128 beats a minute in the file: the second marker is that many seconds per beat further on
-    beats = m[1]["beat_time"] - m[0]["beat_time"]
-    assert abs((m[1]["sample_time"] - m[0]["sample_time"]) - beats * 60 / 128) < 1e-6
+    # 128 beats a minute in the file: every marker is that many seconds per beat further on, four bars apart
+    assert len(m) >= 3 and all(b["beat_time"] - a["beat_time"] == 16 for a, b in zip(m, m[1:]))
+    assert all(abs((b["sample_time"] - a["sample_time"]) - 16 * 60 / 128) < 1e-5 for a, b in zip(m, m[1:]))
     assert m[0]["beat_time"] - m[0]["sample_time"] * 128 / 60 >= 0     # the file's start isn't before the clip's
 
 

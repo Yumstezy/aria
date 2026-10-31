@@ -4,6 +4,9 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 ## Oct 31
 
+- **Vocal sync half-timed it (Ian, 12:09):** Live showed one warp marker and 60.73 BPM: it kept only the first of Aria's two markers (470 beats apart) and said nothing. Now a marker every 4 bars from beat 1, added in order after making room (end marker), read back from Live; if any is missing, Aria puts the clip back and says how many Live kept. Check: Vocal, pick the acapella and the kick, Sync to the kick; the clip should show a marker every 4 bars and its words on the kick. If it says "Live kept N of M", tell Claude N and M.
+- **Aria's voice:** Ian finds the Mac voice doesn't fit; wants ElevenLabs (needs an ElevenLabs API key in engine/.env and a voice id). Waiting on the key.
+
 - **Groove match, Ian's test (12:07):** "0 of 32 hits moved, couldn't measure it" when a perc loop followed a kick loop: the kick plays only the beats, the perc only off 16ths, and pairing needed both at the same 16th. Following a loop now means its grid and feel (its hit where it has one, its median lateness elsewhere): on Ian's loops the perc was 14.9 ms late against the kick, after 0, In time. The result card is now one picture: the followed loop, before and after as waveforms, dashed lines where each hit belongs, Beat or Bar zoom (the dot chart and bars are gone).
 
 - **Talking to Aria, Ian: "it's not working right now".** The engine log shows the two recordings were pure silence (peak -180 dBFS): Live's web view got zeros from the mic, which is what macOS gives an app without microphone permission (the Mac's input is the EarPods mic). Fix for Ian: System Settings, Privacy & Security, Microphone, turn on Ableton Live, quit and reopen Live. Aria now says exactly that for a silent recording instead of "Muse didn't catch any words", and doesn't send silence to Muse.
