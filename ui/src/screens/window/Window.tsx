@@ -213,10 +213,11 @@ const Rail = memo(function Rail({ view, setView, narrow }: { view: View; setView
       <nav className="cp-nav" aria-label="Tools">
         {item("home", "Home", <HomeIcon />)}
         {item("mixcheck", "Mix check", <MixIcon />, list.length ? <span className="ae-count">{list.length}</span> : null)}
-        {item("arrangement", "Arrangement", <ArrangementIcon />)}
-        {item("analyzer", "Live analyzer", <AnalyzerIcon />)}
+        {/* Ian, Oct 31: the tools in the order they're used */}
         {item("groove", "Groove match", <GrooveIcon />)}
         {item("reference", "Reference", <ReferenceIcon />)}
+        {item("arrangement", "Arrangement", <ArrangementIcon />)}
+        {item("analyzer", "Live analyzer", <AnalyzerIcon />)}
       </nav>
       {!narrow && names.length > 0 && (
         <>

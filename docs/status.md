@@ -4,6 +4,8 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 ## Oct 31
 
+- **Groove match picture removed (Ian, 12:52: "just hard to understand... remove or completely rework"):** the result card is the headline (In time), the worst hit before and now in ms, how many hits moved, Original / Matched and Undo. The engine no longer builds a picture. Side menu reordered (Ian): Home, Mix check, Groove match, Reference, Arrangement, Live analyzer.
+
 - **Groove screen stuck on "Putting the new loop under the original" (Ian, 12:46, with "The device sent a message Aria could not read"):** the result with the new waveform picture was 50 KB as sent, past what Max passes to its web view (~32 KB), so it arrived cut off. The picture is now packed (one character a point, every 2 ms): 7 KB in all. The bridge no longer sends warp markers to the screen, refuses any message over 30 KB with a plain error (logged in Max), and sends the window only the newest Ask history that fits (it was 23 KB and growing), keeping Undo's and suggestions' positions right.
 
 - **Groove match on a warped loop (Ian, 12:41: Ask Muse's match "didn't put them on time"):** the loop was a 140 BPM bongo warped to 165, matched in its own file time on a 165 grid: 21 hits moved up to 39 ms the wrong way, and it still said In time. Now each clip's warp markers and place in the song go to the engine, which times everything as heard (song seconds); the matched clip gets the original's warp. Same bongo against the kick: 5.5 ms worst as heard, 14 hits nudged, all found. The button's "isn't at 165 BPM, consolidate it" refusal is gone for warped clips. Also: a failed match from Ask Muse no longer leaves the Groove screen locked.

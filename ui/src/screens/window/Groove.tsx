@@ -22,69 +22,6 @@ function ClipCard({ label, clip, onPick, busy }: { label: string; clip: GrooveCl
   );
 }
 
-/** One bar the way Live shows it (Ian, Oct 31: the dots looked "like random dots placed wherever"): the loop being
-    followed on top (or the 16ths, for the straight grid), then this loop before and after, as waveforms, with a line
-    through every spot a hit belongs. Off-time hits sit off the lines before and on them after. Beat zooms into the
-    beat with the worst hit, where a 15 ms flam is wide enough to see. */
-function GroovePicture({ r, followName }: { r: GrooveResult; followName: string }) {
-  const p = r.picture;
-  const [zoom, setZoom] = useState<"bar" | "beat">("beat");
-  if (!p) return null;
-  const beat = p.step_sec * 4;
-  // the beat holding the hit that was furthest off, in this bar
-  const inBar = r.before.hits.filter((h) => h.sec >= p.start_sec && h.sec < p.start_sec + p.bar_sec);
-  const worst = inBar.reduce((a, h) => (!a || Math.abs(h.offset_ms) > Math.abs(a.offset_ms) ? h : a), null as null | { sec: number; offset_ms: number });
-  const b = worst ? Math.min(3, Math.floor((worst.sec - p.start_sec) / beat)) : 0;
-  const from = zoom === "beat" ? Math.max(0, b * beat - p.step_sec * 0.5) : 0, len = zoom === "beat" ? beat + p.step_sec : p.bar_sec;
-  const unpack = (packed: string) => Array.from(packed, (c) => Math.max(0, p.levels.indexOf(c)) / 63);
-  const W = 640, ROW = 46, rows = [p.anchor ? { name: followName, env: unpack(p.anchor), color: "var(--ink-muted)" } : null,
-    { name: "Before", env: unpack(p.before), color: THEIRS }, { name: "After", env: unpack(p.after), color: YOURS }].filter(Boolean) as { name: string; env: number[]; color: string }[];
-  const per = p.point_ms / 1000;   // seconds between points
-  const H = rows.length * ROW + (p.anchor ? 0 : 14);
-  const X = (sec: number) => ((sec - from) / len) * W;
-  const wave = (env: number[], top: number) => {
-    const a = Math.max(0, Math.floor(from / per)), z = Math.min(env.length, Math.ceil((from + len) / per));
-    const mid = top + ROW / 2, amp = ROW / 2 - 5;
-    const pts = [];
-    for (let i = a; i < z; i++) pts.push([X(i * per), env[i]]);
-    const up = pts.map(([x, v], k) => `${k ? "L" : "M"}${x.toFixed(1)},${(mid - v * amp).toFixed(1)}`).join("");
-    const down = pts.reverse().map(([x, v]) => `L${x.toFixed(1)},${(mid + v * amp).toFixed(1)}`).join("");
-    return `${up}${down}Z`;
-  };
-  const grid = [];
-  for (let k = 0; k <= 16; k++) grid.push(k * p.step_sec);
-  return (
-    <div className="grid gap-2">
-      <div className="flex items-center gap-2">
-        <span className="text-[12.5px] text-ink-muted">{zoom === "beat" ? `Beat ${b + 1} of the bar with the worst hit` : "The bar with the worst hit"}</span>
-        <div className="cp-seg ml-auto" role="group" aria-label="Zoom">
-          <button aria-pressed={zoom === "beat"} onClick={() => setZoom("beat")}>Beat</button>
-          <button aria-pressed={zoom === "bar"} onClick={() => setZoom("bar")}>Bar</button>
-        </div>
-      </div>
-      <div className="relative overflow-hidden rounded-[12px]" style={{ background: "color-mix(in srgb, var(--ground) 55%, transparent)", border: "1px solid var(--hairline)" }}>
-        <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="The loop before and after, against the spots its hits belong">
-          {grid.map((t, k) => <line key={k} x1={X(t)} x2={X(t)} y1={0} y2={H} stroke="var(--hairline)" strokeOpacity={k % 4 === 0 ? 1 : 0.5} />)}
-          {rows.map((row, i) => (
-            <g key={row.name}>
-              {i > 0 && <line x1={0} x2={W} y1={i * ROW} y2={i * ROW} stroke="var(--hairline)" />}
-              <path d={wave(row.env, i * ROW)} fill={row.color} opacity={0.85} />
-            </g>
-          ))}
-          {p.lines_sec.map((t) => <line key={t} x1={X(t)} x2={X(t)} y1={0} y2={H} stroke="var(--good)" strokeWidth={1.4} strokeDasharray="3 3" />)}
-          {!p.anchor && grid.map((t, k) => <rect key={k} x={X(t) - 1} y={H - 10} width={2} height={k % 4 === 0 ? 8 : 5} fill="var(--ink-faint)" />)}
-        </svg>
-        <div className="pointer-events-none absolute inset-0 font-mono text-[10px] leading-3" aria-hidden="true">
-          {rows.map((row, i) => (
-            <span key={row.name} className="absolute left-2 max-w-[45%] truncate rounded px-0.5" style={{ top: `calc(${((i * ROW + 4) / H) * 100}%)`, color: row.color, background: "color-mix(in srgb, var(--ground) 70%, transparent)" }}>{row.name}</span>
-          ))}
-        </div>
-      </div>
-      <span className="text-[12px] text-ink-faint">Dashed lines: where each hit belongs{p.anchor ? `, on ${followName}'s timing` : ", the 16ths"}.</span>
-    </div>
-  );
-}
-
 /** The start of the vocal as a level picture (Ian, Oct 30): beat 1 in gold, and the kick's hits as ticks along the
     bottom where they'll land once synced (or the bar's beats, with no kick), so the producer sees whether the words sit
     on the kicks and moves beat 1 by a beat if not. */
@@ -264,7 +201,7 @@ function LoopsPanel({ narrow }: { narrow: boolean }) {
           <span className="text-[14px] text-ink">
             Worst hit: {r.before.max_ms ?? "?"} ms off, now {r.after.max_ms ?? "?"} ms. {r.hits_moved} of {r.hits} hits moved {r.follow === "Straight" ? "onto the grid" : `to follow ${r.follow}`}{r.after.missing ? `. ${r.after.missing} couldn't be heard again` : ""}.
           </span>
-          <GroovePicture r={r} followName={r.follow === "Straight" ? "Grid" : r.follow} />
+          {/* No picture (Ian, Oct 31: the dots, the bars and the waveforms were all "hard to understand"). Listen instead. */}
           {g.placed && (
             <div className="flex flex-wrap items-center gap-2">
               <div className="cp-seg" role="group" aria-label="Listen to">

@@ -190,58 +190,12 @@ class ClipTime:
         return self._line((s - self.start) / self.spb + self.marker, self.bt, self.st)
 
 
-# The picture's waveforms, packed: one character per point, 64 levels (Ian, Oct 31: as numbers the result was 50 KB
-# sent to the window, past what Max passes to its web view, and the screen hung on "Putting the new loop under")
-PICTURE_STEP_MS = 2
-LEVELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-
-
-def _pack(values):
-    return "".join(LEVELS[min(63, max(0, int(round(v * 63))))] for v in values)
-
-
-def _song_envelope(x, rate, clip, start, seconds):
-    """A clip's waveform as heard in the song, PICTURE_STEP_MS steps from song second start, 0 to 1 against its own
-    loudest, packed (one character a point)"""
-    x = np.abs(_mono(x))
-    ms = max(1, int(rate / 1000))
-    env = np.r_[x, np.zeros((-len(x)) % ms)].reshape(-1, ms).max(axis=1)
-    out = []
-    for k in range(int(round(seconds * 1000 / PICTURE_STEP_MS))):
-        a = int(clip.file(start + k * PICTURE_STEP_MS / 1000) * 1000)
-        b = int(clip.file(start + (k + 1) * PICTURE_STEP_MS / 1000) * 1000)
-        seg = env[max(0, a):max(max(0, a) + 1, b)] if a < len(env) else np.zeros(0)
-        out.append(float(seg.max()) if len(seg) else 0.0)
-    top = max(out) if out else 0.0
-    return _pack([np.sqrt(v / top) if top > 0 else 0.0 for v in out])
-
-
-def _picture(audio, moved, rate, clip, step, anchor_info, song_times, targets):
-    """One bar as producers see it in Live (Ian, Oct 31: the dots "look like random dots placed wherever"): the loop to
-    follow on top, this loop before and after, as heard in the song (warping and all), 1 ms steps, and the lines every
-    hit should sit on (where each was moved to). The bar shown is the one holding the hit that was furthest off."""
-    bar = 16 * step
-    offs = [(abs(g - t), t) for t, g in zip(song_times, targets) if g is not None]
-    worst = max(offs)[1] if offs else (song_times[0] if song_times else 0.0)
-    start = float(np.floor(worst / bar) * bar)
-    lines = sorted({round(g - start, 4) for g in targets if g is not None and start <= g < start + bar})
-    out = {"bar_sec": round(bar, 4), "step_sec": round(step, 5), "start_sec": round(start, 4), "lines_sec": lines,
-           "point_ms": PICTURE_STEP_MS, "levels": LEVELS,
-           "before": _song_envelope(audio, rate, clip, start, bar), "after": _song_envelope(moved, rate, clip, start, bar), "anchor": None}
-    if anchor_info:
-        a, period = anchor_info["clip"], anchor_info["period"]
-        # the same bar of the song, or of the other loop's repeat when it doesn't reach there
-        a_start = start if a.start <= start < a.start + period else a.start + (start - a.start) % period
-        out["anchor"] = _song_envelope(anchor_info["audio"], anchor_info["rate"], a, a_start, bar)
-    return out
-
-
 def match(moving_path, anchor, tempo, strength=1.0, nudge_ms=0.0, beat1_sec=None, out_dir=None, moving=None):
     """Move the moving loop's hits toward the anchor ({"kind": "straight"} or {"kind": "loop", "path", "warp"?,
     "start_beat"?, "start_marker"?}), write "<name> (matched).wav" in out_dir and measure it again. moving
     {warp, start_beat, start_marker} places this loop's clip in the song (Live's warp markers), so a loop at another
     tempo is matched as it's heard. Everything is timed in song seconds; offsets are what you hear.
-    Returns {before, after, in_time, hits, hits_moved, out_path, grid, picture}."""
+    Returns {before, after, in_time, hits, hits_moved, out_path, grid}."""
     beat1_sec, moving = beat1_sec or {}, moving or {}
     audio, rate = sf.read(str(moving_path), always_2d=True, dtype="float64")
     step = 60.0 / tempo / STEPS_PER_BEAT
@@ -258,10 +212,8 @@ def match(moving_path, anchor, tempo, strength=1.0, nudge_ms=0.0, beat1_sec=None
         period = max(bar, round(length / bar) * bar)
         a_song = [a_clip.song(t) for t in onsets(other, orate)]
         targets = _targets(song_times, step, 0.0, a_song, period)
-        anchor_info = {"audio": other, "rate": orate, "clip": a_clip, "period": period}
     elif anchor.get("kind") == "straight":
         targets = _targets(song_times, step, 0.0)
-        anchor_info = None
     else:
         raise ValueError("Groove match can follow a straight grid or another loop.")
 
@@ -277,8 +229,7 @@ def match(moving_path, anchor, tempo, strength=1.0, nudge_ms=0.0, beat1_sec=None
 
     before = _offsets(song_times, targets)
     after = _after(audio, moved, rate, times, shifts, targets, nudge, clip)
-    picture = _picture(audio, moved, rate, clip, step, anchor_info, song_times, targets)
-    return {"before": before, "after": after, "grid": {"step_sec": round(step, 5), "beat1_sec": 0.0, "steps_per_bar": 4 * STEPS_PER_BEAT}, "picture": picture,
+    return {"before": before, "after": after, "grid": {"step_sec": round(step, 5), "beat1_sec": 0.0, "steps_per_bar": 4 * STEPS_PER_BEAT},
             # "Every hit within 5 ms" needs every hit heard again
             "in_time": after["max_ms"] is not None and after["max_ms"] <= IN_TIME_MS and after["missing"] == 0,
             "hits": len(times), "hits_moved": sum(1 for s, g in zip(song_times, targets) if g is not None and abs(g - s) * 1000 > 1.0),
