@@ -7,6 +7,7 @@ You're building the part of Aria that can say how finished an EDM mix sounds, ev
 - **Data:** 99 rated mixes from the shared Drive (good 30, mid 36, bad 33), in 71 song and producer groups.
 - **Official result** (`results/train-report.md`): the best model scores 0.49 on songs it never saw, against 0.45 for "just look at loudness" (0.33 is a coin toss). It wins only 66% of test rounds and fails the shuffle test (p = 0.70), so **by the ship rule, nothing ships yet.**
 - **Side experiment** (`results/no-loudness-experiment.md`, added after the official run): with loudness taken out, tone and stereo alone still separate the tiers better than chance. See "Side experiments" below.
+- **Audiobox side experiment (Oct 30, planned before any scores existed)** (`results/aesthetics-experiment.md`): Meta's Audiobox Aesthetics scores don't beat loudness. Best 0.51 (Audiobox plus tone and stereo) against loudness 0.46; it beats loudness in only 52% of rounds (the bar is 80%). Shuffle p = 0.010 says it's better than chance, not better than loudness. **Not proposed for the next official run.**
 - **Permission (answered by Ian, Oct 30):** the mixes were given to the team or released by their artists for free download for us to use.
 - **In the app (Oct 30):** the classifier doesn't ship, but the good-rated mixes' band balance does, as Aria's "against good mixes" comparison when no reference song is picked (`engine/aria_engine/typical.py`). It measures exactly as `detail.py` does and only reads `data/features.csv`.
 
@@ -26,6 +27,8 @@ You're building the part of Aria that can say how finished an EDM mix sounds, ev
 | `data/song_groups.csv` | Fixes for file names the grouping rule gets wrong, each with a reason |
 | `data/excluded.csv` | Files left out on purpose, each with a reason |
 | `data/manifest.csv` | Where each mix and its rating came from, and permission. To fill in |
+| `data/aesthetics.csv` | Audiobox Aesthetics scores (PQ, PC, CE, CU) for the 99 mixes, from `aesthetics.py` |
+| `data/curves.csv` | Each mix's EQ curve: 109 points from 31.5 Hz to 16 kHz, loudness taken out, from `curves.py` |
 | `results/` | The reports |
 
 ## What you're building, in one minute
@@ -60,6 +63,15 @@ Meta's Audiobox Aesthetics model scores audio on Production Quality, Production 
 - Scores: `ml/aesthetics.py`, on each mix's same loudest 60 s.
 - Test: `ml/experiments/audiobox.py`. Three new sets (Audiobox only; Audiobox plus tone and stereo; Audiobox plus detailed), three models (random forest, ordinal logistic, logistic regression), the same song-grouped splits, the shuffle test over the whole best-of step. Bars: loudness only and the official best, on the same splits.
 - It stays a side experiment. If it beats loudness in 80% of rounds with shuffle p under 0.05, it goes to the team as a proposal for the next official run, not shipped from this result.
+
+**Result (run Oct 30, exactly as planned; full report in `results/aesthetics-experiment.md`):**
+
+- Best new set: logistic regression on Audiobox plus tone and stereo, **0.51**. Loudness only 0.46, the official best 0.49, chance 0.33.
+- It beats loudness in **52%** of the 50 test rounds, short of the 80% bar. Shuffle test p = 0.010: better than chance, not reliably better than loudness. **So it isn't proposed for the next official run.**
+- Audiobox alone scores 0.44 to 0.47, no better than loudness. Its medians are almost the same in every tier (good, mid, bad): Production Quality 8.10, 8.02, 8.02; Production Complexity 6.56, 6.51, 6.43; Content Enjoyment 6.67, 6.75, 6.84; Content Usefulness 8.00, 7.89, 7.86. It rates these finished masters as about equally polished.
+- Two fixes before the run, neither of which changes the test: the experiment matched mixes by full path (`good/GOOD_x.wav`) while the scores were saved by file name (`GOOD_x.wav`), so 0 of 99 matched; it now matches by file name and stops if under 90% match. And every ML script now reads and writes UTF-8, since Windows was garbling names like "BYØRN".
+- Where to run it: `aesthetics.py` downloads the model from Hugging Face on first use, so it needs a machine that can reach it. It ran on Raghav's Windows laptop (about 20 minutes for 99 mixes, CPU only).
+- Proposal, not run: Audiobox may not separate finished masters at all, but could on unmastered work-in-progress mixes, which is what producers check in Aria. Testing that needs a few rated unmastered mixes.
 
 ## Timeline
 
@@ -188,6 +200,7 @@ Ideas that came after seeing the official results. Each has its own script in `e
 
 | Experiment | Question | Result |
 |---|---|---|
+| `experiments/audiobox.py` (planned before running) | Do Meta's Audiobox Aesthetics scores tell the tiers apart better than loudness? | No. Best 0.51 (Audiobox plus tone and stereo) vs loudness 0.46, beats loudness in 52% of rounds (bar 80%), shuffle p = 0.010. Audiobox scores are almost the same in every tier. See `results/aesthetics-experiment.md`. |
 | `experiments/no_loudness.py` | Can the model tell the tiers apart without loudness? | Yes, better than chance: tone and stereo alone score about 0.49 (chance 0.33), shuffle test p = 0.01. Not better than loudness alone (0.45) by enough to ship. Good mixes have more sub-bass and narrower mids. See `results/no-loudness-experiment.md`. |
 
 ## If something goes wrong
