@@ -72,3 +72,14 @@ def test_endpoint(tmp_path):
     assert body["in_time"] and body["out_path"].endswith("Hat loop (matched).wav")
     bad = client.post("/groove/match", json={"moving_path": str(tmp_path / "none.wav"), "anchor": {"kind": "straight"}, "tempo": TEMPO, "out_dir": str(tmp_path)})
     assert bad.status_code == 400
+
+
+def test_follow_a_kick_that_plays_only_the_beats(tmp_path):
+    """Ian, Oct 31: a perc loop on the off 16ths following a four-on-the-floor kick paired nothing. The kick sits 10 ms
+    late; the perc's off 16ths sit 25 ms late; after, they sit 10 ms late like the kick."""
+    kick = write(tmp_path / "Kick loop.wav", hits([k * 4 * STEP + 0.010 for k in range(8)], BARS_SEC, seed=2))
+    perc = write(tmp_path / "Perc loop.wav", hits([k * STEP + 0.025 for k in range(1, 32, 2)], BARS_SEC, seed=3))
+    out = groove.match(perc, anchor={"kind": "loop", "path": kick}, tempo=TEMPO, out_dir=tmp_path)
+    assert out["hits_moved"] == 16 and out["in_time"]
+    moved = groove.onsets(sf.read(out["out_path"])[0], RATE)
+    assert all(abs((t - round((t - 0.010) / STEP) * STEP) - 0.010) < 0.002 for t in moved)

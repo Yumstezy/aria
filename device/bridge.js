@@ -722,7 +722,7 @@ Max.addHandler("groove_run", (s) => serial(async () => {
       warping: m.warping, replace_track_id: replace || null }));
     if (replace) { const k = changeStack.findIndex((x) => x.groove); if (k >= 0) changeStack.splice(k, 1); }
     if (placed.ok) { groove.placed = { track_id: placed.track_id, orig_id: placed.orig_id, playing: "after" }; changeStack.push({ at: null, kind: "d", k: 0, groove: true }); sendUndoNext(); }
-    grooveState({ result: { ...res.json, follow: a ? a.name || a.track_name : "Straight", strength, nudge_ms }, error: placed.ok ? null : placed.text });
+    grooveState({ result: { ...res.json, follow: a ? a.track_name || a.name : "Straight", strength, nudge_ms }, error: placed.ok ? null : placed.text });
   } catch (e) {
     grooveState({ error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
   }

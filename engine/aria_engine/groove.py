@@ -69,18 +69,25 @@ def onsets(audio, rate):
 
 
 def _targets(times, step, beat1, anchor_times=None, loop_sec=None):
-    """Where each hit should be, or None when nothing is near enough. Straight: the nearest 16th. Another loop: its hit
-    at the same place in the loop (both loops repeat every loop_sec)."""
+    """Where each hit should be, or None when nothing is near enough. Straight: the nearest 16th. Another loop: the
+    nearest 16th on the grid that loop plays to: at a 16th where it has a hit, that hit's exact time; at the others,
+    the grid moved by how late or early its hits sit (the median). A kick that plays only the beats still says where
+    the off-beat 16ths go (Ian, Oct 30: a perc loop following a kick loop paired nothing, since no perc hit shared a
+    16th with a kick). Both loops repeat every loop_sec."""
     out = []
+    offs, n = {}, None
+    if anchor_times is not None:
+        n = max(1, int(round(loop_sec / step)))
+        for a in anchor_times:
+            k = int(round(a / step))
+            o = a - k * step
+            if abs(o) < MAX_MOVE_STEPS * step and (k % n not in offs or abs(o) < abs(offs[k % n])):
+                offs[k % n] = o
+    feel = float(np.median(list(offs.values()))) if offs else 0.0
     for t in times:
-        if anchor_times is None:
-            target = beat1 + round((t - beat1) / step) * step
-        else:
-            pos = (t - beat1) % loop_sec
-            gaps = [((a - pos + loop_sec / 2) % loop_sec) - loop_sec / 2 for a in anchor_times]
-            k = int(np.argmin(np.abs(gaps))) if gaps else None
-            target = t + gaps[k] if k is not None else None
-        out.append(target if target is not None and abs(target - t) < MAX_MOVE_STEPS * step else None)
+        k = int(round((t - beat1) / step))
+        target = beat1 + k * step + (offs.get(k % n, feel) if n else 0.0)
+        out.append(target if abs(target - t) < MAX_MOVE_STEPS * step else None)
     return out
 
 
@@ -152,6 +159,38 @@ def _move(x, rate, times, shifts):
     return out
 
 
+def _envelope(x, rate, start, seconds):
+    """The loudest sample in each millisecond from start, 0 to 1 against the stretch's own loudest"""
+    x = _mono(x)
+    ms = max(1, int(rate / 1000))
+    a = max(0, int(round(start * rate)))
+    seg = np.abs(x[a:a + int(round(seconds * rate))])
+    seg = np.r_[seg, np.zeros((-len(seg)) % ms)]
+    env = seg.reshape(-1, ms).max(axis=1) if len(seg) else np.zeros(0)
+    top = env.max() if len(env) else 0.0
+    return [round(float(v), 3) for v in (np.sqrt(env / top) if top > 0 else env)]
+
+
+def _picture(audio, moved, rate, b1, step, anchor_info, times, targets):
+    """One bar as producers see it in Live (Ian, Oct 31: the dots "look like random dots placed wherever"): the loop to
+    follow on top, this loop before and after, as waveforms in 1 ms steps, and the lines every hit should sit on
+    (where each hit was moved to: the other loop's grid, or the 16ths). The bar shown is the one holding the hit that
+    was furthest off."""
+    bar = 16 * step
+    n_bars = max(1, int((len(_mono(audio)) / rate - b1) // bar))
+    offs = [(abs(g - t), t) for t, g in zip(times, targets) if g is not None]
+    k = int((max(offs)[1] - b1) // bar) if offs else 0
+    start = b1 + max(0, min(n_bars - 1, k)) * bar
+    lines = sorted({round(g - start, 4) for g in targets if g is not None and start <= g < start + bar})
+    out = {"bar_sec": round(bar, 4), "step_sec": round(step, 5), "start_sec": round(start, 4), "lines_sec": lines,
+           "before": _envelope(audio, rate, start, bar), "after": _envelope(moved, rate, start, bar), "anchor": None}
+    if anchor_info:
+        # the same place in the other loop's repeat
+        loop = len(_mono(anchor_info["audio"])) / anchor_info["rate"]
+        out["anchor"] = _envelope(anchor_info["audio"], anchor_info["rate"], (anchor_info["beat1"] + (start - b1)) % max(bar, loop), bar)
+    return out
+
+
 def match(moving_path, anchor, tempo, strength=1.0, nudge_ms=0.0, beat1_sec=None, out_dir=None):
     """Move the moving loop's hits toward the anchor ({"kind": "straight"} or {"kind": "loop", "path"}), write
     "<name> (matched).wav" in out_dir and measure it again. Returns the contract's {before, after, in_time, hits_moved, out_path}."""
@@ -168,8 +207,10 @@ def match(moving_path, anchor, tempo, strength=1.0, nudge_ms=0.0, beat1_sec=None
         bar = 4 * 60.0 / tempo
         loop_sec = max(bar, round((len(other) / orate) / bar) * bar)
         targets = _targets(times, step, b1, [t % loop_sec for t in a_times], loop_sec)
+        anchor_info = {"times": a_times, "audio": other, "rate": orate, "beat1": float(beat1_sec.get("anchor", 0.0))}
     elif anchor.get("kind") == "straight":
         targets = _targets(times, step, b1)
+        anchor_info = None
     else:
         raise ValueError("Groove match can follow a straight grid or another loop.")
 
@@ -183,7 +224,8 @@ def match(moving_path, anchor, tempo, strength=1.0, nudge_ms=0.0, beat1_sec=None
 
     before = _offsets(times, targets)
     after = _after(audio, moved, rate, times, shifts, targets, nudge)
-    return {"before": before, "after": after, "grid": {"step_sec": round(step, 5), "beat1_sec": b1, "steps_per_bar": 4 * STEPS_PER_BEAT},
+    picture = _picture(audio, moved, rate, b1, step, anchor_info, times, targets)
+    return {"before": before, "after": after, "grid": {"step_sec": round(step, 5), "beat1_sec": b1, "steps_per_bar": 4 * STEPS_PER_BEAT}, "picture": picture,
             # "Every hit within 5 ms" needs every hit heard again
             "in_time": after["max_ms"] is not None and after["max_ms"] <= IN_TIME_MS and after["missing"] == 0,
             "hits": len(times), "hits_moved": sum(1 for t, g in zip(times, targets) if g is not None and abs(g - t) * 1000 > 1.0),

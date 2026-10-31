@@ -22,68 +22,63 @@ function ClipCard({ label, clip, onPick, busy }: { label: string; clip: GrooveCl
   );
 }
 
-/** Every bar folded into one (Ian, Oct 30: spread over the whole loop the dots "don't show us much"): a column per
-    16th, each hit's offset in its column, before (blue) left of after (gold), over the 5 ms band that counts as in
-    time. A part that drags or rushes shows as a column of dots above or below the band. */
-function TimingChart({ r, tempo, narrow }: { r: GrooveResult; tempo: number | null; narrow: boolean }) {
-  const W = 640, H = narrow ? 260 : 200, PAD = 8;
-  // The scale fits the loop: at least ±15 ms, in 5 ms steps, so 12 ms off doesn't sit on the band
-  const worst = Math.max(0, ...r.before.hits.map((h) => Math.abs(h.offset_ms)), ...r.after.hits.map((h) => Math.abs(h.offset_ms)));
-  const SPAN = Math.max(15, Math.ceil((worst * 1.25) / 5) * 5);
-  const steps = r.grid?.steps_per_bar ?? 16, step = r.grid?.step_sec ?? (tempo ? 15 / tempo : 0.125), b1 = r.grid?.beat1_sec ?? 0;
-  const col = (W - 2 * PAD) / steps;
-  const at = (sec: number) => ((Math.round((sec - b1) / step) % steps) + steps) % steps;
-  const X = (k: number, side: number) => PAD + (k + 0.5) * col + side * Math.min(7, col * 0.18);
-  const Y = (ms: number) => H / 2 - (Math.max(-SPAN, Math.min(SPAN, ms)) / SPAN) * (H / 2 - 14);
+/** One bar the way Live shows it (Ian, Oct 31: the dots looked "like random dots placed wherever"): the loop being
+    followed on top (or the 16ths, for the straight grid), then this loop before and after, as waveforms, with a line
+    through every spot a hit belongs. Off-time hits sit off the lines before and on them after. Beat zooms into the
+    beat with the worst hit, where a 15 ms flam is wide enough to see. */
+function GroovePicture({ r, followName }: { r: GrooveResult; followName: string }) {
+  const p = r.picture;
+  const [zoom, setZoom] = useState<"bar" | "beat">("beat");
+  if (!p) return null;
+  const beat = p.step_sec * 4;
+  // the beat holding the hit that was furthest off, in this bar
+  const inBar = r.before.hits.filter((h) => h.sec >= p.start_sec && h.sec < p.start_sec + p.bar_sec);
+  const worst = inBar.reduce((a, h) => (!a || Math.abs(h.offset_ms) > Math.abs(a.offset_ms) ? h : a), null as null | { sec: number; offset_ms: number });
+  const b = worst ? Math.min(3, Math.floor((worst.sec - p.start_sec) / beat)) : 0;
+  const from = zoom === "beat" ? Math.max(0, b * beat - p.step_sec * 0.5) : 0, len = zoom === "beat" ? beat + p.step_sec : p.bar_sec;
+  const W = 640, ROW = 46, rows = [p.anchor ? { name: followName, env: p.anchor, color: "var(--ink-muted)" } : null,
+    { name: "Before", env: p.before, color: THEIRS }, { name: "After", env: p.after, color: YOURS }].filter(Boolean) as { name: string; env: number[]; color: string }[];
+  const H = rows.length * ROW + (p.anchor ? 0 : 14);
+  const X = (sec: number) => ((sec - from) / len) * W;
+  const wave = (env: number[], top: number) => {
+    const a = Math.max(0, Math.floor(from * 1000)), z = Math.min(env.length, Math.ceil((from + len) * 1000));
+    const mid = top + ROW / 2, amp = ROW / 2 - 5;
+    const pts = [];
+    for (let i = a; i < z; i++) pts.push([X(i / 1000), env[i]]);
+    const up = pts.map(([x, v], k) => `${k ? "L" : "M"}${x.toFixed(1)},${(mid - v * amp).toFixed(1)}`).join("");
+    const down = pts.reverse().map(([x, v]) => `L${x.toFixed(1)},${(mid + v * amp).toFixed(1)}`).join("");
+    return `${up}${down}Z`;
+  };
+  const grid = [];
+  for (let k = 0; k <= 16; k++) grid.push(k * p.step_sec);
   return (
-    <div className="relative overflow-hidden rounded-[12px]" style={{ background: "color-mix(in srgb, var(--ground) 55%, transparent)", border: "1px solid var(--hairline)" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="How far each hit is from its 16th, every bar folded into one, before and after">
-        {Array.from({ length: steps / 4 }, (_, b) => b % 2 === 1 && <rect key={b} x={PAD + b * 4 * col} y={0} width={4 * col} height={H} fill="var(--ink)" opacity={0.03} />)}
-        {Array.from({ length: steps + 1 }, (_, k) => <line key={k} x1={PAD + k * col} x2={PAD + k * col} y1={0} y2={H} stroke={k % 4 === 0 ? "var(--track)" : "var(--hairline)"} strokeOpacity={k % 4 === 0 ? 0.7 : 0.5} />)}
-        <rect x={0} y={Y(5)} width={W} height={Y(-5) - Y(5)} fill="var(--good)" opacity={0.13} />
-        <line x1={0} x2={W} y1={Y(0)} y2={Y(0)} stroke="var(--good)" strokeOpacity={0.45} />
-        {r.before.hits.map((h, i) => <circle key={`b${i}`} cx={X(at(h.sec), -1)} cy={Y(h.offset_ms)} r={narrow ? 6 : 5} fill={THEIRS} opacity={0.85}><title>{`Before: ${Math.abs(h.offset_ms)} ms ${h.offset_ms > 0 ? "late" : "early"}`}</title></circle>)}
-        {r.after.hits.map((h, i) => <circle key={`a${i}`} cx={X(at(h.sec), 1)} cy={Y(h.offset_ms)} r={narrow ? 6 : 5} fill={YOURS} opacity={0.9}><title>{`After: ${Math.abs(h.offset_ms)} ms ${h.offset_ms > 0 ? "late" : "early"}`}</title></circle>)}
-      </svg>
-      <div className="pointer-events-none absolute inset-0 font-mono text-[10px] leading-3 text-ink-faint" aria-hidden="true">
-        <span className="absolute left-2 top-1.5" title={`The top is ${SPAN} ms late`}>late</span>
-        <span className="absolute bottom-1.5 left-2" title={`The bottom is ${SPAN} ms early`}>early</span>
-        <span className="absolute left-2 -translate-y-1/2 rounded px-0.5" style={{ top: "50%", color: "var(--good)", background: "color-mix(in srgb, var(--ground) 70%, transparent)" }}>±5 ms</span>
-        {Array.from({ length: steps / 4 }, (_, b) => (
-          <span key={b} className="absolute bottom-1.5" style={{ left: `calc(${((PAD + b * 4 * col) / W) * 100}% + 4px)`, display: b ? undefined : "none" }}>{b + 1}</span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** The answer in one picture (Ian, Oct 30: the dot chart was "so hard to comprehend"): how far off the worst hit
-    was before and is after, as two bars on one scale, with the 5 ms mark under which nobody hears it. */
-function OffBars({ r }: { r: GrooveResult }) {
-  const top = Math.max(10, r.before.max_ms ?? 0, r.after.max_ms ?? 0) * 1.1;
-  const pct = (ms: number | null) => `${Math.max(0, Math.min(100, ((ms ?? 0) / top) * 100))}%`;
-  const row = (label: string, ms: number | null, color: string) => (
-    <div className="grid items-center gap-3" style={{ gridTemplateColumns: "3.6rem minmax(0, 1fr) 4rem" }}>
-      <span className="text-[13px] text-ink-muted">{label}</span>
-      <span className="relative h-3 rounded-full" style={{ background: "var(--well)" }}>
-        <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: ms ? `max(6px, ${pct(ms)})` : "6px", background: color }} />
-      </span>
-      <span className="ae-mono text-right">{ms === null ? "?" : `${ms} ms`}</span>
-    </div>
-  );
-  return (
-    <div className="grid gap-1.5">
-      <div className="relative grid gap-2.5">
-        {row("Before", r.before.max_ms, THEIRS)}
-        {row("After", r.after.max_ms, YOURS)}
-        {/* the 5 ms line: under it, nobody hears a flam */}
-        <div className="pointer-events-none absolute inset-y-[-4px]" style={{ left: "calc(3.6rem + 12px)", right: "calc(4rem + 12px)" }} aria-hidden="true">
-          <span className="absolute inset-y-0 border-l border-dashed" style={{ left: pct(5), borderColor: "var(--good)" }} />
+    <div className="grid gap-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[12.5px] text-ink-muted">{zoom === "beat" ? `Beat ${b + 1} of the bar with the worst hit` : "The bar with the worst hit"}</span>
+        <div className="cp-seg ml-auto" role="group" aria-label="Zoom">
+          <button aria-pressed={zoom === "beat"} onClick={() => setZoom("beat")}>Beat</button>
+          <button aria-pressed={zoom === "bar"} onClick={() => setZoom("bar")}>Bar</button>
         </div>
       </div>
-      <span className="text-[11.5px]" style={{ paddingLeft: "calc(3.6rem + 12px)", color: "var(--good)" }}>
-        <span style={{ marginLeft: pct(5), display: "inline-block", transform: "translateX(-50%)" }}>5 ms: can't hear it</span>
-      </span>
+      <div className="relative overflow-hidden rounded-[12px]" style={{ background: "color-mix(in srgb, var(--ground) 55%, transparent)", border: "1px solid var(--hairline)" }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="The loop before and after, against the spots its hits belong">
+          {grid.map((t, k) => <line key={k} x1={X(t)} x2={X(t)} y1={0} y2={H} stroke="var(--hairline)" strokeOpacity={k % 4 === 0 ? 1 : 0.5} />)}
+          {rows.map((row, i) => (
+            <g key={row.name}>
+              {i > 0 && <line x1={0} x2={W} y1={i * ROW} y2={i * ROW} stroke="var(--hairline)" />}
+              <path d={wave(row.env, i * ROW)} fill={row.color} opacity={0.85} />
+            </g>
+          ))}
+          {p.lines_sec.map((t) => <line key={t} x1={X(t)} x2={X(t)} y1={0} y2={H} stroke="var(--good)" strokeWidth={1.4} strokeDasharray="3 3" />)}
+          {!p.anchor && grid.map((t, k) => <rect key={k} x={X(t) - 1} y={H - 10} width={2} height={k % 4 === 0 ? 8 : 5} fill="var(--ink-faint)" />)}
+        </svg>
+        <div className="pointer-events-none absolute inset-0 font-mono text-[10px] leading-3" aria-hidden="true">
+          {rows.map((row, i) => (
+            <span key={row.name} className="absolute left-2 max-w-[45%] truncate rounded px-0.5" style={{ top: `calc(${((i * ROW + 4) / H) * 100}%)`, color: row.color, background: "color-mix(in srgb, var(--ground) 70%, transparent)" }}>{row.name}</span>
+          ))}
+        </div>
+      </div>
+      <span className="text-[12px] text-ink-faint">Dashed lines: where each hit belongs{p.anchor ? `, on ${followName}'s timing` : ", the 16ths"}.</span>
     </div>
   );
 }
@@ -265,10 +260,10 @@ function LoopsPanel({ narrow }: { narrow: boolean }) {
           {r.in_time
             ? <span className="inline-flex items-center gap-2 text-[24px] font-medium" style={{ color: "var(--good)" }}><CheckIcon style={{ width: 22, height: 22 }} />In time</span>
             : <span className="text-[24px] font-medium">{r.after.max_ms === null ? "Couldn't measure it again" : `Still ${r.after.max_ms} ms off`}</span>}
-          <OffBars r={r} />
-          <span className="cp-meta">
-            {r.hits_moved} of {r.hits} hits moved {r.follow === "Straight" ? "onto the grid" : `to follow ${r.follow}`}{r.after.missing ? `. ${r.after.missing} couldn't be heard again` : ""}.
+          <span className="text-[14px] text-ink">
+            Worst hit: {r.before.max_ms ?? "?"} ms off, now {r.after.max_ms ?? "?"} ms. {r.hits_moved} of {r.hits} hits moved {r.follow === "Straight" ? "onto the grid" : `to follow ${r.follow}`}{r.after.missing ? `. ${r.after.missing} couldn't be heard again` : ""}.
           </span>
+          <GroovePicture r={r} followName={r.follow === "Straight" ? "Grid" : r.follow} />
           {g.placed && (
             <div className="flex flex-wrap items-center gap-2">
               <div className="cp-seg" role="group" aria-label="Listen to">
@@ -278,17 +273,6 @@ function LoopsPanel({ narrow }: { narrow: boolean }) {
               <button className="cp-btn cp-btn-sm ml-auto" onClick={undoLast}>Undo</button>
             </div>
           )}
-          <details className="group">
-            <summary className="cursor-pointer select-none text-[12.5px] text-ink-muted">Every hit</summary>
-            <div className="grid gap-2 pt-2.5">
-              <div className="flex flex-wrap gap-x-3.5 gap-y-1 text-[12px] text-ink-muted">
-                <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: THEIRS }} />Before</span>
-                <span className="inline-flex items-center gap-1.5"><span className="ae-dot" style={{ color: YOURS }} />After</span>
-                <span>one column per 16th, every bar on top of each other</span>
-              </div>
-              <TimingChart r={r} tempo={tempo} narrow={narrow} />
-            </div>
-          </details>
         </section>
       ) : !g.moving && (
         <section className={cn("cp-tile cp-card items-center")} style={{ gap: 10, minHeight: 120, placeItems: "center" }}>
