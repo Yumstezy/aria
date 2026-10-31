@@ -1041,7 +1041,10 @@ function vocal_warp(encoded) {
   clip.set("warping", 1);
   try { clip.set("warp_mode", 6); } catch (e) { }   // Complex Pro, for vocals
   const kept = setWarp(clip, q.markers, Math.max(before.end_marker, q.end_marker));
-  if (kept < q.markers.length) {
+  // Aria's markers all sit on one line (one tempo, evenly spaced), so any two of them make the same warp: a marker
+  // Live drops in between or at an end changes nothing (Ian, Oct 31: it kept 23 of 24 and Aria gave up). Fewer than
+  // two can't set a tempo.
+  if (kept < 2) {
     setWarp(clip, before.markers, before.end_marker);
     clip.set("warping", before.warping);
     try { clip.set("warp_mode", before.warp_mode); clip.set("end_marker", before.end_marker); } catch (e) { }
@@ -1050,5 +1053,5 @@ function vocal_warp(encoded) {
   }
   try { clip.set("end_marker", q.end_marker); clip.set("start_marker", q.start_marker); } catch (e) { }
   undoStack.push({ kind: "vocal", track_id: q.track_id, start_beat: q.start_beat, path: q.path, before: before, name: String(one(clip, "name")) });
-  send("vocal_done", { ok: true, text: "Synced \"" + String(one(clip, "name")) + "\" to the song's grid." });
+  send("vocal_done", { ok: true, kept: kept, of: q.markers.length, text: "Synced \"" + String(one(clip, "name")) + "\" to the song's grid." });
 }
