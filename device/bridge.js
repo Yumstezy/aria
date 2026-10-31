@@ -60,10 +60,18 @@ const encode = (obj) => encodeURIComponent(JSON.stringify(obj));
 const decode = (s) => JSON.parse(decodeURIComponent(s));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Both the strip and the window get every UI message.
+// Max passes the web view a message only up to about 32 KB; a longer one arrives cut off and can't be read (Ian, Oct 31:
+// a 50 KB groove result left the screen on "Putting the new loop under"). Say so instead of sending it broken.
+const UI_MAX_CHARS = 30000;
 const toUI = (name, payload) => {
-  Max.outlet("jweb", name, encode(payload));
-  if (windowLoaded) Max.outlet("window", name, encode(payload));
-  if (chatLoaded) Max.outlet("chat", name, encode(payload));
+  let msg = encode(payload);
+  if (msg.length > UI_MAX_CHARS) {
+    Max.post(`toUI ${name}: ${msg.length} characters, too long for the web view; sent a short error instead`);
+    msg = encode({ error: "That result was too big to show. Tell Claude: " + name, too_big: true });
+  }
+  Max.outlet("jweb", name, msg);
+  if (windowLoaded) Max.outlet("window", name, msg);
+  if (chatLoaded) Max.outlet("chat", name, msg);
 };
 const toLive = (...args) => Max.outlet("live", ...args);
 const toRec = (...args) => Max.outlet("rec", ...args);
@@ -94,7 +102,7 @@ function logChanged() {
   } catch (e) {
     Max.post(`Couldn't save the Ask Muse history: ${e.message}`);
   }
-  toUI("ask_log", askLog);
+  sendAskLog();
   pushSession();
 }
 
@@ -300,8 +308,18 @@ let changeStack = [];   // [{ i: exchange's at, kind: "d" | "s", k }]
 const UNDOABLE = (type) => !["jump_to", "check_mix", "undo", "route_sidechain", "vocal_sync", "groove_match", "check_again", "hear_song", "add_part_markers"].includes(type);
 function sendUndoNext() {
   const top = changeStack[changeStack.length - 1];
-  const i = top ? askLog.findIndex((x) => x.at === top.at) : -1;
+  const i = top ? askLog.findIndex((x) => x.at === top.at) - logShownFrom : -1;   // counted in what the window has
   toUI("undo_next", top && i >= 0 ? { i, kind: top.kind, k: top.k } : null);
+}
+
+// The window gets the newest exchanges that fit in one message (Max's ~32 KB limit; the history was 23 KB and
+// growing, Oct 31). The whole history stays saved here; logShownFrom is where the window's copy starts.
+let logShownFrom = 0;
+function sendAskLog() {
+  let from = 0;
+  while (from < askLog.length && encode(askLog.slice(from)).length > UI_MAX_CHARS - 2000) from++;
+  logShownFrom = from;
+  toUI("ask_log", askLog.slice(from));
 }
 
 // ---------- live.js ----------
@@ -687,8 +705,10 @@ let groove = { moving: null, anchor: null, placed: null, vocal: null, kick: null
 const GROOVE_TEMPO_SLACK = 0.03;   // a warped loop's file must be within 3% of whole bars at the song's tempo
 
 function grooveState(extra) {
-  toUI("groove_state", { moving: groove.moving, anchor: groove.anchor, placed: groove.placed,
-                         vocal: groove.vocal, kick: groove.kick, vocal_sync: groove.vocalSync, vocal_applied: groove.vocalApplied, ...extra });
+  // The screen needs the clips' names, not their warp markers
+  const slim = (c) => c && { name: c.name, path: c.path, track_name: c.track_name, track_id: c.track_id, arrangement: c.arrangement, start_beat: c.start_beat };
+  toUI("groove_state", { moving: slim(groove.moving), anchor: slim(groove.anchor), placed: groove.placed,
+                         vocal: slim(groove.vocal), kick: slim(groove.kick), vocal_sync: groove.vocalSync, vocal_applied: groove.vocalApplied, ...extra });
 }
 
 Max.addHandler("groove_pick", (s) => serial(async () => {
@@ -836,7 +856,7 @@ Max.addHandler("ready", async () => {
   toUI("engine", engineState);
   if (lastResult) toUI("mix_result", lastResult);
   if (arrangement) toUI("arrangement", arrangement);
-  toUI("ask_log", askLog);
+  sendAskLog();
   sendUndoNext();
   pushSession();
   try { await ensureEngine(); } catch (e) { setEngine("error", e.message); }
@@ -1272,7 +1292,7 @@ function undoneTop() {
 Max.addHandler("answer", (s) => serial(async () => {
   const { exchange, index, yes, at } = decode(s);
   // By the exchange's time when given: positions shift once the history is full
-  const x = at ? askLog.find((e) => e.at === at) : askLog[exchange];
+  const x = at ? askLog.find((e) => e.at === at) : askLog[exchange + logShownFrom];
   const sg = x && x.suggestions[index];
   if (!sg || sg.answered) return;
   sg.answered = yes ? "yes" : "no";

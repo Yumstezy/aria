@@ -190,17 +190,30 @@ class ClipTime:
         return self._line((s - self.start) / self.spb + self.marker, self.bt, self.st)
 
 
+# The picture's waveforms, packed: one character per point, 64 levels (Ian, Oct 31: as numbers the result was 50 KB
+# sent to the window, past what Max passes to its web view, and the screen hung on "Putting the new loop under")
+PICTURE_STEP_MS = 2
+LEVELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+
+def _pack(values):
+    return "".join(LEVELS[min(63, max(0, int(round(v * 63))))] for v in values)
+
+
 def _song_envelope(x, rate, clip, start, seconds):
-    """A clip's waveform as heard in the song, 1 ms steps from song second start, 0 to 1 against its own loudest"""
+    """A clip's waveform as heard in the song, PICTURE_STEP_MS steps from song second start, 0 to 1 against its own
+    loudest, packed (one character a point)"""
     x = np.abs(_mono(x))
     ms = max(1, int(rate / 1000))
     env = np.r_[x, np.zeros((-len(x)) % ms)].reshape(-1, ms).max(axis=1)
     out = []
-    for k in range(int(round(seconds * 1000))):
-        i = int(clip.file(start + k / 1000) * 1000)
-        out.append(float(env[i]) if 0 <= i < len(env) else 0.0)
+    for k in range(int(round(seconds * 1000 / PICTURE_STEP_MS))):
+        a = int(clip.file(start + k * PICTURE_STEP_MS / 1000) * 1000)
+        b = int(clip.file(start + (k + 1) * PICTURE_STEP_MS / 1000) * 1000)
+        seg = env[max(0, a):max(max(0, a) + 1, b)] if a < len(env) else np.zeros(0)
+        out.append(float(seg.max()) if len(seg) else 0.0)
     top = max(out) if out else 0.0
-    return [round(float(np.sqrt(v / top)), 3) if top > 0 else 0.0 for v in out]
+    return _pack([np.sqrt(v / top) if top > 0 else 0.0 for v in out])
 
 
 def _picture(audio, moved, rate, clip, step, anchor_info, song_times, targets):
@@ -213,6 +226,7 @@ def _picture(audio, moved, rate, clip, step, anchor_info, song_times, targets):
     start = float(np.floor(worst / bar) * bar)
     lines = sorted({round(g - start, 4) for g in targets if g is not None and start <= g < start + bar})
     out = {"bar_sec": round(bar, 4), "step_sec": round(step, 5), "start_sec": round(start, 4), "lines_sec": lines,
+           "point_ms": PICTURE_STEP_MS, "levels": LEVELS,
            "before": _song_envelope(audio, rate, clip, start, bar), "after": _song_envelope(moved, rate, clip, start, bar), "anchor": None}
     if anchor_info:
         a, period = anchor_info["clip"], anchor_info["period"]

@@ -149,7 +149,8 @@ export interface GrooveClip { name: string; path: string; track_name: string; tr
 export interface GrooveTiming { avg_ms: number | null; max_ms: number | null; hits: { sec: number; offset_ms: number }[]; missing?: number }
 export interface GrooveResult { before: GrooveTiming; after: GrooveTiming; in_time: boolean; hits: number; hits_moved: number; out_path: string;
   grid?: { step_sec: number; beat1_sec: number; steps_per_bar: number };
-  picture?: { bar_sec: number; step_sec: number; start_sec: number; lines_sec: number[]; before: number[]; after: number[]; anchor: number[] | null };
+  /** before, after, anchor: packed waveforms, one character a point (point_ms apart), its place in levels = 0 to 63 */
+  picture?: { bar_sec: number; step_sec: number; start_sec: number; lines_sec: number[]; point_ms: number; levels: string; before: string; after: string; anchor: string | null };
   follow: string; strength: number; nudge_ms: number }
 export interface GrooveState { moving: GrooveClip | null; anchor: GrooveClip | null; placed: { track_id: number; orig_id: number; playing: "before" | "after" } | null;
   result: GrooveResult | null; error: string | null; busy: string | null;

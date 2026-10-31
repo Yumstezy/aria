@@ -36,15 +36,17 @@ function GroovePicture({ r, followName }: { r: GrooveResult; followName: string 
   const worst = inBar.reduce((a, h) => (!a || Math.abs(h.offset_ms) > Math.abs(a.offset_ms) ? h : a), null as null | { sec: number; offset_ms: number });
   const b = worst ? Math.min(3, Math.floor((worst.sec - p.start_sec) / beat)) : 0;
   const from = zoom === "beat" ? Math.max(0, b * beat - p.step_sec * 0.5) : 0, len = zoom === "beat" ? beat + p.step_sec : p.bar_sec;
-  const W = 640, ROW = 46, rows = [p.anchor ? { name: followName, env: p.anchor, color: "var(--ink-muted)" } : null,
-    { name: "Before", env: p.before, color: THEIRS }, { name: "After", env: p.after, color: YOURS }].filter(Boolean) as { name: string; env: number[]; color: string }[];
+  const unpack = (packed: string) => Array.from(packed, (c) => Math.max(0, p.levels.indexOf(c)) / 63);
+  const W = 640, ROW = 46, rows = [p.anchor ? { name: followName, env: unpack(p.anchor), color: "var(--ink-muted)" } : null,
+    { name: "Before", env: unpack(p.before), color: THEIRS }, { name: "After", env: unpack(p.after), color: YOURS }].filter(Boolean) as { name: string; env: number[]; color: string }[];
+  const per = p.point_ms / 1000;   // seconds between points
   const H = rows.length * ROW + (p.anchor ? 0 : 14);
   const X = (sec: number) => ((sec - from) / len) * W;
   const wave = (env: number[], top: number) => {
-    const a = Math.max(0, Math.floor(from * 1000)), z = Math.min(env.length, Math.ceil((from + len) * 1000));
+    const a = Math.max(0, Math.floor(from / per)), z = Math.min(env.length, Math.ceil((from + len) / per));
     const mid = top + ROW / 2, amp = ROW / 2 - 5;
     const pts = [];
-    for (let i = a; i < z; i++) pts.push([X(i / 1000), env[i]]);
+    for (let i = a; i < z; i++) pts.push([X(i * per), env[i]]);
     const up = pts.map(([x, v], k) => `${k ? "L" : "M"}${x.toFixed(1)},${(mid - v * amp).toFixed(1)}`).join("");
     const down = pts.reverse().map(([x, v]) => `L${x.toFixed(1)},${(mid + v * amp).toFixed(1)}`).join("");
     return `${up}${down}Z`;
