@@ -19,7 +19,7 @@ import { KINDS, KindMark, findingIcon, rangeOf } from "@/components/problem-mark
 import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
          ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
-import { FIXED_DB, fixAgain, problemKey, undoLast, type Exchange, type FixState } from "@/lib/aria";
+import { FIXED_DB, fixAgain, problemKey, send, undoLast, type Exchange, type FixState } from "@/lib/aria";
 import { ANALYZER_HZ, addArrangementMarkers, barsLabel, checkMix, clearReference, editArrangement, hearSong, onAnalyzer, recheck, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
          partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Part, type RefCompare, type Result, type SongParts } from "@/lib/aria";
 import { cn } from "@/lib/utils";
@@ -1065,13 +1065,30 @@ const Detailed = memo(function Detailed({ r, narrow }: { r: Result; narrow: bool
 /** Minimized: a small tab on the docked edge. Tap it to bring the window back as it was. */
 function MinTab() {
   const { result, progress } = useAria();
-  const n = result ? problemsOf(result).length : 0;
+  const n = useTodo(result).length;   // what's left to fix, like every other count
   const left = lastDock() === "left";
+  // Drag to slide it along the edge (Ian, Oct 31); a click without a drag brings Aria back
+  const drag = useRef<{ y: number; moved: boolean; frame: number } | null>(null);
+  const dragged = useRef(false);
+  const down = (e: React.PointerEvent) => { e.currentTarget.setPointerCapture(e.pointerId); drag.current = { y: e.screenY, moved: false, frame: 0 }; dragged.current = false; };
+  const move = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    const dy = e.screenY - d.y;
+    if (!d.moved && Math.abs(dy) < 4) return;
+    if (!d.moved) { d.moved = true; send("tab_drag_start"); }
+    cancelAnimationFrame(d.frame);
+    d.frame = requestAnimationFrame(() => send("tab_move", { dy }));
+  };
+  const up = () => { if (drag.current?.moved) { send("tab_drag_end"); dragged.current = true; } drag.current = null; };
   return (
-    <button onClick={restore} title="Bring Aria back" aria-label="Bring Aria back"
-            className="flex h-screen w-full flex-col items-center justify-center gap-2.5"
+    <button onClick={() => { if (!dragged.current) restore(); dragged.current = false; }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+            title="Click to bring Aria back. Drag to move it up or down." aria-label="Bring Aria back"
+            className="flex h-screen w-full touch-none select-none flex-col items-center justify-center gap-2.5"
             style={{ background: "color-mix(in srgb, var(--ground) 86%, transparent)", border: "1px solid var(--glass-edge)", color: "var(--ink)",
-                     borderRadius: left ? "0 16px 16px 0" : "16px 0 0 16px", boxShadow: "var(--shadow-tile)", cursor: "pointer" }}>
+                     borderRadius: left ? "0 16px 16px 0" : "16px 0 0 16px", boxShadow: "var(--shadow-tile)", cursor: "grab" }}>
+      {/* a grip, so it reads as something to drag */}
+      <span aria-hidden="true" className="grid grid-cols-2 gap-[3px] opacity-40">{[0, 1, 2, 3, 4, 5].map((k) => <i key={k} className="block size-[3px] rounded-full bg-current" />)}</span>
       <Mark size={22} />
       {progress ? <span className="cp-meta" style={{ fontSize: 10 }}>…</span>
         : result ? <span className={n ? "cp-tag cp-tag-hot" : "cp-tag cp-tag-good"} style={{ padding: "0 6px" }}>{n}</span> : null}

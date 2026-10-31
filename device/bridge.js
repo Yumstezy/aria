@@ -1006,8 +1006,30 @@ Max.addHandler("minimize", () => {
   minimized = { chat: chatOpen };
   if (chatOpen) { chatOpen = false; Max.outlet("chat", "wclose"); }
   const x = side === "left" ? sc.x : sc.x + sc.w - TAB.w;
-  sizeWindow("window", "aria-window-ui", { x, y: dockTop(sc) + Math.round(dockHeight(sc) / 2 - TAB.h / 2), ...TAB }, true);
+  // Where it was last left (dragged), else the middle of the edge
+  const y = tabY(sc, typeof prefs.tabY === "number" ? prefs.tabY : dockTop(sc) + Math.round(dockHeight(sc) / 2 - TAB.h / 2));
+  tabAt = { x, y, from: y };
+  sizeWindow("window", "aria-window-ui", { x, y, ...TAB }, true);
   Max.outlet("window", "front");
+});
+
+// Slide the tab along its edge (Ian, Oct 31: so it can be moved out of the way). The page sends how far the pointer
+// has moved since the drag began; only the window's position changes, so it follows smoothly.
+let tabAt = null;   // { x, y, from } while minimized
+const tabY = (sc, y) => Math.max(dockTop(sc), Math.min(dockTop(sc) + dockHeight(sc) - TAB.h, Math.round(y)));
+Max.addHandler("tab_drag_start", () => { if (minimized && tabAt) tabAt.from = tabAt.y; });
+Max.addHandler("tab_move", (s) => {
+  if (!minimized || !tabAt) return;
+  let dy;
+  try { dy = Number(decode(s).dy) || 0; } catch (e) { return; }
+  const sc = loadWindowPrefs().screen || FALLBACK_SCREEN;
+  tabAt.y = tabY(sc, tabAt.from + dy);
+  Max.outlet("window", "window", "size", tabAt.x, tabAt.y, tabAt.x + TAB.w, tabAt.y + TAB.h);
+  Max.outlet("window", "window", "exec");
+});
+Max.addHandler("tab_drag_end", () => {
+  if (!minimized || !tabAt) return;
+  savePrefs({ ...loadWindowPrefs(), tabY: tabAt.y });
 });
 Max.addHandler("restore", () => {
   const was = minimized;
