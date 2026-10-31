@@ -35,6 +35,12 @@ const n = (v: number) => ({ "--n": v }) as CSSProperties;
 export function AriaWindow() {
   const { engine, progress, result, error, notice: note, session } = useAria();
   const [view, setView] = useState<View>("home");
+  const [grooveMode, setGrooveMode] = useState<"loops" | "vocal">("loops");
+  // Ask Muse ran a groove match or a vocal sync: show its result
+  const goto = useAriaSel((s) => s.goto);
+  useEffect(() => {
+    if (goto?.view === "groove") { setView("groove"); setGrooveMode(goto.mode === "vocal" ? "vocal" : "loops"); }
+  }, [goto?.n]);
   const [detailed, setDetailed] = useState(false);
   const [open, setOpen] = useState(0);
   const [width, height] = useViewport();
@@ -115,7 +121,7 @@ export function AriaWindow() {
           {view === "home" ? <Home narrow={narrow} onOpen={openMixCheck} go={setView} />
             : view === "arrangement" ? <ArrangementScreen narrow={narrow} onReference={() => setView("reference")} />
             : view === "analyzer" ? <LiveAnalyzer narrow={narrow} />
-            : view === "groove" ? <GrooveScreen narrow={narrow} />
+            : view === "groove" ? <GrooveScreen narrow={narrow} mode={grooveMode} setMode={setGrooveMode} />
             : view === "reference" ? <ReferenceScreen narrow={narrow} onOpen={openMixCheck} />
             : !result ? <EmptyCheck narrow={narrow} />
             : detailed ? <Detailed r={result} narrow={narrow} />

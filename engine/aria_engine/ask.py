@@ -162,6 +162,36 @@ TOOLS = [
             "from_track": {"type": "string", "description": "The track it listens to, usually the kick (exact name)."},
             "amount": {"type": "string", "enum": ["light", "medium", "heavy"], "description": "How much it ducks. Default medium."}},
             "required": ["track", "from_track"]}}},
+    # Groove match, vocal sync, Before and after and Arrangement, asked for in words (Oct 31)
+    {"type": "function", "function": {
+        "name": "vocal_sync", "description": "Put a vocal or acapella on the song's beat: Aria reads its original tempo and key, puts its beat 1 "
+                                              "on the kick (or Live's grid) and warps it to the song's tempo. For \"put my vocal on time / in sync / "
+                                              "on beat with the kick\". Not a sidechain.",
+        "parameters": {"type": "object", "properties": {
+            "vocal_track": {"type": "string", "description": "The vocal's track (exact name from context.tracks)."},
+            "kick_track": {"type": "string", "description": "The kick or drum track to sync to (exact name). Leave out for Live's grid."},
+            "tempo": {"type": "number", "minimum": 40, "maximum": 300, "description": "The vocal's original tempo, only if they said it."}},
+            "required": ["vocal_track"]}}},
+    {"type": "function", "function": {
+        "name": "groove_match", "description": "Move a loop's hits in time: onto the straight 16th grid, or onto another loop's timing "
+                                                "(\"tighten the hats\", \"make the perc follow the kick\"). Makes a new clip on a track under it; "
+                                                "the original is kept, muted.",
+        "parameters": {"type": "object", "properties": {
+            "track": {"type": "string", "description": "The loop's track (exact name from context.tracks)."},
+            "follow_track": {"type": "string", "description": "The loop to follow (exact name). Leave out for the straight grid."},
+            "strength": {"type": "number", "minimum": 0, "maximum": 100, "description": "Percent, default 100."},
+            "nudge_ms": {"type": "number", "minimum": -20, "maximum": 20, "description": "Move every hit later (+) or earlier (-), in ms. Default 0."}},
+            "required": ["track"]}}},
+    {"type": "function", "function": {
+        "name": "check_again", "description": "Play the bars of the last Mix check again and measure what changed (Before and after): "
+                                               "\"did that work\", \"check it again\".",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "hear_song", "description": "Play the whole song once from bar 1 and find its parts (Intro, Build, Drop...), shown in Arrangement.",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "add_part_markers", "description": "Add a named marker at the start of each part Aria found by hearing the whole song.",
+        "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
         "name": "undo", "description": "Undo the last change Aria made in Live.",
         "parameters": {"type": "object", "properties": {}}}},
@@ -211,6 +241,12 @@ For a buried sound or mud, act on the producer's own tracks (context.tracks, by 
 Match parts to tracks by name: a vocal is a track named like Vocal, Vox or Voice; synths and keys are tracks
 named like Synth, Keys, Pad, Lead or Chords; prefer a group track when there is one. If no track clearly
 matches, don't guess: name the tracks you see and ask which one.
+Timing: "on time", "in sync", "on beat", "on the grid", "tighten", "quantize", "line up" mean vocal_sync (for a vocal
+or acapella) or groove_match (for a loop), never sidechain. sidechain only when they say duck, pump or sidechain.
+vocal_sync and groove_match need the exact tracks: when they don't name the vocal or loop, or say "the kick" and no
+track is clearly the kick, ask which track in one short question and call no tool. "Did that work" or "check it
+again" after a fix is check_again. "Find the parts" or "hear the whole song" is hear_song; "add the part markers"
+is add_part_markers.
 Other effects use Live's stock devices, which every producer has, with track_device. Knobs and units:
 {STOCK_LINES}
 "Add" or "put on" a device means a new one (mode add), even if the track already has one: never change the
@@ -586,8 +622,32 @@ def check_action(name, args, tracks=(), plugins=()):
             if shape in ("low_cut", "high_cut"):
                 out["steep"] = bool(args.get("steep", False))
             return out if ok else None
-        if name in ("check_mix", "undo"):
+        if name in ("check_mix", "undo", "check_again", "hear_song", "add_part_markers"):
             return {}
+        if name == "vocal_sync":
+            vocal = match_track(args.get("vocal_track"), tracks)
+            kick = match_track(args.get("kick_track"), tracks) if args.get("kick_track") else None
+            tempo = args.get("tempo")
+            if not vocal or (args.get("kick_track") and not kick) or (tempo is not None and not 40 <= float(tempo) <= 300):
+                return None
+            out = {"vocal_track": vocal}
+            if kick:
+                out["kick_track"] = kick
+            if tempo is not None:
+                out["tempo"] = round(float(tempo), 2)
+            return out
+        if name == "groove_match":
+            track = match_track(args.get("track"), tracks)
+            follow = match_track(args.get("follow_track"), tracks) if args.get("follow_track") else None
+            strength = float(args.get("strength", 100))
+            strength = strength / 100 if strength > 1 else strength      # "70" and "0.7" both mean 70%
+            nudge = float(args.get("nudge_ms", 0))
+            if not track or (args.get("follow_track") and not follow) or follow == track or not 0 <= strength <= 1 or abs(nudge) > 20:
+                return None
+            out = {"track": track, "strength": round(strength, 2), "nudge_ms": round(nudge, 1)}
+            if follow:
+                out = {"track": track, "follow_track": follow, "strength": round(strength, 2), "nudge_ms": round(nudge, 1)}
+            return out
         if name == "delete_marker":
             bar = int(args["bar"])
             return {"bar": bar} if 1 <= bar <= 9999 else None

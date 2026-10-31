@@ -905,19 +905,42 @@ function selected_clip(role) {
   if (!ensureSong()) { send("selected_clip", { role: role, error: "Live isn't ready yet." }); return; }
   const c = new LiveAPI("live_set view detail_clip");
   if (!c.id || Number(c.id) === 0) { send("selected_clip", { role: role, error: "Click the loop's clip in Live first, then press this again." }); return; }
-  if (one(c, "is_audio_clip") !== 1) { send("selected_clip", { role: role, error: "That's a MIDI clip. Groove match works on audio loops." }); return; }
+  send("selected_clip", clipInfo(c, role));
+}
+
+// What Groove match needs to know about a clip, or {error}
+function clipInfo(c, role) {
+  if (one(c, "is_audio_clip") !== 1) return { role: role, error: "That's a MIDI clip. Groove match works on audio." };
   // An Arrangement clip's parent is its track; a Session clip's is its clip slot, whose parent is the track
   var parent = new LiveAPI("id " + ids(c.get("canonical_parent"))[0]);
   const arrangement = parent.type === "Track";
   if (!arrangement) parent = new LiveAPI("id " + ids(parent.get("canonical_parent"))[0]);
   const trackId = Number(parent.id);
-  send("selected_clip", {
+  return {
     role: role, name: String(one(c, "name")), path: String(one(c, "file_path")), arrangement: arrangement,
     track_id: trackId, track_index: ids(song.get("tracks")).indexOf(trackId), track_name: String(one(parent, "name")),
     start_beat: arrangement ? one(c, "start_time") : null, start_marker: one(c, "start_marker"), end_marker: one(c, "end_marker"),
     warping: one(c, "warping") === 1, sample_length: one(c, "sample_length"), sample_rate: one(c, "sample_rate"),
     tempo: one(song, "tempo")
-  });
+  };
+}
+
+// A track's Arrangement clip, by the track's name (Ask Muse: "sync my vocal test to my kick test"): the audio clip
+// under the playhead, else its first. q = URI-encoded {name, role}
+function track_clip(encoded) {
+  const q = JSON.parse(decodeURIComponent(encoded));
+  if (!ensureSong()) { send("track_clip", { error: "Live isn't ready yet." }); return; }
+  const want = String(q.name).toLowerCase().replace(/\s+/g, " ").trim();
+  const tracks = ids(song.get("tracks")).map(function (id) { return new LiveAPI("id " + id); });
+  var hits = tracks.filter(function (t) { return String(one(t, "name")) === q.name; });
+  if (hits.length !== 1) hits = tracks.filter(function (t) { return String(one(t, "name")).toLowerCase().replace(/\s+/g, " ").trim() === want; });
+  if (hits.length !== 1) { send("track_clip", { error: hits.length ? "Two tracks are called \"" + q.name + "\". Rename one in Live." : "There's no track called \"" + q.name + "\"." }); return; }
+  const at = one(song, "current_song_time");
+  const clips = ids(hits[0].get("arrangement_clips")).map(function (id) { return new LiveAPI("id " + id); })
+    .filter(function (c) { return one(c, "is_audio_clip") === 1; });
+  if (!clips.length) { send("track_clip", { error: "\"" + q.name + "\" has no audio clip in the Arrangement." }); return; }
+  const under = clips.filter(function (c) { return one(c, "start_time") <= at && at < one(c, "end_time"); })[0];
+  send("track_clip", clipInfo(under || clips[0], q.role));
 }
 
 // The matched loop on a new track right under the original, at the same bar; the original track is muted, so it's

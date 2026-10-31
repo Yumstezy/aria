@@ -296,7 +296,8 @@ function serial(fn) {
 // Undo, as the producer sees it: which pill each live.js undo step belongs to, newest last.
 // The UI shows Undo on the top one only; an undone change is marked, never offered again.
 let changeStack = [];   // [{ i: exchange's at, kind: "d" | "s", k }]
-const UNDOABLE = (type) => !["jump_to", "check_mix", "undo", "route_sidechain"].includes(type);
+// The newer tools put their own step on the Undo stack (groove, vocal, markers), or change nothing (checks)
+const UNDOABLE = (type) => !["jump_to", "check_mix", "undo", "route_sidechain", "vocal_sync", "groove_match", "check_again", "hear_song", "add_part_markers"].includes(type);
 function sendUndoNext() {
   const top = changeStack[changeStack.length - 1];
   const i = top ? askLog.findIndex((x) => x.at === top.at) : -1;
@@ -306,7 +307,7 @@ function sendUndoNext() {
 // ---------- live.js ----------
 
 // Reading the whole set takes longer on big projects than one change does
-const LIVE_SLOW = { live_state: 8000, ears_removed: 8000, clips_playing: 8000 };
+const LIVE_SLOW = { live_state: 8000, ears_removed: 8000, clips_playing: 8000, vocal_done: 20000, groove_placed: 10000, track_clip: 8000 };
 function askLive(command, reply, ...args) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -335,7 +336,7 @@ Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete wai
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
 Max.addHandler("device_done", (s) => { const w = waiters.device_done; delete waiters.device_done; if (w) w(decode(s)); });
-for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done", "clips_playing", "selected_clip", "groove_placed", "groove_ab_done", "vocal_done"]) {
+for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done", "clips_playing", "selected_clip", "groove_placed", "groove_ab_done", "vocal_done", "track_clip"]) {
   Max.addHandler(reply, (s) => { const w = waiters[reply]; delete waiters[reply]; if (w) w(decode(s)); });
 }
 Max.addHandler("ears_removed", (s) => { const w = waiters.ears_removed; delete waiters.ears_removed; if (w) w(decode(s)); });
@@ -556,7 +557,8 @@ async function referenceSections() {
 
 // "Add markers to Live": each part's name at its first bar. The producer pressed the button, so that's the yes;
 // each marker is its own Undo.
-Max.addHandler("arrangement_markers", () => serial(async () => {
+Max.addHandler("arrangement_markers", () => serial(addPartMarkers));
+async function addPartMarkers() {
   const parts = arrangement && arrangement.mine ? arrangement.mine.sections : [];
   let added = 0;
   toLive("markers_begin");   // stop once, place them all, put the playhead back once (live.js)
@@ -570,7 +572,7 @@ Max.addHandler("arrangement_markers", () => serial(async () => {
   toLive("markers_end");
   sendUndoNext();
   toUI("notice", { text: added ? `Added ${added} marker${added === 1 ? "" : "s"} to Live. Undo takes them back one at a time.` : "Live didn't take the markers." });
-}));
+}
 
 // Which part of the song a check heard (most of its bars), and the reference's part with the same name
 function partsFor(startBar, bars) {
@@ -663,6 +665,15 @@ async function recheck() {
 }
 
 // ---------- Groove match (build step 9) ----------
+
+// The Arrangement clip on a track, by the track's name, for Ask Muse ("sync my vocal test"): the clip under the
+// playhead, else the track's first audio clip. Throws a plain UserError when there isn't one.
+async function trackClip(name, role) {
+  const c = await askLive("track_clip", "track_clip", encode({ name, role }));
+  if (c.error) throw new UserError(c.error);
+  if (!c.path || !fs.existsSync(c.path)) throw new UserError(`Aria can't find the file of the clip on "${name}". Consolidate it in Live (Cmd+J) and ask again.`);
+  return c;
+}
 // Pick the loop to fix and, optionally, the loop to follow, from the clip selected in Live. The engine moves the
 // hits; the matched loop goes on a new track under the original (muted, kept), and a new try replaces the last one.
 let groove = { moving: null, anchor: null, placed: null, vocal: null, kick: null, vocalSync: null, vocalApplied: false, vocalFix: {} };
@@ -701,9 +712,14 @@ Max.addHandler("groove_pick", (s) => serial(async () => {
 }));
 
 Max.addHandler("groove_run", (s) => serial(async () => {
-  const { follow, strength = 1, nudge_ms = 0 } = decode(s);
+  try { await grooveRunNow(decode(s)); }
+  catch (e) { grooveState({ error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` }); }
+}));
+
+// The match itself, for the button and for Ask Muse (which already runs in the queue). Throws a UserError.
+async function grooveRunNow({ follow, strength = 1, nudge_ms = 0 }) {
   const m = groove.moving, a = follow === "loop" ? groove.anchor : null;
-  try {
+  {
     if (!m) throw new UserError("Pick the loop to fix first.");
     if (follow === "loop" && !a) throw new UserError("Pick the loop to follow first.");
     await ensureEngine();
@@ -723,10 +739,10 @@ Max.addHandler("groove_run", (s) => serial(async () => {
     if (replace) { const k = changeStack.findIndex((x) => x.groove); if (k >= 0) changeStack.splice(k, 1); }
     if (placed.ok) { groove.placed = { track_id: placed.track_id, orig_id: placed.orig_id, playing: "after" }; changeStack.push({ at: null, kind: "d", k: 0, groove: true }); sendUndoNext(); }
     grooveState({ result: { ...res.json, follow: a ? a.track_name || a.name : "Straight", strength, nudge_ms }, error: placed.ok ? null : placed.text });
-  } catch (e) {
-    grooveState({ error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
+    toUI("show_view", { view: "groove" });
+    return { ...res.json, placed: placed.ok };
   }
-}));
+}
 
 // Vocal sync: the vocal's tempo and beat 1 from the engine (with the producer's corrections), then Live's warping
 // (Ian, Oct 30): read unwarped from the file, then beat 1 on the kick at the nearest bar line when a kick clip is picked
@@ -751,8 +767,13 @@ Max.addHandler("vocal_analyze", (s) => serial(async () => {
 }));
 
 Max.addHandler("vocal_apply", () => serial(async () => {
+  try { await vocalApplyNow(); }
+  catch (e) { grooveState({ error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` }); }
+}));
+
+async function vocalApplyNow() {
   const v = groove.vocal, a = groove.vocalSync;
-  try {
+  {
     if (!v || !a) throw new UserError("Pick the vocal first.");
     toUI("groove_progress", { text: "Setting Live's warp markers" });
     const out = await askLive("vocal_warp", "vocal_done", encode({ track_id: v.track_id, start_beat: v.start_beat, path: v.path,
@@ -762,8 +783,9 @@ Max.addHandler("vocal_apply", () => serial(async () => {
     changeStack.push({ at: null, kind: "d", k: 0, vocal: true });
     sendUndoNext();
     grooveState();
-  } catch (e) { grooveState({ error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` }); }
-}));
+    toUI("show_view", { view: "groove", mode: "vocal" });
+  }
+}
 
 // A/B: switch which of the two tracks plays
 Max.addHandler("groove_ab", (s) => serial(async () => {
@@ -1023,7 +1045,8 @@ Max.addHandler("tab_move", (s) => {
   let dy;
   try { dy = Number(decode(s).dy) || 0; } catch (e) { return; }
   const sc = loadWindowPrefs().screen || FALLBACK_SCREEN;
-  tabAt.y = tabY(sc, tabAt.from + dy);
+  // Ian, Oct 31: dragging up moved it down. Live's web view reports the pointer the other way round, so flip it
+  tabAt.y = tabY(sc, tabAt.from - dy);
   Max.outlet("window", "window", "size", tabAt.x, tabAt.y, tabAt.x + TAB.w, tabAt.y + TAB.h);
   Max.outlet("window", "window", "exec");
 });
@@ -1094,6 +1117,36 @@ async function apply(action, tracks = []) {
       if (busy) return { ok: false, text: "A Mix check is already running." };
       serial(checkMix);   // queued: it starts once this answer's changes are done
       return { ok: true, text: "Mix check is next." };
+    // The newer tools, asked for in words (Ian, Oct 31: "set my vocal test on time with my kick test" got a sidechain)
+    case "vocal_sync": {
+      groove.vocal = await trackClip(a.vocal_track, "vocal");
+      groove.kick = a.kick_track ? await trackClip(a.kick_track, "kick") : null;
+      groove.vocalApplied = false;
+      await vocalAnalyze({ tempo: a.tempo || null, beat_shift: 0 });
+      await vocalApplyNow();
+      const v = groove.vocalSync, src = v.tempo_source === "file name" ? "from its file name" : v.tempo_source === "you" ? "as you said" : "measured";
+      return { ok: true, text: `Synced "${groove.vocal.track_name}" ${groove.kick && v.sync.kick_found ? `to the kick on "${groove.kick.track_name}" at bar ${v.sync.bar}` : "to Live's grid"}: ` +
+                               `${v.tempo} BPM (${src})${v.key ? `, ${v.key}` : ""}, now playing at ${v.song_tempo}.` };
+    }
+    case "groove_match": {
+      groove.moving = await trackClip(a.track, "moving");
+      groove.anchor = a.follow_track ? await trackClip(a.follow_track, "anchor") : null;
+      groove.placed = null;
+      const r = await grooveRunNow({ follow: a.follow_track ? "loop" : "straight", strength: a.strength ?? 1, nudge_ms: a.nudge_ms ?? 0 });
+      return { ok: true, text: `Matched "${groove.moving.track_name}" ${groove.anchor ? `to "${groove.anchor.track_name}"` : "to the grid"}: worst hit ${r.before.max_ms ?? "?"} ms off, now ` +
+                               `${r.after.max_ms ?? "?"} ms${r.in_time ? ", in time" : ""}. The new loop is on a track under it; the original is kept, muted.` };
+    }
+    case "check_again":
+      if (!lastCheck) return { ok: false, text: "Run a Mix check first, then Aria can check the same bars again." };
+      serial(recheck);
+      return { ok: true, text: `Checking bars ${lastCheck.start_bar} to ${lastCheck.start_bar + BARS - 1} again next.` };
+    case "hear_song":
+      serial(hearSong);
+      return { ok: true, text: "Hearing the whole song next." };
+    case "add_part_markers":
+      if (!(arrangement && arrangement.mine && arrangement.mine.sections.length)) return { ok: false, text: "Aria hasn't heard the whole song yet. Ask it to hear the whole song first." };
+      serial(addPartMarkers);
+      return { ok: true, text: `Adding ${arrangement.mine.sections.length} part markers next.` };
     default:
       return { ok: false, text: `Aria can't do "${action.type}" yet.` };
   }

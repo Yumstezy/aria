@@ -4,6 +4,9 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 ## Oct 31
 
+- **Ask Muse runs the newer tools (Ian, 12:28: "set my vocal test on time with my kick test" added a sidechain):** new tools `vocal_sync`, `groove_match`, `check_again`, `hear_song`, `add_part_markers`; timing words mean these, never sidechain; Muse asks which track when unsure. Real Muse Spark on Ian's track names: his sentence gave vocal_sync VOCAL TEST to KICK TEST; "put my vocal on beat" asked "VOCAL TEST or Vox 2?"; "tighten the loop wrong track to the kick test at 70%" gave groove_match at 0.7; "sidechain the bass to the kick test" is still a sidechain. The window switches to Groove match to show the result. Check in Live (re-add Aria): type or say those four.
+- **Minimized tab dragged the wrong way:** flipped.
+
 - **Vocal sync half-timed it (Ian, 12:09):** Live showed one warp marker and 60.73 BPM: it kept only the first of Aria's two markers (470 beats apart) and said nothing. Now a marker every 4 bars from beat 1, added in order after making room (end marker), read back from Live; if any is missing, Aria puts the clip back and says how many Live kept. Check: Vocal, pick the acapella and the kick, Sync to the kick; the clip should show a marker every 4 bars and its words on the kick. If it says "Live kept N of M", tell Claude N and M.
 - **Aria's voice:** Ian finds the Mac voice doesn't fit; wants ElevenLabs (needs an ElevenLabs API key in engine/.env and a voice id). Waiting on the key.
 

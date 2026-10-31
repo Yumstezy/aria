@@ -279,8 +279,13 @@ The device runs only these action types and drops anything else or anything out 
 | `eq_band` | freq_hz, gain_db, q, sections | gain -6 to +6 dB, on the producer's EQ Eight only |
 | `limiter_ceiling` | db | -3 to 0 |
 | `jump_to` | bar | |
+| `vocal_sync` | vocal_track, kick_track?, tempo? | tracks from the set; tempo 40 to 300 (Oct 31) |
+| `groove_match` | track, follow_track?, strength, nudge_ms | strength 0 to 1 (Muse may say 0 to 100), nudge -20 to 20 ms (Oct 31) |
+| `check_again` | | the last Mix check's bars, Before and after (Oct 31) |
+| `hear_song` | | (Oct 31) |
+| `add_part_markers` | | after hear_song (Oct 31) |
 
-Every applied action pushes an undo entry.
+Every applied action pushes an undo entry. (Oct 31: the planned `groove_anchor`, `groove_strength` and `groove_nudge` became `groove_match`'s fields. The bridge finds each track's Arrangement clip by name, the one under the playhead or the first, with live.js `track_clip`. Muse asks which track when the request doesn't say, and uses these, never sidechain, for "on time", "in sync", "tighten".)
 
 ## Device to UI messages
 

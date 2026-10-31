@@ -135,6 +135,8 @@ interface State {
   groove: GrooveState;
   /** What happened to each problem of this check after Fix it (Oct 30), by problemKey. None: still to fix. */
   fixes: Record<string, FixState>;
+  /** A screen to show, from the bridge (Ask Muse ran a groove match or vocal sync): n goes up each time */
+  goto: { view: string; mode?: string; n: number } | null;
 }
 
 /** changed: Muse made a change for it (not heard yet). fixed: Check again measured its range FIXED_DB or more lower.
@@ -179,6 +181,7 @@ let state: State = {
   progress: null, result: null, error: null, marker: null, notice: null, theme: initialTheme(), session: null, askFocus: 0, ears: { busy: false, text: null }, voice: { state: "idle", error: null }, undoNext: null, layout: null, arrangement: null, hearing: null, beforeAfter: null, rechecking: null,
   groove: { moving: null, anchor: null, placed: null, result: null, error: null, busy: null, vocal: null, kick: null, vocal_sync: null, vocal_applied: false },
   fixes: {},
+  goto: null,
 };
 
 // Dark (Night) unless the producer picked Light. Inside Live the bridge saves the choice and puts it in
@@ -315,6 +318,7 @@ export function connect() {
     on<{ busy: boolean; text: string }>("ears", (e) => set({ ears: e }));
     on<Arrangement>("arrangement", (a) => set({ arrangement: a, hearing: null }));
     on<Progress>("arrangement_progress", (p) => set({ hearing: p }));
+    on<{ view: string; mode?: string }>("show_view", (v) => set({ goto: { view: v.view, mode: v.mode, n: (state.goto?.n ?? 0) + 1 } }));
     on<{ text: string }>("groove_progress", (p) => set({ groove: { ...state.groove, busy: p.text, error: null } }));
     on<Partial<GrooveState> & { undone?: boolean }>("groove_state", (g) => set({ groove: {
       moving: g.moving ?? null, anchor: g.anchor ?? null, placed: g.placed ?? null, busy: null, error: g.error ?? null,

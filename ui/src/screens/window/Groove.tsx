@@ -188,8 +188,7 @@ function VocalPanel({ narrow }: { narrow: boolean }) {
   );
 }
 
-export function GrooveScreen({ narrow }: { narrow: boolean }) {
-  const [mode, setMode] = useState<"loops" | "vocal">("loops");
+export function GrooveScreen({ narrow, mode, setMode }: { narrow: boolean; mode: "loops" | "vocal"; setMode: (m: "loops" | "vocal") => void }) {
   return (
     <div className="grid gap-3 pt-1">
       <div className="cp-seg justify-self-start" role="group" aria-label="What to put in time">

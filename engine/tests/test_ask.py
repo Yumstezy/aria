@@ -371,3 +371,16 @@ def test_utility_mono_only_when_asked():
     asked = ask.interpret(msg(None, call("track_device", track="Bass", device="Utility", settings=[{"param": "Mono", "option": "On"}])), ctx, "make the bass mono")
     assert asked["actions"][0]["args"]["settings"] == [{"param": "Mono", "option": "On"}]
     assert "Dry/Wet" in ask.why_dropped("track_device", {"track": "BASS", "device": "Drum Buss", "settings": [{"param": "Dry/Wet", "value": 140}]}, ["BASS"])
+
+
+def test_timing_requests_get_the_timing_tools():
+    """Ian, Oct 31: "set my vocal test on time with my kick test" got a sidechain. The new tools are checked like the rest."""
+    ctx = {"tracks": ["VOCAL TEST", "KICK TEST", ":LOOP WRONG"]}
+    out = ask.interpret(msg("Syncing it.", call("vocal_sync", vocal_track="vocal test", kick_track="KICK TEST")), ctx, "x")
+    assert out["actions"] == [{"type": "vocal_sync", "args": {"vocal_track": "VOCAL TEST", "kick_track": "KICK TEST"}}]
+    loop = ask.interpret(msg(None, call("groove_match", track=":LOOP WRONG", follow_track="KICK TEST", strength=70)), ctx, "x")
+    assert loop["actions"][0]["args"] == {"track": ":LOOP WRONG", "follow_track": "KICK TEST", "strength": 0.7, "nudge_ms": 0.0}
+    assert ask.interpret(msg(None, call("groove_match", track="Nope")), ctx, "x")["actions"] == []
+    for name in ("check_again", "hear_song", "add_part_markers"):
+        assert ask.interpret(msg(None, call(name)), ctx, "x")["actions"] == [{"type": name, "args": {}}]
+    assert "never sidechain" in ask.PROMPT
