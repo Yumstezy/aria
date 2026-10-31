@@ -27,7 +27,7 @@ OUT = Path(__file__).resolve().parent.parent / "Aria.amxd"
 STRIP_W, STRIP_H = 150.0, 169.0   # just the buttons, glassy and muted like Live's devices (Ian, Oct 28)
 WINDOW_W, WINDOW_H = 1200.0, 860.0
 CHAT_W, CHAT_H = 400.0, 620.0
-AN_BANDS = 31   # Live analyzer: third octaves from 31.25 Hz (31.25 x 1.2599^k)
+AN_BANDS = 55   # Live analyzer: sixth octaves from 31.25 Hz to 16 kHz (31.25 x 1.12246^k; Oct 31, finer, so peaks show)
 AN_EXTRA = 5    # then mid level, side level, K-weighted L and R (400 ms), peak since the last frame
 
 # The page the strip starts on, built into the device. The bridge swaps in the real strip about
@@ -120,7 +120,7 @@ def build():
         # times a second while the window's analyzer is open (the bridge turns the metro on and off), to the bridge
         obj("an-sum", "+~", [600.0, 220.0, 40.0, 22.0], 2, 1, ["signal"]),
         obj("an-half", "*~ 0.5", [600.0, 250.0, 50.0, 22.0], 2, 1, ["signal"]),
-        obj("an-bank", f"fffb~ {AN_BANDS} 31.25 1.2599 4.3", [600.0, 280.0, 160.0, 22.0], 1, AN_BANDS, ["signal"] * AN_BANDS),
+        obj("an-bank", f"fffb~ {AN_BANDS} 31.25 1.12246 8.65", [600.0, 280.0, 160.0, 22.0], 1, AN_BANDS, ["signal"] * AN_BANDS),
         obj("an-metro", "metro 50", [800.0, 280.0, 60.0, 22.0], 2, 1, ["bang"]),
         obj("an-order", "t b b", [800.0, 310.0, 40.0, 22.0], 1, 2, ["bang", "bang"]),
         *[obj(f"an-rms-{k}", "average~ 2048 rms", [600.0 + k * 36, 330.0, 34.0, 22.0], 1, 1, ["signal"]) for k in range(AN_BANDS)],
@@ -142,6 +142,13 @@ def build():
             obj(f"an-k-snap-{ch}", "snapshot~", [1220.0 + ch * 220, 360.0, 60.0, 22.0], 2, 1, [""]))],
         obj("an-peak", "peakamp~", [1660.0, 330.0, 60.0, 22.0], 2, 1, [""]),
         obj("an-pack", "pack " + " ".join(["0."] * (AN_BANDS + AN_EXTRA)), [600.0, 400.0, 400.0, 22.0], AN_BANDS + AN_EXTRA, 1),
+        # The stereo view (Oct 31): Main's last 100 ms recorded round and round into a stereo buffer~, read by
+        # scope.js on each analyzer frame ("---" makes the buffer's name this device's own)
+        obj("scope-buf", "buffer~ ---aria_scope 100 2", [1700.0, 420.0, 160.0, 22.0], 1, 2, ["float", "bang"]),
+        obj("scope-rec", "record~ ---aria_scope 2 @loop 1", [1700.0, 380.0, 170.0, 22.0], 4, 1, ["signal"]),
+        obj("scope-lb", "loadbang", [1880.0, 340.0, 60.0, 22.0], 1, 1, ["bang"]),
+        obj("scope-on", "1", [1880.0, 360.0, 30.0, 22.0], 2, 1, [""], maxclass="message"),
+        obj("scope-js", "v8 scope.js ---aria_scope", [1880.0, 420.0, 150.0, 22.0], 1, 1),
         obj("an-prepend", "prepend analyzer_frame", [600.0, 430.0, 130.0, 22.0], 1, 1),
     ]
 
@@ -186,6 +193,9 @@ def build():
         *[w for ch in (0, 1) for w in (wire("in", f"an-k1-{ch}", ch, 0), wire(f"an-k1-{ch}", f"an-k2-{ch}"), wire(f"an-k2-{ch}", f"an-k-rms-{ch}"), wire(f"an-k-rms-{ch}", f"an-k-snap-{ch}"))],
         *[wire("an-order", x, 1, 0) for x in ("an-mid-snap", "an-side-snap", "an-k-snap-0", "an-k-snap-1", "an-peak")],
         *[wire(x, "an-pack", 0, AN_BANDS + i) for i, x in enumerate(("an-mid-snap", "an-side-snap", "an-k-snap-0", "an-k-snap-1", "an-peak"))],
+        # the stereo view: record always (from load), read on each frame, to the bridge
+        wire("in", "scope-rec", 0, 0), wire("in", "scope-rec", 1, 1), wire("scope-lb", "scope-on"), wire("scope-on", "scope-rec", 0, 0),
+        wire("an-order", "scope-js", 1, 0), wire("scope-js", "bridge"),
         wire("an-pack", "an-prepend"), wire("an-prepend", "bridge"),
     ]
 

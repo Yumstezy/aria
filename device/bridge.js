@@ -609,7 +609,7 @@ function partsFor(startBar, bars) {
 let analyzerOn = false;
 Max.addHandler("analyzer_on", () => { analyzerOn = true; Max.outlet("an", 1); });
 Max.addHandler("analyzer_off", () => { analyzerOn = false; Max.outlet("an", 0); });
-const AN_BANDS = 31;
+const AN_BANDS = 55;   // sixth octaves, 31.25 Hz to 16 kHz (device/tools/make_aria_amxd.py)
 const dbOf = (x) => (x > 1e-6 ? Math.round(200 * Math.log10(x)) / 10 : -120);
 Max.addHandler("analyzer_frame", (...v) => {
   if (!analyzerOn || !windowLoaded) return;
@@ -621,6 +621,12 @@ Max.addHandler("analyzer_frame", (...v) => {
     kl * kl + kr * kr > 1e-12 ? Math.round(10 * (-0.691 + 10 * Math.log10(kl * kl + kr * kr))) / 10 : -120,
     dbOf(peak)] : [];
   Max.outlet("window", "analyzer", encode([...v.slice(0, AN_BANDS).map(dbOf), ...extra]));
+});
+
+// The stereo view (Oct 31): left and right sample pairs from scope.js, about 160 a frame, to the analyzer
+Max.addHandler("scope_frame", (...v) => {
+  if (!analyzerOn || !windowLoaded) return;
+  Max.outlet("window", "scope", encode(v.map(Number)));
 });
 
 // ---------- Arrangement edits (Oct 30): renamed parts and moved edges, kept for markers and checks ----------

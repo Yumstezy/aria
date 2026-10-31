@@ -332,6 +332,7 @@ export function connect() {
     on<BeforeAfter>("before_after", (b) => set({ beforeAfter: b, rechecking: null, fixes: fixesHeard(b) }));
     on<Progress>("before_after_progress", (p) => set({ rechecking: p }));
     on<number[]>("analyzer", (frame) => analyzerListeners.forEach((l) => l(frame)));
+    on<number[]>("scope", (pairs) => scopeListeners.forEach((l) => l(pairs)));
     // The mapped key: hold to talk, let go to send. Only the popped-out chat listens, so it records once.
     if (new URLSearchParams(location.search).get("view") === "chat") on<{ down: boolean }>("voice_key", (k) => voiceKey(k.down));
     if (new URLSearchParams(location.search).get("view") === "chat") on("focus_ask", () => { arrive(); set({ askFocus: state.askFocus + 1 }); });
@@ -383,8 +384,12 @@ export function recheck() {
 
 // ---------- Live analyzer (Oct 30): frames of 31 third-octave levels in dB, 20 a second ----------
 // Kept out of the main state, so a frame redraws only the analyzer, not the whole window.
-export const ANALYZER_HZ = Array.from({ length: 31 }, (_, k) => 31.25 * 1.2599 ** k);
+// Sixth octaves from 31.25 Hz to 16 kHz (Oct 31: finer than the first third octaves, so peaks show)
+export const ANALYZER_HZ = Array.from({ length: 55 }, (_, k) => 31.25 * 2 ** (k / 6));
 const analyzerListeners = new Set<(frame: number[]) => void>();
+// The stereo view's left and right sample pairs (Oct 31), flat: [l, r, l, r, ...], while the analyzer is on
+const scopeListeners = new Set<(pairs: number[]) => void>();
+export function onScope(fn: (pairs: number[]) => void) { scopeListeners.add(fn); return () => { scopeListeners.delete(fn); }; }
 export function onAnalyzer(fn: (frame: number[]) => void) {
   analyzerListeners.add(fn);
   send("analyzer_on");

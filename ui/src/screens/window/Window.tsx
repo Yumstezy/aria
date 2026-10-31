@@ -20,6 +20,7 @@ import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIco
          ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { FIXED_DB, fixAgain, problemKey, send, undoLast, type Exchange, type FixState } from "@/lib/aria";
+import { onScope } from "@/lib/aria";
 import { ANALYZER_HZ, addArrangementMarkers, barsLabel, checkMix, clearReference, editArrangement, hearSong, onAnalyzer, recheck, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
          partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Part, type RefCompare, type Result, type SongParts } from "@/lib/aria";
 import { cn } from "@/lib/utils";
@@ -747,6 +748,57 @@ function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
     gliding toward each frame like an analyzer's ballistics: up in about 25 ms, down in about 150 ms. The moving
     lines are written straight to the SVG, so a frame doesn't re-render React, and the dB scale only moves in 6 dB steps. */
 const RISE_S = 0.025, FALL_S = 0.15, PEAK_FALL_DB_S = 12;
+// The analyzer's own color, violet (Ian, Oct 31: the gold "is kinda ugly"; after the spectrum he showed from iZotope)
+const AN_COLOR = "var(--trk-4)";
+
+/** A frame's color from where its sound is: the share of power below 200 Hz (red), 200 Hz to 2 kHz (orange) and
+    above 2 kHz (green), mixed. A kick or bass reads red, hats and air green (Ian, Oct 31, after rekordbox). */
+function bandColor(db: number[]): [number, number, number] {
+  let lo = 0, mi = 0, hi = 0;
+  // Weighted as the spectrum is drawn (tipped up toward the highs), or the bass wins every frame of an EDM mix
+  db.forEach((d, i) => { const f = ANALYZER_HZ[i], p = 10 ** ((d + tilt(f)) / 10); if (f < 200) lo += p; else if (f < 2000) mi += p; else hi += p; });
+  const t = lo + mi + hi || 1, [a, b, c] = [lo / t, mi / t, hi / t];
+  return [Math.round(255 * a + 255 * b + 61 * c), Math.round(77 * a + 170 * b + 220 * c), Math.round(77 * a + 40 * b + 132 * c)];
+}
+
+/** Where the sound sits, like a polar stereo meter (Ian, Oct 31): a half circle, L to R, each dot a sample pair from
+    Main (scope.js): mono sits in the middle, wide spreads out, and a lopsided mix leans to one side. Out of phase
+    (left and right fighting) shows red. Scaled to the loudest moment of the last seconds, so quiet songs fill it too. */
+function StereoScope() {
+  const cv = useRef<HTMLCanvasElement>(null), scale = useRef(0.05);
+  useEffect(() => onScope((v) => {
+    const el = cv.current, ctx = el?.getContext("2d");
+    if (!el || !ctx) return;
+    const dpr = window.devicePixelRatio || 1, cw = el.clientWidth, ch = el.clientHeight;
+    if (!cw) return;
+    if (el.width !== Math.round(cw * dpr)) { el.width = Math.round(cw * dpr); el.height = Math.round(ch * dpr); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const css = getComputedStyle(el), ground = css.getPropertyValue("--card").trim() || "#141416";
+    const cx = cw / 2, cy = ch - 14, R = Math.min(cw / 2 - 8, ch - 22);
+    // fade what was there, so the last few frames trail
+    ctx.globalAlpha = 0.35; ctx.fillStyle = ground; ctx.fillRect(0, 0, cw, ch); ctx.globalAlpha = 1;
+    ctx.strokeStyle = css.getPropertyValue("--track").trim() || "#444"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - R * Math.SQRT1_2, cy - R * Math.SQRT1_2); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.SQRT1_2, cy - R * Math.SQRT1_2); ctx.stroke();
+    let loud = 0;
+    for (let i = 0; i + 1 < v.length; i += 2) loud = Math.max(loud, Math.hypot(v[i], v[i + 1]));
+    scale.current = Math.max(loud, scale.current * 0.97, 0.01);
+    const himid = css.getPropertyValue("--rng-himid").trim() || "#3fd5e6", hot = css.getPropertyValue("--hot").trim() || "#ff8a5b";
+    for (let i = 0; i + 1 < v.length; i += 2) {
+      const l = v[i], r = v[i + 1], side = (r - l) * Math.SQRT1_2, mid = (l + r) * Math.SQRT1_2;
+      const a = Math.atan2(side, Math.abs(mid)), rad = Math.min(1, Math.hypot(side, mid) / scale.current);
+      ctx.fillStyle = Math.abs(side) > Math.abs(mid) && rad > 0.15 ? hot : himid;   // outside the 45 degree lines: left and right pulling apart
+      ctx.fillRect(cx + R * rad * Math.sin(a) - 1, cy - R * rad * Math.cos(a) - 1, 2, 2);
+    }
+  }), []);
+  return (
+    <div className="relative">
+      <canvas ref={cv} className="block h-[118px] w-full" role="img" aria-label="Where the sound sits, left to right" />
+      <span className="absolute bottom-0 left-1 font-mono text-[10px] text-ink-faint">L</span>
+      <span className="absolute bottom-0 right-1 font-mono text-[10px] text-ink-faint">R</span>
+    </div>
+  );
+}
 const WAVE_FRAMES = 160;   // 8 s at 20 frames a second
 function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: boolean; onOpen?: () => void }) {
   const result = useAriaSel((s) => s.result);
@@ -768,7 +820,8 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
 
   // Width, loudness and the waveform (Oct 31), after the 31 bands in each frame
   const [stats, setStats] = useState<{ lufs: number | null; width: number | null } | null>(null);
-  const wave = useRef<number[]>([]), waveEl = useRef<SVGPathElement>(null), power = useRef<number | null>(null), widthAvg = useRef<number | null>(null);
+  const waveTop = useRef(-120);
+  const wave = useRef<{ db: number; rgb: [number, number, number] }[]>([]), waveEl = useRef<HTMLCanvasElement>(null), power = useRef<number | null>(null), widthAvg = useRef<number | null>(null);
   useEffect(() => onAnalyzer((frame) => {
     const f = frame.slice(0, ANALYZER_HZ.length), [width, lufs, peak] = frame.slice(ANALYZER_HZ.length);
     latest.current = f;
@@ -778,7 +831,12 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
       const p = lufs > -100 ? 10 ** ((lufs + 0.691) / 10) : 0;
       power.current = power.current === null ? p : power.current * 0.983 + p * 0.017;
       if (width !== null && width !== undefined) widthAvg.current = widthAvg.current === null ? width : widthAvg.current * 0.95 + width * 0.05;
-      wave.current = [...wave.current.slice(-(WAVE_FRAMES - 1)), peak ?? -120];
+      // Each bar: the frame's overall level (all bands, 2048 samples), which moves with the beat; a mastered drop's peak
+      // sits near 0 dB all the time and made every bar the same
+      const level = 10 * Math.log10(f.reduce((a, d) => a + 10 ** (d / 10), 0) + 1e-12);
+      waveTop.current = Math.max(level, waveTop.current - 0.05);
+      wave.current = [...wave.current.slice(-(WAVE_FRAMES - 1)), { db: level - waveTop.current, rgb: bandColor(f) }];
+      void peak;
     }
   }), []);
   useEffect(() => {
@@ -804,11 +862,22 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
       const want = Math.ceil((Math.max(-6, ...pk) + 3) / 6) * 6;
       if (want > g.top || want < g.top - 9) setTop(want);
       if (now - lastLevel > 1000) { lastLevel = now; setLevel(avg.current); setPlaying(true); }
-      // The waveform: the last WAVE_FRAMES peaks, newest on the right, mirrored, 0 dB at the edge and -48 dB at the line
-      if (waveEl.current && wave.current.length) {
-        const w = wave.current, h = (db: number) => Math.max(0, Math.min(1, (db + 48) / 48)) * 26;
-        const x = (i: number) => ((i + WAVE_FRAMES - w.length) / (WAVE_FRAMES - 1)) * 300;
-        waveEl.current.setAttribute("d", w.map((db, i) => `M${x(i).toFixed(1)},${(30 - h(db)).toFixed(1)}V${(30 + h(db)).toFixed(1)}`).join(""));
+      // The waveform: the last WAVE_FRAMES peaks, newest on the right, mirrored, each bar colored by where its sound
+      // is (red lows, orange mids, green highs), like DJ software (Ian, Oct 31)
+      const cv = waveEl.current;
+      if (cv && wave.current.length) {
+        const ctx = cv.getContext("2d"), dpr = window.devicePixelRatio || 1, cw = cv.clientWidth, ch = cv.clientHeight;
+        if (ctx && cw) {
+          if (cv.width !== Math.round(cw * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.clearRect(0, 0, cw, ch);
+          const w = wave.current, bw = cw / WAVE_FRAMES, mid = ch / 2;
+          w.forEach((fr, i) => {
+            const h = Math.max(0.5, Math.min(1, (fr.db + 15) / 15) * (mid - 2));   // 0 at the loudest lately, -15 dB at the line, so the beat shows
+            ctx.fillStyle = `rgb(${fr.rgb[0]},${fr.rgb[1]},${fr.rgb[2]})`;
+            ctx.fillRect((i + WAVE_FRAMES - w.length) * bw, mid - h, Math.max(1, bw - 0.6), h * 2);
+          });
+        }
       }
       if (now - lastStats > 250) {
         lastStats = now;
@@ -833,26 +902,22 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
   return (
     <div className={cn("grid gap-3", !compact && "pt-1")}>
       {/* Loudness, width and the waveform of Main as it plays (Ian, Oct 31) */}
-      {!compact && <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.4fr)" }}>
+      {!compact && <div className="grid gap-3" style={{ gridTemplateColumns: narrow ? "minmax(0, 1fr) minmax(0, 1fr)" : "minmax(0, 0.7fr) minmax(0, 1fr) minmax(0, 1.5fr)" }}>
         <section className="cp-tile cp-card" style={{ gap: 2 }} title="Loudness as BS.1770 measures it, over about the last 3 seconds (LUFS).">
           <span className="cp-cap">Loudness</span>
           <span className="ae-big">{stats?.lufs ?? "–"}<span className="ml-1.5 text-[15px] text-ink-muted">LUFS</span></span>
           <span className="cp-meta">last 3 s</span>
         </section>
-        <section className="cp-tile cp-card" style={{ gap: 6 }} title="How much of the sound is in the sides: the side's share of mid plus side. 0% is mono.">
-          <span className="cp-cap">Width</span>
-          <span className="ae-big">{stats?.width ?? "–"}<span className="ml-1 text-[15px] text-ink-muted">%</span></span>
-          <div className="relative h-1.5 rounded-full" style={{ background: "var(--well)" }}>
-            <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, (stats?.width ?? 0) * 2)}%`, background: "var(--cool)", transition: "width 240ms" }} />
-          </div>
-          <span className="flex justify-between font-mono text-[10px] text-ink-faint"><span>mono</span><span>wide</span></span>
+        <section className="cp-tile cp-card" style={{ gap: 4 }} title="Where your sound sits: every dot is a moment of sound, mono in the middle, wider to the sides. The number is the side's share of mid plus side.">
+          <div className="flex items-baseline gap-2"><span className="cp-cap">Width</span>
+            <span className="ml-auto font-mono text-[13px] text-ink">{stats?.width ?? "–"}%</span></div>
+          <StereoScope />
         </section>
         <section className="cp-tile cp-card" style={{ gap: 6, gridColumn: narrow ? "1 / -1" : undefined }}>
-          <span className="cp-cap">Waveform</span>
-          <svg viewBox="0 0 300 60" preserveAspectRatio="none" className="block h-[60px] w-full" role="img" aria-label="Main's waveform, the last 8 seconds">
-            <line x1={0} x2={300} y1={30} y2={30} stroke="var(--hairline)" />
-            <path ref={waveEl} stroke={YOURS} strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
-          </svg>
+          <div className="flex items-baseline gap-2"><span className="cp-cap">Waveform</span>
+            <span className="ml-auto flex gap-2.5 font-mono text-[10.5px] text-ink-faint">
+              <span style={{ color: "rgb(255,77,77)" }}>lows</span><span style={{ color: "rgb(255,170,40)" }}>mids</span><span style={{ color: "rgb(61,220,132)" }}>highs</span></span></div>
+          <canvas ref={waveEl} className="block h-[92px] w-full" role="img" aria-label="Main's waveform, the last 8 seconds, colored by where its sound is" />
           <span className="cp-meta">last 8 s</span>
         </section>
       </div>}
@@ -869,17 +934,18 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
           <span className="text-[14px] font-medium text-ink">{playing ? "Playing now" : "Play your song"}</span>
           {/* What each line is (Ian, Oct 30: "what is the grey line supposed to signify") */}
           <div className="ml-auto flex min-w-0 flex-wrap gap-x-3.5 gap-y-1 text-[12.5px] text-ink-muted">
-            <span className="inline-flex items-center gap-1.5" title="Your Main track right now"><i className="h-[3px] w-3.5 rounded-sm" style={{ background: YOURS }} />Now</span>
+            <span className="inline-flex items-center gap-1.5" title="Your Main track right now"><i className="h-[3px] w-3.5 rounded-sm" style={{ background: AN_COLOR }} />Now</span>
             <span className="inline-flex items-center gap-1.5" title="The loudest each range got in the last moment"><i className="h-[2px] w-3.5 rounded-sm bg-ink opacity-50" />Peaks</span>
-            {target && <span className="inline-flex min-w-0 items-center gap-1.5" title="Your reference's shape, moved to your level"><i className="w-3.5 border-t-2 border-dashed" style={{ borderColor: THEIRS }} /><span className="truncate">{target.name}</span></span>}
+            {target && <span className="inline-flex min-w-0 items-center gap-1.5" title="Your reference's shape, moved to your level"><i className="w-3.5 border-t-2 border-dashed" style={{ borderColor: "var(--ink-muted)" }} /><span className="truncate">{target.name}</span></span>}
           </div>
         </div>
         <Plot height={H} dbTicks={ticks}>
           <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" role="img" aria-label="Your song's sound right now">
             <PlotGrid height={H} dbTicks={ticks} />
-            {tgt && <path d={line(tgt)} fill="none" stroke={THEIRS} strokeWidth={1.6} strokeDasharray="5 4" opacity={0.85} vectorEffect="non-scaling-stroke" />}
-            <path ref={fillEl} fill={YOURS} opacity={0.12} />
-            <path ref={liveEl} fill="none" stroke={YOURS} strokeWidth={1.8} vectorEffect="non-scaling-stroke" />
+            <defs><linearGradient id="an-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={AN_COLOR} stopOpacity={0.55} /><stop offset="1" stopColor={AN_COLOR} stopOpacity={0.08} /></linearGradient></defs>
+            <path ref={fillEl} fill="url(#an-fill)" />
+            <path ref={liveEl} fill="none" stroke={AN_COLOR} strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
+            {tgt && <path d={line(tgt)} fill="none" stroke="var(--ink)" strokeWidth={1.6} strokeDasharray="5 4" opacity={0.7} vectorEffect="non-scaling-stroke" />}
             <path ref={peakEl} fill="none" stroke="var(--ink)" strokeWidth={1} opacity={0.45} vectorEffect="non-scaling-stroke" />
           </svg>
         </Plot>
