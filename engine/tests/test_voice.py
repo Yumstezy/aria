@@ -65,3 +65,16 @@ def test_a_page_in_lives_web_view_may_send_a_recording():
         res = TestClient(app).options("/voice/transcribe", headers={"Origin": origin, "Access-Control-Request-Method": "POST",
                                                                     "Access-Control-Request-Headers": "content-type"})
         assert res.status_code == 200, origin
+
+
+def test_pure_silence_says_to_allow_the_mic(tmp_path):
+    """Ian, Oct 31: the mic gave Live all zeros (no permission). Aria says so instead of asking Muse."""
+    import io
+    import numpy as np
+    import soundfile as sf
+    import pytest
+    from aria_engine import voice
+    buf = io.BytesIO()
+    sf.write(buf, np.zeros(48000), 48000, format="WAV", subtype="PCM_16")
+    with pytest.raises(voice.VoiceError, match="Microphone"):
+        voice.to_api_wav(buf.getvalue())

@@ -2,6 +2,11 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
+## Oct 31
+
+- **Talking to Aria, Ian: "it's not working right now".** The engine log shows the two recordings were pure silence (peak -180 dBFS): Live's web view got zeros from the mic, which is what macOS gives an app without microphone permission (the Mac's input is the EarPods mic). Fix for Ian: System Settings, Privacy & Security, Microphone, turn on Ableton Live, quit and reopen Live. Aria now says exactly that for a silent recording instead of "Muse didn't catch any words", and doesn't send silence to Muse.
+- **Aria talks back:** Meta's Model API has no voice output (dev.meta.ai: Muse Voice Transcribe "does not synthesize speech"). Answers to spoken requests are read aloud with the Mac's voice (`say`, from the bridge); typed requests stay quiet; pressing the mic stops it. Check: allow the mic, ask by voice, hear the answer.
+
 ## Oct 30, afternoon
 
 - **"Against good mixes" is out** (Ian: confusing, and 30 rated mixes aren't an industry standard). With no reference, Aria finds clashes and problem spots only. `typical.py` and its tests are deleted (in git history); `ml/` keeps the data and `ml/curves.py`.

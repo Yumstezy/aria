@@ -301,6 +301,7 @@ export function connect() {
       // Only a new entry counts: the same request asked twice (Fix it on one problem again) mustn't match the old answer
       const answered = state.ask.pending !== null && log.length > state.ask.log.length && log[log.length - 1].request === state.ask.pending;
       const fixes = fixesAfter(log, log.length > state.ask.log.length ? log[log.length - 1] : null);
+      if (log.length > state.ask.log.length) speakAnswer(log[log.length - 1]);
       set({ ask: { ...state.ask, log, ...(answered ? { pending: null } : {}) }, fixes });
       if (answered) askQueued();
     });
@@ -478,6 +479,16 @@ function voiceError(text: string) {
   voiceErrorTimer = setTimeout(() => set({ voice: { ...state.voice, error: null } }), 6000);
 }
 
+// Spoken in, spoken out (Ian, Oct 31: "I want to be able to talk with it"): a request that came by voice gets its
+// answer read aloud by the Mac's voice (Meta's Model API has speech to text only, no voice output). Typed ones stay quiet.
+const spoken = new Set<string>();
+function speakAnswer(x: Exchange) {
+  if (!spoken.delete(x.request)) return;
+  const did = x.done.filter((d) => d.ok).map((d) => d.text);
+  const text = [x.reply, ...(x.reply ? [] : did), x.error, ...(x.problems ?? [])].filter(Boolean).join(" ");
+  if (text) send("speak", { text });
+}
+
 /** The mic button: first press starts listening, the next sends what was said to Muse. */
 let releasedWhileStarting = false;
 
@@ -488,6 +499,7 @@ export async function toggleVoice() {
     // "starting" at once, so a second press or a key release while the mic opens is handled, not lost
     releasedWhileStarting = false;
     set({ voice: { state: "starting", error: null } });
+    send("speak_stop");      // Aria stops talking when you start
     send("ensure_engine");   // the words go to the engine; start it if it isn't running
     try { await startRecording(); } catch (e) { voiceError((e as Error).message); return; }
     voiceSince = Date.now();
@@ -499,7 +511,7 @@ export async function toggleVoice() {
   try {
     const words = (await transcribe(await stopRecording())).trim();
     set({ voice: { state: "idle", error: null } });
-    if (words) askMuse(words);
+    if (words) { spoken.add(words); askMuse(words); }
     else voiceError("Muse didn't hear any words. Try again a little closer to the mic.");
   } catch (e) { voiceError((e as Error).message); }
 }

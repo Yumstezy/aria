@@ -17,6 +17,7 @@ MODEL = "muse-voice-transcribe-1.0"
 RATE = 16000
 MAX_SECONDS = 30.0      # a spoken request, not a podcast
 MIN_SECONDS = 0.3
+SILENT_PEAK = 10 ** (-90 / 20)   # a recording that never gets above -90 dBFS is silence, not a quiet voice
 TIMEOUT_SEC = 20.0
 
 
@@ -39,6 +40,11 @@ def to_api_wav(raw: bytes) -> bytes:
     peak = float(np.abs(mono).max()) if len(mono) else 0.0
     # Local engine log only: how long and how loud, for "Muse didn't hear me"
     print(f"voice: {seconds:.1f} s at {rate} Hz, peak {20 * np.log10(peak + 1e-9):.0f} dBFS")
+    # Nothing at all came in (Ian, Oct 31: two recordings at -180 dBFS, read as "didn't catch any words"): that's
+    # macOS giving Live silence, not a quiet voice, so don't send it to Muse and say what to change
+    if peak < SILENT_PEAK:
+        raise VoiceError("Aria's mic heard nothing at all. In System Settings, Privacy & Security, Microphone, turn on "
+                         "Ableton Live, then quit and reopen Live. Also check Sound, Input is the mic you're using.")
     g = np.gcd(int(rate), RATE)
     pcm = resample_poly(mono, RATE // g, int(rate) // g)
     out = io.BytesIO()
