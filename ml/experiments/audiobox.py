@@ -36,9 +36,13 @@ SHUFFLES, SHUFFLE_REPEATS = 100, 2
 
 
 def main(features_csv, abx_csv):
-    scores = {r["file"]: r for r in csv.DictReader(open(abx_csv))}
+    # Match by file name: features.csv stores "good/GOOD_x.wav", aesthetics.csv stores "GOOD_x.wav" (fix, Oct 30, before any run).
+    scores = {r["file"]: r for r in csv.DictReader(open(abx_csv, encoding="utf-8"))}
     rows, dropped = t.load(features_csv, t.DETAILED)
-    rows = [{**r, **scores[r["file"]]} for r in rows if r["file"] in scores]
+    measured = len(rows)
+    rows = [{**r, **scores[Path(r["file"]).name], "file": r["file"]} for r in rows if Path(r["file"]).name in scores]
+    if len(rows) < 0.9 * measured:
+        sys.exit(f"Only {len(rows)} of {measured} mixes matched between {features_csv} and {abx_csv}. Check the file names.")
     y = np.array([t.tier_index(r["label"]) for r in rows])
     groups = np.array([r["song"] for r in rows])
     Xs = {s: np.array([[float(r[f]) for f in fs] for r in rows]) for s, fs in SETS.items()}
@@ -72,7 +76,7 @@ def main(features_csv, abx_csv):
               "Audiobox medians per tier (good, mid, bad):", ""]
     lines += [f"- {a[4:].upper()}: {m[0]:.2f}, {m[1]:.2f}, {m[2]:.2f}" for a, m in med.items()]
     out = ML / "results" / "aesthetics-experiment.md"
-    out.write_text("\n".join(lines) + "\n")
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
 
 

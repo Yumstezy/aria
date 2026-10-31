@@ -25,7 +25,7 @@ def tier_index(label):
 
 def load(path):
     """Rows with every feature measured. Rows with gaps are dropped and counted, never filled in."""
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     usable, dropped = [], 0
     for r in rows:

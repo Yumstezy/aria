@@ -120,7 +120,7 @@ def song_overrides(out):
     path = Path(out).parent / "song_groups.csv"
     if not path.exists():
         return {}
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return {r["file"].strip(): r["song"].strip().lower() for r in csv.DictReader(f)}
 
 
@@ -129,7 +129,7 @@ def excluded(out):
     path = Path(out).parent / "excluded.csv"
     if not path.exists():
         return {}
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return {r["file"].strip(): r["why"].strip() for r in csv.DictReader(f)}
 
 
@@ -152,7 +152,7 @@ def main(root, out):
             print(f"LEFT OUT {path.name}: {skip[path.name]}")
     files = [(p, label) for p, label in files if p.name not in skip]
     workers = max(1, min(4, os.cpu_count() or 1))
-    with open(out, "w", newline="") as f, ProcessPoolExecutor(workers) as pool:
+    with open(out, "w", newline="", encoding="utf-8") as f, ProcessPoolExecutor(workers) as pool:
         w = csv.DictWriter(f, fieldnames=FIELDS)
         w.writeheader()
         jobs = [pool.submit(row_for, path, label, root) for path, label in files]

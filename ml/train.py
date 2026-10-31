@@ -104,7 +104,7 @@ REAL = {
 
 def load(path, features):
     import csv
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     usable, dropped = [], 0
     for r in rows:
@@ -263,7 +263,7 @@ def main(csv_path):
                   "That's a real result. Report it as it is."]
 
     (ROOT / "results").mkdir(exist_ok=True)
-    (ROOT / "results" / "train-report.md").write_text("\n".join(lines) + "\n")
+    (ROOT / "results" / "train-report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
 
 
