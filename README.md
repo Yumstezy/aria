@@ -31,17 +31,6 @@
 
 ---
 
-## How this maps to the rubric
-
-| | Weight | Where to look |
-|---|---|---|
-| **Impact** | 30% | [Who it helps](#impact) |
-| **Use of Meta AI** | 25% | [Meta's models in every screen](#meta-ai) |
-| **Technical** | 20% | [How it's built](#how-its-built) · [Results](#results) · [Challenges](#challenges) |
-| **Demo** | 25% | [The seven tools](#the-seven-tools), screen by screen |
-
----
-
 ## Impact
 
 **Finishing a song stops at the mix.** Most producers learn to make a drop long before they learn why it sounds muddy next to the songs they love. The usual answers are an engineer, a course, or guessing with plugins. Aria works where they already are: in Ableton, on their own song.
@@ -67,7 +56,6 @@ Meta's models do the work you see, in every screen. Not a chat box on the side.
 | | **Asks instead of guessing.** A real reply from testing: *"Which vocal track do you mean, VOCAL TEST or Vox 2?"* |
 | | Names the parts of a song (Intro, Build, Drop, Break, Bridge, Outro) from their measured loudness and shape. |
 | **Muse Voice Transcribe** `muse-voice-transcribe-1.0` | Hold the mapped key and say it. *"Cut the mud on the bass"* came back as text in 1.4 s, then ran like a typed request. |
-| **Demucs** `htdemucs` (Meta AI research) | Splits each Mix check into vocals, drums, bass and other, so Aria can say which sound covers which. |
 | **Audiobox Aesthetics** | Scored all 99 rated mixes as a feature for the mix model. A planned side experiment, [reported honestly](#what-didnt-work): it didn't beat loudness, so it didn't ship. |
 
 > **The guardrail.** Muse Spark never touches Live directly. It answers with actions from a fixed menu; Aria checks each one (the track exists, the gain stays within ±6 dB, the knob's unit fits) and only then applies it, with Undo. If Muse is down, Aria shows the measurements and says advice is unavailable. It never falls back to canned text.
@@ -78,7 +66,7 @@ Meta's models do the work you see, in every screen. Not a chat box on the side.
 
 ### Mix check
 
-Records 16 bars of your Main track, splits it with Demucs, and finds what clashes or sticks out: buried sounds, mud, harsh hits, ringing notes, bass clicks, tracks that fight. Each problem is marked on the spectrum by its kind (icon) and its range (color, lows red to highs violet). Compare with a reference song, part for part: *"Against their Drop."*
+Records 16 bars of your Main track, splits it into its parts, and finds what clashes or sticks out: buried sounds, mud, harsh hits, ringing notes, bass clicks, tracks that fight. Each problem is marked on the spectrum by its kind (icon) and its range (color, lows red to highs violet). Compare with a reference song, part for part: *"Against their Drop."*
 
 <img src="site/public/img/judges/mixcheck.png" alt="Mix check against a reference song">
 
@@ -127,7 +115,7 @@ Two loops flamming? Aria finds every hit to the millisecond, moves each one onto
 
 Drop in an acapella. Aria reads its original tempo and key, puts its first beat on your kick, and warps it to your song with Live's own warp markers, which it reads back to be sure they stuck. Undo puts it back.
 
-*Ian's vocal: 148 BPM, A minor, beat 1 on the kick at bar 9, which sits 22.6 ms after Live's grid.*
+*Ian's vocal: 148 BPM (set by hand), A minor, beat 1 on the kick at bar 10, which sits 25.3 ms after Live's grid.*
 
 </td>
 </tr>
@@ -160,19 +148,17 @@ flowchart LR
   B["Bridge<br/>Node for Max<br/>Undo stack"]
   E["Engine<br/>Python, FastAPI<br/>127.0.0.1:8765"]
   M["Muse Spark<br/>Muse Voice Transcribe"]
-  X["Demucs"]
   D <--> B
   W <--> B
   B <--> E
   E <--> M
-  E --> X
 ```
 
 | Part | What it does |
 |---|---|
 | **The device** (`device/Aria.amxd`) | Sits last on the Main track. Records bars for a check, reads tempo, clips and warp markers, sets EQ, devices, markers and warp markers through the Live API, and runs the live analyzer: 55 sixth-octave bands, K-weighted loudness and a stereo buffer, 20 times a second. |
 | **The bridge** (`device/bridge.js`) | Node for Max. Carries messages between Live, the screens and the engine, keeps every change on an Undo stack, and starts the engine when it's needed. |
-| **The engine** (`engine/`) | Python. Measures, splits with Demucs, and talks to Muse Spark. Returns numbers; the words come from Muse. |
+| **The engine** (`engine/`) | Python. Measures the audio and talks to Muse Spark. Returns numbers; the words come from Muse. |
 | **The screens** (`ui/`) | React, TypeScript and Tailwind, built into single HTML files that Live's own web view loads: the strip on the device and the window docked over Live. |
 
 **How it measures**
@@ -195,7 +181,7 @@ Every number came from real audio this week, and the code that produced it is in
 | **5.5 ms** worst, for a 140 BPM loop warped into a 165 song (before warp-aware timing, 21 hits moved up to 39 ms the wrong way) | Same loop, same kick, timed through Live's warp markers |
 | **6.9 dB less** for a planted harsh boost after the fix, so **Fixed** | Test mix B against the clean control, loudness matched |
 | **126.6 BPM** read from a 126 BPM acapella (190 before the fix); key **G# minor**, right | The vocal alone, no beat underneath |
-| **22.6 ms**: how far Ian's kick sits after Live's grid, so a vocal lands on the kick, not the grid | His drum and vocal stems |
+| **22 to 25 ms**: how far Ian's kick sits after Live's grid, depending on the bar, so a vocal lands on the kick, not the grid | His drum and vocal stems |
 | **-9.2 LUFS** in the Live analyzer on Ian's drop, the same as the engine measured for that recording | BS.1770 in the device against pyloudnorm in the engine |
 | **5 of 5** real requests to Muse Spark got the right tool or a clarifying question | Sync, groove at 70%, a sidechain, an unclear vocal, "did that work" |
 | **Same part names three runs in a row** for Ian's reference song | `POST /sections`, Muse Spark naming, Oct 29 |
@@ -278,7 +264,13 @@ docs/      build steps, contracts, the rubric, status
 
 ## Licenses and credits
 
-- **Demucs:** the code is MIT, but its author says the license of the trained weights is unclear (trained partly on MUSDB, which is for research use). Aria uses it in this hackathon prototype only, for non-commercial use. The weights download from Meta on first use and are not in this repo.
 - **No commercial music** anywhere in the repo or the video. The 99 rated mixes were given to us or released for free download for us to use; only their measurements are in the repo, never the audio.
 - **Fonts:** the system font on Mac, Geist bundled under the OFL.
-- Built by **Ian** and **Raghav**, with Claude Code.
+
+## Team
+
+| | | |
+|---|---|---|
+| **Ian Barrie** | Everything: product, sound, the build, testing in Live every day | [@Yumstezy](https://github.com/Yumstezy) |
+| **Dylan Haman** | Product manager | [@Hamqnn](https://github.com/Hamqnn) |
+| **Raghav Agarwal** | The mix model: the rated mixes, the measurements, the experiments | [@RaghavAgarwal18](https://github.com/RaghavAgarwal18) |
