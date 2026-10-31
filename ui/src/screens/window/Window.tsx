@@ -766,6 +766,10 @@ function bandColor(db: number[]): [number, number, number] {
     (left and right fighting) shows red. Scaled to the loudest moment of the last seconds, so quiet songs fill it too. */
 function StereoScope() {
   const cv = useRef<HTMLCanvasElement>(null), scale = useRef(0.05);
+  // Phase (correlation, -1 to +1) and balance (right minus left, dB), smoothed, read 4 times a second
+  const corr = useRef<number | null>(null), bal = useRef<number | null>(null);
+  const [meter, setMeter] = useState<{ corr: number; bal: number } | null>(null);
+  useEffect(() => { const t = setInterval(() => { if (corr.current !== null && bal.current !== null) setMeter({ corr: corr.current, bal: bal.current }); }, 250); return () => clearInterval(t); }, []);
   useEffect(() => onScope((v) => {
     const el = cv.current, ctx = el?.getContext("2d");
     if (!el || !ctx) return;
@@ -776,27 +780,58 @@ function StereoScope() {
     const css = getComputedStyle(el), ground = css.getPropertyValue("--card").trim() || "#141416";
     const cx = cw / 2, cy = ch - 14, R = Math.min(cw / 2 - 8, ch - 22);
     // fade what was there, so the last few frames trail
-    ctx.globalAlpha = 0.35; ctx.fillStyle = ground; ctx.fillRect(0, 0, cw, ch); ctx.globalAlpha = 1;
+    ctx.globalAlpha = 0.28; ctx.fillStyle = ground; ctx.fillRect(0, 0, cw, ch); ctx.globalAlpha = 1;   // the last frames trail off
     ctx.strokeStyle = css.getPropertyValue("--track").trim() || "#444"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI, 0); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx - R * Math.SQRT1_2, cy - R * Math.SQRT1_2); ctx.moveTo(cx, cy); ctx.lineTo(cx + R * Math.SQRT1_2, cy - R * Math.SQRT1_2); ctx.stroke();
-    let loud = 0;
-    for (let i = 0; i + 1 < v.length; i += 2) loud = Math.max(loud, Math.hypot(v[i], v[i + 1]));
+    let loud = 0, lr = 0, ll = 0, rr = 0;
+    for (let i = 0; i + 1 < v.length; i += 2) { loud = Math.max(loud, Math.hypot(v[i], v[i + 1])); lr += v[i] * v[i + 1]; ll += v[i] * v[i]; rr += v[i + 1] * v[i + 1]; }
+    if (ll + rr > 1e-9) {
+      const c = lr / Math.sqrt(ll * rr || 1e-12), b = 10 * Math.log10((rr + 1e-12) / (ll + 1e-12));
+      corr.current = corr.current === null ? c : corr.current * 0.85 + c * 0.15;
+      bal.current = bal.current === null ? b : bal.current * 0.85 + b * 0.15;
+    }
     scale.current = Math.max(loud, scale.current * 0.97, 0.01);
     const himid = css.getPropertyValue("--rng-himid").trim() || "#3fd5e6", hot = css.getPropertyValue("--hot").trim() || "#ff8a5b";
     for (let i = 0; i + 1 < v.length; i += 2) {
       const l = v[i], r = v[i + 1], side = (r - l) * Math.SQRT1_2, mid = (l + r) * Math.SQRT1_2;
       const a = Math.atan2(side, Math.abs(mid)), rad = Math.min(1, Math.hypot(side, mid) / scale.current);
-      ctx.fillStyle = Math.abs(side) > Math.abs(mid) && rad > 0.15 ? hot : himid;   // outside the 45 degree lines: left and right pulling apart
-      ctx.fillRect(cx + R * rad * Math.sin(a) - 1, cy - R * rad * Math.cos(a) - 1, 2, 2);
+      const c = Math.abs(side) > Math.abs(mid) && rad > 0.15 ? hot : himid;   // outside the 45 degree lines: left and right pulling apart
+      ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.arc(cx + R * rad * Math.sin(a), cy - R * rad * Math.cos(a), 1 + rad * 0.8, 0, 2 * Math.PI); ctx.fill();
     }
+    ctx.shadowBlur = 0;
   }), []);
   return (
     <div className="relative">
       <canvas ref={cv} className="block h-[118px] w-full" role="img" aria-label="Where the sound sits, left to right" />
-      <span className="absolute bottom-0 left-1 font-mono text-[10px] text-ink-faint">L</span>
-      <span className="absolute bottom-0 right-1 font-mono text-[10px] text-ink-faint">R</span>
+      <span className="absolute left-1 top-[104px] font-mono text-[10px] text-ink-faint">L</span>
+      <span className="absolute right-1 top-[104px] font-mono text-[10px] text-ink-faint">R</span>
+      {/* Phase: +1 is safe in mono, below 0 parts cancel when summed; balance: which side is louder */}
+      <div className="mt-2 grid gap-1" title="Phase: +1 means left and right agree (safe in mono). Below 0, parts cancel out when the song plays in mono.">
+        <div className="relative h-1.5 rounded-full" style={{ background: "linear-gradient(90deg, var(--hot), var(--well) 50%, var(--good))", opacity: 0.85 }}>
+          {meter && <span className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink" style={{ left: `${((meter.corr + 1) / 2) * 100}%`, transition: "left 240ms", boxShadow: "0 0 0 2px var(--card)" }} />}
+        </div>
+        <div className="flex justify-between font-mono text-[10px] text-ink-faint"><span>-1</span><span>phase</span><span>+1</span></div>
+        <div className="text-center font-mono text-[11px] text-ink-muted">
+          {meter ? `${meter.corr >= 0 ? "+" : ""}${meter.corr.toFixed(2)} · ${Math.abs(meter.bal) < 0.3 ? "centered" : `${meter.bal > 0 ? "right" : "left"} +${Math.abs(meter.bal).toFixed(1)} dB`}` : "–"}
+        </div>
+      </div>
     </div>
+  );
+}
+
+/** The last 30 s of loudness as a line (Oct 31): rising, holding or dipping at a glance. Scaled to its own range. */
+function LoudnessLine({ values }: { values: number[] }) {
+  if (values.length < 2) return <div className="mt-auto h-9" />;
+  const lo = Math.min(...values) - 1, hi = Math.max(...values) + 1, W = 200, H = 36;
+  const pts = values.map((v, i) => [((i + 120 - values.length) / 119) * W, H - 3 - ((v - lo) / (hi - lo)) * (H - 6)] as [number, number]);
+  const d = path(pts);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="mt-auto block h-9 w-full" aria-label="Loudness over the last 30 seconds">
+      <path d={`${d}L${pts[pts.length - 1][0]},${H}L${pts[0][0]},${H}Z`} fill={AN_COLOR} opacity={0.15} />
+      <path d={d} fill="none" stroke={AN_COLOR} strokeWidth={1.6} vectorEffect="non-scaling-stroke" />
+    </svg>
   );
 }
 const WAVE_FRAMES = 160;   // 8 s at 20 frames a second
@@ -819,8 +854,8 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
   geo.current = { line, draw, top, n, H, X };
 
   // Width, loudness and the waveform (Oct 31), after the 31 bands in each frame
-  const [stats, setStats] = useState<{ lufs: number | null; width: number | null } | null>(null);
-  const waveTop = useRef(-120);
+  const [stats, setStats] = useState<{ lufs: number | null; width: number | null; peak?: number | null; history?: number[] } | null>(null);
+  const waveTop = useRef(-120), waveAt = useRef(0), lufsHistory = useRef<number[]>([]), peakHold = useRef<number[]>([]);
   const wave = useRef<{ db: number; rgb: [number, number, number] }[]>([]), waveEl = useRef<HTMLCanvasElement>(null), power = useRef<number | null>(null), widthAvg = useRef<number | null>(null);
   useEffect(() => onAnalyzer((frame) => {
     const f = frame.slice(0, ANALYZER_HZ.length), [width, lufs, peak] = frame.slice(ANALYZER_HZ.length);
@@ -836,7 +871,8 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
       const level = 10 * Math.log10(f.reduce((a, d) => a + 10 ** (d / 10), 0) + 1e-12);
       waveTop.current = Math.max(level, waveTop.current - 0.05);
       wave.current = [...wave.current.slice(-(WAVE_FRAMES - 1)), { db: level - waveTop.current, rgb: bandColor(f) }];
-      void peak;
+      waveAt.current = performance.now();
+      peakHold.current = [...peakHold.current.slice(-59), peak ?? -120];   // the last 3 s of peaks
     }
   }), []);
   useEffect(() => {
@@ -865,24 +901,41 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
       // The waveform: the last WAVE_FRAMES peaks, newest on the right, mirrored, each bar colored by where its sound
       // is (red lows, orange mids, green highs), like DJ software (Ian, Oct 31)
       const cv = waveEl.current;
-      if (cv && wave.current.length) {
+      if (cv && wave.current.length > 1) {
         const ctx = cv.getContext("2d"), dpr = window.devicePixelRatio || 1, cw = cv.clientWidth, ch = cv.clientHeight;
         if (ctx && cw) {
           if (cv.width !== Math.round(cw * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.clearRect(0, 0, cw, ch);
-          const w = wave.current, bw = cw / WAVE_FRAMES, mid = ch / 2;
-          w.forEach((fr, i) => {
-            const h = Math.max(0.5, Math.min(1, (fr.db + 15) / 15) * (mid - 2));   // 0 at the loudest lately, -15 dB at the line, so the beat shows
-            ctx.fillStyle = `rgb(${fr.rgb[0]},${fr.rgb[1]},${fr.rgb[2]})`;
-            ctx.fillRect((i + WAVE_FRAMES - w.length) * bw, mid - h, Math.max(1, bw - 0.6), h * 2);
-          });
+          // Smooth scroll: between frames the whole shape slides left by the time since the last one (50 ms a step),
+          // so it moves every screen frame like the spectrum, not in jumps
+          const w = wave.current, step = cw / (WAVE_FRAMES - 1), mid = ch / 2;
+          const slide = Math.min(1, (now - waveAt.current) / 50) * step;
+          const xOf = (i: number) => (i + WAVE_FRAMES - w.length) * step - slide;
+          const hOf = (db: number) => Math.max(0.5, Math.min(1, (db + 15) / 15) * (mid - 3));
+          // the color flows along the shape: one gradient stop a frame
+          const grad = ctx.createLinearGradient(0, 0, cw, 0);
+          w.forEach((fr, i) => { const x = xOf(i) / cw; if (x >= 0 && x <= 1) grad.addColorStop(x, `rgb(${fr.rgb[0]},${fr.rgb[1]},${fr.rgb[2]})`); });
+          ctx.beginPath();
+          ctx.moveTo(xOf(0), mid - hOf(w[0].db));
+          for (let i = 1; i < w.length; i++) { const xm = (xOf(i - 1) + xOf(i)) / 2; ctx.quadraticCurveTo(xOf(i - 1), mid - hOf(w[i - 1].db), xm, mid - (hOf(w[i - 1].db) + hOf(w[i].db)) / 2); }
+          ctx.lineTo(xOf(w.length - 1), mid - hOf(w[w.length - 1].db));
+          for (let i = w.length - 1; i > 0; i--) { const xm = (xOf(i - 1) + xOf(i)) / 2; ctx.quadraticCurveTo(xOf(i), mid + hOf(w[i].db), xm, mid + (hOf(w[i - 1].db) + hOf(w[i].db)) / 2); }
+          ctx.lineTo(xOf(0), mid + hOf(w[0].db));
+          ctx.closePath();
+          ctx.globalAlpha = 0.9; ctx.fillStyle = grad; ctx.fill(); ctx.globalAlpha = 1;
+          // the newest moment glows at the right edge
+          const last = w[w.length - 1], lx = xOf(w.length - 1);
+          ctx.shadowBlur = 10; ctx.shadowColor = `rgb(${last.rgb.join(",")})`; ctx.fillStyle = "rgba(255,255,255,0.9)";
+          ctx.fillRect(lx - 1, mid - hOf(last.db), 2, hOf(last.db) * 2); ctx.shadowBlur = 0;
         }
       }
       if (now - lastStats > 250) {
         lastStats = now;
-        const p = power.current;
-        setStats({ lufs: p && p > 0 ? Math.round(10 * (-0.691 + 10 * Math.log10(p))) / 10 : null, width: widthAvg.current === null ? null : Math.round(widthAvg.current) });
+        const p = power.current, lufs = p && p > 0 ? Math.round(10 * (-0.691 + 10 * Math.log10(p))) / 10 : null;
+        if (lufs !== null) lufsHistory.current = [...lufsHistory.current.slice(-119), lufs];   // 30 s, 4 a second
+        const pk = peakHold.current.length ? Math.max(...peakHold.current) : null;
+        setStats({ lufs, width: widthAvg.current === null ? null : Math.round(widthAvg.current), peak: pk === null || pk < -100 ? null : Math.round(pk * 10) / 10, history: lufsHistory.current });
       }
     };
     raf = requestAnimationFrame(tick);
@@ -906,7 +959,8 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
         <section className="cp-tile cp-card" style={{ gap: 2 }} title="Loudness as BS.1770 measures it, over about the last 3 seconds (LUFS).">
           <span className="cp-cap">Loudness</span>
           <span className="ae-big">{stats?.lufs ?? "–"}<span className="ml-1.5 text-[15px] text-ink-muted">LUFS</span></span>
-          <span className="cp-meta">last 3 s</span>
+          <span className="cp-meta">last 3 s{stats?.peak !== undefined && stats?.peak !== null ? ` · peak ${stats.peak} dB` : ""}</span>
+          <LoudnessLine values={stats?.history ?? []} />
         </section>
         <section className="cp-tile cp-card" style={{ gap: 4 }} title="Where your sound sits: every dot is a moment of sound, mono in the middle, wider to the sides. The number is the side's share of mid plus side.">
           <div className="flex items-baseline gap-2"><span className="cp-cap">Width</span>
