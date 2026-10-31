@@ -19,7 +19,14 @@ const { spawn } = require("child_process");
 const Max = require("max-api");
 
 const ENGINE = { host: "127.0.0.1", port: 8765 };
-const REPO = path.resolve(__dirname, "..");
+// The repo: where install.sh says it is (Oct 31: the devices sit in Live's User Library as links), else one folder up
+const REPO = (() => {
+  try {
+    const at = JSON.parse(fs.readFileSync(path.join(os.homedir(), "Library", "Application Support", "Aria", "install.json"), "utf8")).repo;
+    if (at && fs.existsSync(path.join(at, "engine"))) return at;
+  } catch (e) { /* not installed with install.sh: run from the repo */ }
+  return path.resolve(__dirname, "..");
+})();
 const ENGINE_DIR = path.join(REPO, "engine");
 // The React builds (ui/dist, see ui/vite.config.ts): one self-contained HTML file per screen.
 // Dark (Night) by default; Light (Sky) when the producer picks it in the window's rail (Ian, Oct 27). Saved in window.json.

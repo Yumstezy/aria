@@ -4,6 +4,9 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 ## Oct 31
 
+- **Install like a plugin (Ian, 13:20):** `./install.sh` sets up the engine, puts Aria and Aria Ear in Live's browser (User Library > Presets > Audio Effects > Max Audio Effect > Aria, as links to the repo, so pulls update them), copies the Remote Script, and writes ~/Library/Application Support/Aria/install.json so the bridge finds the repo from there. Ran on Ian's Mac: the links are in place. Check in Live: restart Live, open the browser at that folder, drag Aria onto Main: the strip loads and Check mix works. If Live doesn't list the linked devices, tell Claude (the fallback is copies plus install.json).
+- **Home card hover lag fixed:** the glow moves through CSS variables once a screen frame, without re-rendering; the masked grid layer is gone.
+
 - **Spoken replies removed (Ian, Oct 31: "get rid of the voice, it's not nice").** Answers show on screen only. Talking to Aria (the mic, Muse Voice Transcribe) stays. ElevenLabs is no longer planned. Ian: "everything is good and functional with the software".
 
 - **Live analyzer redone after Ian's references (13:01):** spectrum filled violet like iZotope (the gold "is kinda ugly"), at sixth octaves (55 bands, the device rebuilt: 155 boxes) so peaks show; Width is a polar stereo view (half circle L to R, a dot per sample pair from a 100 ms stereo buffer read by device/scope.js, red outside the 45 degree lines); the waveform is colored by where the sound is (red lows, orange mids, green highs, weighted like the spectrum is drawn). Loudness unchanged. Checked with frames and samples computed from Ian's drop. Check in Live (re-add Aria, the device changed): Live analyzer while playing; the dots move, the waveform scrolls in colors. If the width view stays empty, scope.js's buffer read is the part to look at.
@@ -52,7 +55,7 @@ Updated at the end of each session: what passed, what's next, any blocker.
 - **Vocal sync, redone after Ian's try (14:37, "unwarp it, find the original key and BPM, sync it to the kick"), to check in Live.** Groove match, Vocal: pick the vocal's clip, then the kick (or drums) clip. Aria reads the vocal unwarped from its file: "Original 148 BPM · A minor" on his vocal stem. Beat 1 goes on the kick at the nearest bar (his drums sit 22.6 ms after Live's grid; kicks timed by their full sound, counted as kicks by the low band), the kicks drawn under the vocal's picture. Sync clears Live's markers and sets Aria's two (Complex Pro); Undo restores. Check: acapella and kick clip in the Arrangement, pick both, Sync to the kick, play: the words sit on the kick. If they're a beat off, Beat 1 earlier or later and Sync again.
 
 **Bug queue**
-- Home's kind cards (GlowCard): hovering lags a little, and since the cards fill half the page, scrolling over them feels sticky (Ian, Oct 30, 12:35).
+- ~~Home's kind cards (GlowCard): hovering lags~~ fixed Oct 31.
 
 ## Pick up here (Oct 29, 20:15)
 

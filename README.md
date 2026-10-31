@@ -14,7 +14,13 @@ You need Python 3.11 (`brew install python@3.11`).
 ./install.sh
 ```
 
-This sets up the engine and starts it on http://127.0.0.1:8765. Put your Meta Model API key in `engine/.env` (created on first run), then restart the engine with `engine/run.sh`.
+One script, run once:
+
+1. **The engine:** a Python environment with Aria's libraries, and `engine/.env`. Put your Meta Model API key in it (`MODEL_API_KEY=...`).
+2. **Live's browser:** Aria and Aria Ear appear in your User Library, under Presets > Audio Effects > Max Audio Effect > Aria. Drag them onto a track like any effect. They're links to this folder, so `git pull` updates them.
+3. **The Remote Script**, for "Name my tracks". In Live, once: Settings > Link, Tempo & MIDI > Control Surface: Aria.
+
+Then open Live and drag **Aria** onto the Main track, last. Aria starts its engine by itself when it needs it (`./install.sh --start` starts it right away).
 
 - Tests: `cd engine && .venv/bin/pytest`
 - UI without Live: open `ui/index.html` (window) or `ui/strip.html` (device strip) in Chrome. Add `?theme=night` for the dark theme.

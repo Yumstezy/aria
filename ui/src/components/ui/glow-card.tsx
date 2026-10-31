@@ -2,7 +2,7 @@
 // that follows the cursor, and a spotlight and faint grid inside, all in one accent. Only the shell is used; the
 // bento's demo content (latency, deploy log, scores) was invented data and is left out.
 // In the app (Oct 29): the same card as the website (Ian: "the website should be your reference"), on the theme's card color.
-import { useState, type MouseEvent, type ReactNode, type TouchEvent } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export type Accent = "hot" | "gold" | "blue" | "good" | "white";
@@ -16,45 +16,39 @@ const ACCENTS: Record<Accent, string> = {
   white: "237, 237, 239",
 };
 
-// Faint grid that only shows near the cursor
-const GRID_IMAGE =
-  "linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)";
-
+// Oct 31 (Ian: hovering the cards lagged, and scrolling over them stuck): the cursor's place goes into two CSS
+// variables at most once a screen frame, so moving the mouse never re-renders the card or what's in it, and the
+// masked grid (the costliest layer to repaint in Live's web view) is gone.
 export function GlowCard({ accent = "white", className, padded = true, children }: {
   accent?: Accent; className?: string; padded?: boolean; children: ReactNode;
 }) {
-  const [pos, setPos] = useState({ x: 0, y: 0 });
   const [active, setActive] = useState(false);
+  const box = useRef<HTMLDivElement>(null), frame = useRef(0);
   const rgb = ACCENTS[accent];
 
   // Cursor position, measured from the card's top-left corner
-  const moveTo = (clientX: number, clientY: number, el: HTMLElement) => {
-    const rect = el.getBoundingClientRect();
-    setPos({ x: clientX - rect.left, y: clientY - rect.top });
+  const moveTo = (clientX: number, clientY: number) => {
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => {
+      const el = box.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      el.style.setProperty("--gx", `${clientX - rect.left}px`);
+      el.style.setProperty("--gy", `${clientY - rect.top}px`);
+    });
   };
-  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => moveTo(e.clientX, e.clientY, e.currentTarget);
-  // Touch screens have no hover, so a finger dragging across the card lights it up too
-  const handleTouch = (e: TouchEvent<HTMLDivElement>) => {
-    const touch = e.touches[0];
-    if (touch) { moveTo(touch.clientX, touch.clientY, e.currentTarget); setActive(true); }
-  };
-  const gridMask = `radial-gradient(220px circle at ${pos.x}px ${pos.y}px, black, transparent 75%)`;
 
   return (
-    <div onMouseMove={handleMouseMove} onMouseEnter={() => setActive(true)} onMouseLeave={() => setActive(false)}
-         onTouchStart={handleTouch} onTouchMove={handleTouch} onTouchEnd={() => setActive(false)}
+    <div ref={box} onPointerMove={(e) => moveTo(e.clientX, e.clientY)} onPointerEnter={() => setActive(true)} onPointerLeave={() => setActive(false)}
          className={cn("relative rounded-[18px]", className)}>
       {/* Edge layer 1: dim border */}
       <div aria-hidden="true" className="absolute inset-0 rounded-[18px]" style={{ background: "var(--card-edge)" }} />
       {/* Edge layer 2: bright border that follows the cursor */}
       <div aria-hidden="true" className={cn("absolute inset-0 rounded-[18px] transition-opacity duration-500", active ? "opacity-100" : "opacity-0")}
-           style={{ background: `radial-gradient(240px circle at ${pos.x}px ${pos.y}px, rgba(${rgb}, 0.9), transparent 70%)` }} />
-      {/* Card face: spotlight and grid live inside it */}
+           style={{ background: `radial-gradient(240px circle at var(--gx, 50%) var(--gy, 50%), rgba(${rgb}, 0.9), transparent 70%)` }} />
+      {/* Card face, with the spotlight inside it */}
       <div aria-hidden="true" className="absolute inset-px overflow-hidden rounded-[17px]" style={{ background: "var(--card)" }}>
-        <div className={cn("absolute inset-0 transition-opacity duration-500", active ? "opacity-100" : "opacity-0")}
-             style={{ background: `radial-gradient(380px circle at ${pos.x}px ${pos.y}px, rgba(${rgb}, 0.1), transparent 65%)` }} />
-        <div className={cn("absolute inset-0 transition-opacity duration-500", active ? "opacity-100" : "opacity-0")}
-             style={{ backgroundImage: GRID_IMAGE, backgroundSize: "26px 26px", maskImage: gridMask, WebkitMaskImage: gridMask }} />
+        {active && <div className="absolute inset-0" style={{ background: `radial-gradient(380px circle at var(--gx, 50%) var(--gy, 50%), rgba(${rgb}, 0.1), transparent 65%)` }} />}
       </div>
       {/* Content */}
       <div className={cn("relative z-10 flex h-full flex-col", padded && "p-5 sm:p-6")}>{children}</div>
