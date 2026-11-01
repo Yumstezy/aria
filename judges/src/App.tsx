@@ -129,9 +129,9 @@ const META: [string, string, Accent, ReactNode][] = [
 
 const TOOLS: { crop: number; skip?: number; title: string; line: string; src: string; alt: string }[] = [
   { crop: 560, skip: 150, title: "Fix it, then prove it.", line: "Fix it asks Muse Spark for the change and it happens in Live. Check again plays the same bars at the same loudness: 3 dB or more lower is Fixed, and it moves out of the way. Less, and it comes back with Fix it again.", src: "/img/fixed.png", alt: "A problem confirmed fixed by Before and after" },
-  { crop: 420, skip: 530, title: "Two loops, one groove.", line: "Aria finds every hit to the millisecond and moves each one onto the grid or onto another loop's feel, in a new clip under the original. A perc loop 14.9 ms behind its kick came back at 0, all 32 hits. Nothing is stretched.", src: "/img/groove.png", alt: "Groove match: in time" },
+  { crop: 420, skip: 450, title: "Two loops, one groove.", line: "Aria finds every hit to the millisecond and moves each one onto the grid or onto another loop's feel, in a new clip under the original. A perc loop 14.9 ms behind its kick came back at 0, all 32 hits. Nothing is stretched.", src: "/img/groove.png", alt: "Groove match: in time" },
   { crop: 560, skip: 410, title: "A vocal on your kick.", line: "Drop in an acapella. Aria reads its tempo and key, puts its first beat on your kick, not just the grid (Ian's kick sits 22 to 25 ms late), and warps it with Live's own markers, reading them back to be sure they stuck.", src: "/img/vocal.png", alt: "Vocal sync on the kick" },
-  { crop: 560, skip: 300, title: "Ask, and it happens.", line: "Real requests from testing, typos and all. 5 of 5 got the right tool, or a question when the track wasn't clear. Each change has Undo.", src: "/img/ask.png", alt: "Ask Muse making changes in Live" },
+  { crop: 560, skip: 40, title: "Ask, and it happens.", line: "Real requests from testing, typos and all. 5 of 5 got the right tool, or a question when the track wasn't clear. Each change has Undo.", src: "/img/chat.png", alt: "Ask Muse making changes in Live" },
 ];
 
 const BUILD: [string, string][] = [
@@ -174,7 +174,7 @@ const GET: [string, ReactNode][] = [
 export default function App() {
   return (
     <main className="min-h-screen bg-black text-white">
-      <header className="fixed inset-x-0 top-0 z-50">
+      <header className="fixed inset-x-0 top-0 z-50 bg-gradient-to-b from-black via-black/70 to-transparent pb-5">
         <div className="mx-auto flex max-w-[1160px] items-center gap-4 px-6 pt-4">
           <a href="#" className="flex items-center gap-2.5 text-[17px] font-semibold"><span className="mark size-[22px]" />Aria</a>
           <div className="flex flex-1 justify-center"><LiquidNavbar tone="dark" items={NAV} /></div>
@@ -191,7 +191,7 @@ export default function App() {
         </>}
       >
         <LiveMockup />
-        <p className="mt-5 text-center text-[13px] text-faint">A drawing of Aria in Live. The clips are Ian's song, drawn from its stems, with the parts Muse Spark named on it. The Aria screens are real screenshots.</p>
+        <p className="mt-5 text-center text-[13px] text-faint">A drawing of Aria in Live. The clips are Ian's song, drawn from its stems, with the parts Muse Spark named on it. The Aria screens are real screenshots, the chat with real requests.</p>
       </Hero>
 
       {DEMO_VIDEO && (
@@ -244,9 +244,10 @@ export default function App() {
                 <h3 className="m-0 text-[28px] font-medium leading-tight tracking-[-0.03em]">{t.title}</h3>
                 <p className="m-0 mt-3 text-[16px] leading-relaxed text-muted">{t.line}</p>
               </div>
-              {/* the top of the docked window, where the answer is, faded at the bottom */}
-              <div className="relative mx-auto w-full max-w-[400px] overflow-hidden rounded-[18px] border border-edge bg-card shadow-[0_40px_120px_-40px_rgba(0,0,0,0.8)]" style={{ maxHeight: t.crop }}>
-                <img src={t.src} alt={t.alt} className="block w-full" loading="lazy" style={{ marginTop: -(t.skip ?? 0) }} />
+              {/* the top of the docked window, where the answer is, faded at the bottom. A fixed height and no lazy
+                  loading: a lazy image clipped to an empty box never loads (Ian, Oct 31: "why is this empty") */}
+              <div className="relative mx-auto w-full max-w-[400px] overflow-hidden rounded-[18px] border border-edge bg-card shadow-[0_40px_120px_-40px_rgba(0,0,0,0.8)]" style={{ height: t.crop }}>
+                <img src={t.src} alt={t.alt} className="block w-full" style={{ marginTop: -(t.skip ?? 0) }} />
                 <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-24" style={{ background: "linear-gradient(transparent, #000)" }} />
               </div>
             </Rise>

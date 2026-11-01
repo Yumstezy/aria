@@ -2,6 +2,9 @@
 
 Updated at the end of each session: what passed, what's next, any blocker.
 
+
+**Oct 31 night: one-click download and release.** `Install Aria.command` (double-click, runs install.sh, opens engine/.env for the key) and `scripts/release.sh` (git archive of only what's needed to run: devices, ui/dist, engine, installers; 672 KB). GitHub release v0.1.0 has Aria-mac.zip; https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip always points at the newest. Tested by unzipping into a throwaway folder and installing with HOME pointed there: engine installed and answered /health. Not yet tried by Ian: the double-click on a fresh download (macOS may ask to right-click > Open the first time). Judges' page: the product site's liquid navbar, a Download button and a Get Aria section; the Live mockup redrawn like Live 12 with Ian's BELIEVE IT stems (waveforms from the stems' peaks; locators from Aria's part finder on the summed stems, named by Muse Spark: Build 29, Drop 45) and the real Ask Muse chat; the reference song shows as reference track.wav everywhere on the page (screenshots retaken); the four tool pictures that showed empty (lazy images in a 0 px box) fixed. Product site's Get Aria buttons now download the zip.
+
 ## Oct 31
 
 - **Install like a plugin (Ian, 13:20):** `./install.sh` sets up the engine, puts Aria and Aria Ear in Live's browser (User Library > Presets > Audio Effects > Max Audio Effect > Aria, as links to the repo, so pulls update them), copies the Remote Script, and writes ~/Library/Application Support/Aria/install.json so the bridge finds the repo from there. Ran on Ian's Mac: the links are in place. Check in Live: restart Live, open the browser at that folder, drag Aria onto Main: the strip loads and Check mix works. If Live doesn't list the linked devices, tell Claude (the fallback is copies plus install.json).

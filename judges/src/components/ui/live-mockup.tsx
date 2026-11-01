@@ -5,7 +5,7 @@
 //     (live-arrangement.json, bars 25 to 56)
 //   - the locators are the parts Aria found on those stems and Muse Spark named (Build 29, Drop 45)
 //   - the browser shows Aria where install.sh puts it
-//   - the docked window and the device are screenshots of Aria; EQ Eight shows the fix Muse Spark returned
+//   - the Ask Muse chat and the device are screenshots of Aria; EQ Eight shows the fix Muse Spark returned
 //     for the harsh spot (3620 Hz, -3.5 dB, Q 6)
 // Mixer values are Live's defaults (0 dB, C), not made-up levels.
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -206,9 +206,10 @@ function Arrangement() {
       </div>
       <div className="grid flex-1 place-items-center text-[10.5px] text-[#8a8a8a]" style={{ width: LANES }}>Drop Files and Devices Here</div>
 
-      {/* Aria's window, docked over the arrangement (a real screenshot, the top of it) */}
-      <div className="absolute left-[12px] top-[44px] h-[392px] w-[236px] overflow-hidden rounded-[14px] border border-white/15 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.9)]">
-        <img src="/img/ask.png" alt="" className="block w-full" />
+      {/* Ask Muse, popped out over the arrangement (Ian: "the chat box with some stuff to show it works"): a real
+          screenshot of the chat with Ian's last real exchanges */}
+      <div className="absolute left-[14px] top-[42px] w-[290px] overflow-hidden rounded-[16px] border border-white/15 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.9)]">
+        <img src="/img/chat.png" alt="" className="block w-full" />
       </div>
     </div>
   );

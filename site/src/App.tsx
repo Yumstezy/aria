@@ -8,6 +8,8 @@ import { GlowCard, type Accent } from "@/components/ui/glow-card";
 import { cn } from "@/lib/utils";
 
 const GITHUB = "https://github.com/Yumstezy/aria";
+// The newest release's zip: the devices, the engine and a double-click installer (scripts/release.sh)
+const DOWNLOAD = "https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip";
 
 /* ---------- icons (the app's own line icons, ui/src/components/icons.tsx) ---------- */
 const svg = (d: ReactNode, size = 18) => (
@@ -243,7 +245,7 @@ export default function App() {
         <div className="mx-auto flex max-w-[1160px] items-center gap-4 px-6 pt-4">
           <a href="#" className="flex items-center gap-2.5 text-[17px] font-semibold"><span className="mark size-[22px]" />Aria</a>
           <div className="flex flex-1 justify-center"><LiquidNavbar tone="dark" items={NAV} /></div>
-          <a href={GITHUB} className="hidden h-10 items-center gap-2 rounded-[10px] bg-ink px-4 text-[14px] font-medium text-ground sm:inline-flex">Get Aria</a>
+          <a href={DOWNLOAD} className="hidden h-10 items-center gap-2 rounded-[10px] bg-ink px-4 text-[14px] font-medium text-ground sm:inline-flex">Get Aria</a>
         </div>
       </header>
 
@@ -257,7 +259,7 @@ export default function App() {
             <p className="mx-auto mt-6 max-w-[660px] text-[19px] leading-relaxed text-muted">
               Aria is an AI helper inside Ableton Live, the app producers use to make songs. Tell it what you want, typed or out loud, and it makes the change for you. Then it listens to your song and shows you what to fix.
             </p>
-            <div className="mt-8 flex justify-center gap-2.5"><Btn href={GITHUB} primary>Get Aria</Btn><Btn href="#talk">See it work</Btn></div>
+            <div className="mt-8 flex justify-center gap-2.5"><Btn href={DOWNLOAD} primary>Get Aria</Btn><Btn href="#talk">See it work</Btn></div>
           </Rise>
           <Rise delay={0.15} className="relative mx-auto mt-16 max-w-[1100px] pb-20">
             <Shot src="/img/mixcheck.png" alt="Aria's Mix check window over Ableton Live" />
