@@ -256,6 +256,11 @@ For a buried sound or mud, act on the producer's own tracks (context.tracks, by 
   covering it in that range with track_eq (a cut of 2 to 4 dB, broad q).
 - mud: there is already too much in that range, so never raise anything there. Cut the track that crowds it,
   usually the bass or the biggest synth or pad, with track_eq in that range (2 to 4 dB, broad q).
+context.aria_eq lists the EQ bands Aria has already set (track, band, shape, freq, gain), as Live shows them. A new
+bell or shelf within half an octave of one of those deepens that band: give only the extra amount (-2 dB more, not
+the new total). One band stops at -6 dB. When a band there is already -6 dB, or a sound needs more than about 6 dB
+less, EQ is the wrong tool: turn that track down with track_volume, use a low_cut when the problem is below the
+sound's main part (rumble or mud under a lead or vocal), or cut the other sound in that range instead.
 Match parts to tracks by name: a vocal is a track named like Vocal, Vox or Voice; synths and keys are tracks
 named like Synth, Keys, Pad, Lead or Chords; prefer a group track when there is one. If no track clearly
 matches, don't guess: name the tracks you see and ask which one.
@@ -885,26 +890,23 @@ def ask(request, context, client=None, image=None):
 
 
 # ---------- Fix my whole mix (Nov 1): Muse fixes, Aria measures, Muse tries again on what didn't move ----------
-# The device runs the loop: a "fix" round, Check again, a "retry" round on what isn't Fixed yet, Check again, and a
-# "report". Each round is one Muse call. The fixes go through the same checks and limits as any Ask Muse request.
+# The device runs it: a "fix" round, Check again once, and a "report" (Ian, Nov 1: a second round meant hearing the same
+# bars twice). Pressing it again builds on the first: context.aria_eq shows the bands Aria set. Each round is one Muse
+# call, and the fixes go through the same checks and limits as any Ask Muse request.
 FIXED_DB = -3.0          # 3 dB or more lower in its range, at the same loudness, is Fixed (the same rule as the screens)
 FIX_MAX = 4              # fixes in the first round, strongest problems first
 FIX_TOOLS = [t for t in TOOLS if t["function"]["name"] in ("eq_band", "track_volume", "track_eq", "track_device")]
-FIX_STAGES = ("fix", "retry", "report")
+FIX_STAGES = ("fix", "report")
 
 FIX_PROMPT = PROMPT + """
 
 You are running "Fix my whole mix". The producer asked for it, so your fixes happen right away, with Undo.
 stage "fix": fix the strongest problems in context.findings, at most """ + str(FIX_MAX) + """, one fix per problem, strongest first,
 using the rules above (buried sounds and mud on the producer's own tracks, ringing notes and harsh hits on Main).
-Reply in one short sentence on what you changed.
-stage "retry": context.results says how much each problem's range changed after your first fixes ("change_db", at the
-same loudness; """ + str(FIXED_DB) + """ dB or lower is Fixed) and context.recent says what you did. For each problem that isn't Fixed, try
-once more: a deeper cut on the same track, or the other track in that range. Your first cut stays in place, and a new
-bell at the same frequency adds to it, so give only the extra amount (another -2 dB, not the new total). Leave Fixed
-problems alone. Reply in one short sentence.
+If context.aria_eq shows Aria already cut a problem's range, this is another try: add a little more there (only the
+extra amount), or use another tool if that band is at -6 dB. Reply in one short sentence on what you changed.
 stage "report": call no tools. In two short sentences, tell the producer how it went: which problems are Fixed and
-which didn't move enough, using only the numbers in context.results."""
+which didn't move enough, using only the numbers in context.results. If some didn't, say Fix all again tries more."""
 
 
 def fix_round(stage, context, results=None, client=None):
@@ -919,7 +921,7 @@ def fix_round(stage, context, results=None, client=None):
     client = _client(client)
     if client is None:
         return {"reply": None, "actions": [], "problems": [], "error": "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."}
-    request = {"fix": "Fix my whole mix.", "retry": "Try again on what isn't Fixed yet.", "report": "How did it go?"}[stage]
+    request = {"fix": "Fix my whole mix.", "report": "How did it go?"}[stage]
     extra = {"tools": FIX_TOOLS, "tool_choice": "auto"} if stage != "report" else {}
     try:
         res = client.chat.completions.create(

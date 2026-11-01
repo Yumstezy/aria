@@ -4,6 +4,26 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 1, afternoon: Fix my whole mix after Ian's first runs in Live.** Ian found three things.
+- It played the 16 bars twice. That was the retry round, so it's gone: one fix round, one replay, then the report. Pressing Fix all again is the next try.
+- Every ask stacked new bells (five -3 dB bells at one frequency dug a -15 dB hole, and some asks added a whole new EQ Eight). Aria's list of the EQs it added was lost each time live.js reloaded. Now:
+  - The EQ Eight Aria adds is named "Aria EQ", and Aria finds it by name.
+  - A bell near one Aria already set deepens that band.
+  - One band stops at 6 dB, and Muse then turns the track down or cuts the other sound.
+  - Muse sees the bands Aria already set (`aria_eq` in its context).
+  - Real Muse runs: with the bass band at -3 it asked for -2 more on that band; with it at -6 it turned the bass down 2 dB instead.
+  - The volume tool no longer says "up 2 dB" when the fader is already at +6.
+- Sometimes it loaded forever. The engine log shows Muse answered, then the bridge never recorded the fixes, and the engine restarted. The engine restarts when the bridge process ends, so the bridge probably crashed or the device was reloaded. Root cause not found yet. Changes so far:
+  - The bridge now catches stray errors instead of ending, and clears the step on screen.
+  - Each Fix my whole mix step is written to `~/Library/Logs/Aria/bridge.log`.
+  - The chat stops waiting after 2 minutes with no answer.
+  - Adding an EQ Eight gets 8 s instead of 3 s, so a slow insert isn't mistaken for no answer.
+- Manual check for Ian:
+  1. Delete the old stacked EQ Eights from your tracks and Main.
+  2. Run a Mix check, then press Fix all. Expect: "Fixing the strongest problems" with green pills, one 16-bar replay, then "How it went". The new EQ Eights are titled "Aria EQ".
+  3. Press Fix all again. Expect the same bands to get deeper ("now -5.00 dB ... (was -3.0 dB)"), not new bands. Past -6 dB, the track gets turned down instead.
+  4. If it ever loads forever again, note the time and send me `~/Library/Logs/Aria/bridge.log`. It shows the last step reached.
+
 **Nov 1: Fix my whole mix, and Muse looks at screenshots. Built, engine tested with real Muse calls; to check in Live.**
 - Fix my whole mix: "fix my whole mix" in Ask Muse, a "Fix all N" button on Mix check's To fix card, or the first starter chip. Muse fixes the strongest problems (up to 4), Aria plays the same bars again, Muse adds a little more on whatever moved less than 3 dB, Aria checks again, and Muse reports from the measurements. Real Muse run on the three-problem reference check: round 1 cut MAIN SYNTH at 3.2 kHz, BASS at 160 Hz and Main at 3.62 kHz; with made-up test results it retried only the two unfixed ones (-2 dB more each) and the report quoted only the given numbers. Engine: `fix_mix` tool, `POST /muse/fix` (stages fix, retry, report). Bridge: `fixMix()` runs the loop in the queue; `recheck()` now returns its result.
 - Screenshots: the image button in Ask Muse (or paste). The page scales it and sends it to `POST /muse/image`; the request carries its id; Muse gets it as an image part and answers with `screenshot_steps` (what it is, the settings it reads, the moves). Real Muse run on a crop of the mockup's EQ Eight read band 4, 3.62 kHz, -3.50 dB, Q 6.00 correctly and tied it to the harsh finding. 161 engine tests pass (8 new).

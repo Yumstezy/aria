@@ -212,6 +212,24 @@ function stopEngine() {
 
 ["SIGTERM", "SIGINT", "exit"].forEach((sig) => process.on(sig, () => { stopEngine(); if (sig !== "exit") process.exit(0); }));
 
+// Ian, Nov 1: Fix my whole mix sometimes loaded forever. Muse had answered, but the fixes never came back, and the
+// engine restarted, which is what happens when this process ends. So a stray error is written down and the step it
+// stopped is cleared on screen, instead of ending the bridge. bridge.log also keeps each Fix my whole mix step.
+const BRIDGE_LOG = path.join(LOG_DIR, "bridge.log");
+function logLine(text) {
+  try { fs.mkdirSync(LOG_DIR, { recursive: true }); fs.appendFileSync(BRIDGE_LOG, `${new Date().toISOString()} ${text}\n`); } catch (e) { /* no log, carry on */ }
+}
+function stray(e) {
+  logLine(`error: ${(e && e.stack) || e}`);
+  try {
+    Max.post(`Aria: ${(e && e.message) || e}`);
+    toUI("ask_pending", { request: null });
+    toUI("notice", { text: "Aria hit a problem and stopped that step. Details are in ~/Library/Logs/Aria/bridge.log" });
+  } catch (x) { /* Max isn't listening */ }
+}
+process.on("uncaughtException", stray);
+process.on("unhandledRejection", stray);
+
 // ---------- Aria's helper in Live (device/remote): puts Aria Ears on key tracks ----------
 // Live's API inserts only Live's own devices, so a Max for Live device like Aria Ear needs the browser.
 
@@ -332,7 +350,7 @@ function sendAskLog() {
 // ---------- live.js ----------
 
 // Reading the whole set takes longer on big projects than one change does
-const LIVE_SLOW = { live_state: 8000, ears_removed: 8000, clips_playing: 8000, vocal_done: 20000, groove_placed: 10000, track_clip: 8000 };
+const LIVE_SLOW = { live_state: 8000, eq_done: 8000, aria_eqs: 8000, ears_removed: 8000, clips_playing: 8000, vocal_done: 20000, groove_placed: 10000, track_clip: 8000 };
 function askLive(command, reply, ...args) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -361,7 +379,7 @@ Max.addHandler("marker_done", (s) => { const w = waiters.marker_done; delete wai
 Max.addHandler("eq_done", (s) => { const w = waiters.eq_done; delete waiters.eq_done; if (w) w(decode(s)); });
 Max.addHandler("undo_done", (s) => { const w = waiters.undo_done; delete waiters.undo_done; if (w) w(decode(s)); });
 Max.addHandler("device_done", (s) => { const w = waiters.device_done; delete waiters.device_done; if (w) w(decode(s)); });
-for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done", "clips_playing", "selected_clip", "groove_placed", "groove_ab_done", "vocal_done", "track_clip"]) {
+for (const reply of ["marker_deleted", "prop_done", "tempo_done", "route_done", "jump_done", "clips_playing", "selected_clip", "groove_placed", "groove_ab_done", "vocal_done", "track_clip", "aria_eqs"]) {
   Max.addHandler(reply, (s) => { const w = waiters[reply]; delete waiters[reply]; if (w) w(decode(s)); });
 }
 Max.addHandler("ears_removed", (s) => { const w = waiters.ears_removed; delete waiters.ears_removed; if (w) w(decode(s)); });
@@ -719,16 +737,14 @@ async function fixMix() {
     logChanged();
     return;
   }
-  let results = null;
-  for (const stage of ["fix", "retry"]) {
-    if (results && results.every((r) => r.change_db !== null && r.change_db <= FIXED_DB)) break;   // all Fixed already
-    const entry = await fixStep(stage, results, stage === "fix" ? "Round 1: fixing the strongest problems" : "Round 2: trying again on what didn't move");
-    if (!entry.done.some((d) => d.ok)) break;   // nothing changed, so nothing to measure
-    const after = await recheck();
-    if (!after) break;
-    results = after.problems;
-  }
-  if (results) await fixStep("report", results, "How it went");
+  // One round and one replay (Ian, Nov 1: a second round meant hearing the same 16 bars twice). Pressing Fix all again
+  // builds on it: Muse sees the bands Aria already set, and a cut near one deepens that band.
+  const entry = await fixStep("fix", null, "Fixing the strongest problems");
+  if (!entry.done.some((d) => d.ok)) return;   // nothing changed, so nothing to measure
+  logLine("fix: checking the same bars again");
+  const after = await recheck();
+  logLine(`fix: check again ${after ? "done" : "didn't finish"}`);
+  if (after) await fixStep("report", after.problems, "How it went");
 }
 
 async function fixStep(stage, results, label) {
@@ -738,12 +754,15 @@ async function fixStep(stage, results, label) {
   try {
     await ensureEngine();
     const context = await askContext();
+    logLine(`fix ${stage}: asking Muse`);
     const res = await request("POST", "/muse/fix", { stage, context, results }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200 || !res.json) throw new UserError(`Muse couldn't answer (HTTP ${res.status}).`);
+    logLine(`fix ${stage}: Muse sent ${res.json.actions.length} changes`);
     const done = [];
     for (const action of res.json.actions) {
       try { done.push({ ...action, ...(await apply(action, context.tracks)) }); }
       catch (e) { done.push({ ...action, ok: false, text: e.message }); }
+      logLine(`fix ${stage}: ${action.type} -> ${done[done.length - 1].text}`);
     }
     entry = { request: label, auto: true, reply: done.length && done.every((d) => !d.ok) ? null : res.json.reply, done, suggestions: [],
               problems: res.json.problems || [], error: res.json.error, notes: [], at, ...(stage === "report" ? { results } : {}) };
@@ -1258,7 +1277,13 @@ async function askContext() {
     tracks: live ? live.tracks : [],
     // The last few exchanges, so "it" and "that" make sense. What was done, as Aria reported it.
     recent: askLog.slice(-3).map((x) => ({ asked: x.request, did: x.done.map((d) => d.text), replied: x.reply })),
+    aria_eq: await ariaEqs(),
   };
+}
+
+// The EQ bands Aria has set so far, on Main and the tracks, as Live shows them (Nov 1)
+async function ariaEqs() {
+  try { return (await askLive("aria_eqs", "aria_eqs")).bands || []; } catch (e) { return []; }
 }
 
 // "/devices <track>": list every device on a track and every parameter Live exposes for it

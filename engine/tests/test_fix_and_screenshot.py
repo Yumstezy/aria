@@ -91,3 +91,13 @@ def test_fix_endpoint_without_a_key_says_so(monkeypatch):
     monkeypatch.setenv("MODEL_API_KEY", "")
     res = TestClient(app).post("/muse/fix", json={"stage": "fix", "context": CONTEXT})
     assert res.status_code == 200 and "No Muse Spark key" in res.json()["error"]
+
+
+def test_muse_sees_the_bands_aria_already_set_and_there_is_one_round():
+    bands = [{"track": "BASS", "band": 4, "shape": "Bell", "freq": "1.00 kHz", "gain": "-3.00 dB", "q": "1.00"}]
+    seen = []
+    ask.fix_round("fix", {**CONTEXT, "aria_eq": bands}, client=client_for("Cut the bass 2 dB more at 1 kHz.",
+                  call("track_eq", track="BASS", freq_hz=1000, gain_db=-2, q=1), seen=seen))
+    assert json.loads(seen[0]["messages"][1]["content"])["context"]["aria_eq"] == bands
+    assert "context.aria_eq" in seen[0]["messages"][0]["content"]
+    assert "Unknown stage" in ask.fix_round("retry", CONTEXT, client=client_for("x"))["error"]

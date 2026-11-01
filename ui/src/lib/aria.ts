@@ -211,8 +211,25 @@ export function setTheme(theme: Theme) {
 }
 const listeners = new Set<() => void>();
 function set(patch: Partial<State>) {
+  const was = state.ask.pending;
   state = { ...state, ...patch };
   listeners.forEach((l) => l());
+  if (state.ask.pending !== was) watchPending();
+}
+
+// Never wait forever (Ian, Nov 1: Fix my whole mix sometimes loaded with no end). Every step the bridge runs answers
+// well inside this, so a step still pending after it has stopped: say so and let the producer ask again.
+const PENDING_LIMIT_MS = 120000;
+let pendingTimer: ReturnType<typeof setTimeout> | undefined;
+function watchPending() {
+  clearTimeout(pendingTimer);
+  const stuck = state.ask.pending;
+  if (!stuck) return;
+  pendingTimer = setTimeout(() => {
+    if (state.ask.pending !== stuck) return;
+    set({ ask: { ...state.ask, pending: null, pendingAuto: false, pendingImage: null } });
+    notice("Aria stopped answering that one. Ask again.");
+  }, PENDING_LIMIT_MS);
 }
 export const useAriaSnapshot = () => state;
 /** One slice of the state: the component re-renders only when that slice changes (not on every progress tick). */

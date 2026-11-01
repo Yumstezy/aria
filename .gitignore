@@ -31,3 +31,7 @@ site/dist/
 
 # The release zip (scripts/release.sh), uploaded to GitHub releases, not committed
 release/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+# Private plans (the paid plugin), kept off the public repo
+docs/private/

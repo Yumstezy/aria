@@ -399,9 +399,41 @@ function findEq(track, mode) {
     const d = new LiveAPI("id " + devs[i]);
     if (one(d, "class_name") === EQ_CLASS) fits.push(d);
   }
-  const mine = fits.filter(function (d) { return ariaAdded.indexOf(Number(d.id)) >= 0; });
+  const mine = fits.filter(isAriaEq);
   if (mine.length) return mine[mine.length - 1];
   return mode === "change" && fits.length ? fits[fits.length - 1] : null;
+}
+
+// Aria names the EQ Eights it adds (Ian, Nov 1: every ask made a new one, because the list of ids is lost whenever
+// live.js reloads or the set is reopened). The name stays with the set, so Aria finds its own EQ again.
+const ARIA_EQ = "Aria EQ";
+function isAriaEq(d) {
+  return ariaAdded.indexOf(Number(d.id)) >= 0 || String(one(d, "name")) === ARIA_EQ;
+}
+
+// The bands Aria has set on its EQ Eights, for Muse (Nov 1: so a second ask builds on the first instead of stacking
+// new bells at the same frequency). Main is "Main"; tracks by name. Bands that are off or flat are left out.
+function aria_eqs() {
+  if (!ensureSong()) { send("aria_eqs", { bands: [] }); return; }
+  const out = [];
+  const look = function (track, name) {
+    ids(track.get("devices")).forEach(function (id) {
+      const d = new LiveAPI("id " + id);
+      if (one(d, "class_name") !== EQ_CLASS || !isAriaEq(d)) return;
+      const bands = bandParams(d);
+      Object.keys(bands).sort().forEach(function (n) {
+        const b = bands[n];
+        if (BAND_KNOBS.some(function (k) { return !b[k]; }) || one(b["Filter On"], "value") !== 1 || isFlat(b)) return;
+        const str = function (k) { return String(b[k].call("str_for_value", one(b[k], "value"))); };
+        out.push({ track: name, band: Number(n), shape: str("Filter Type"), freq: str("Frequency"), gain: str("Gain"), q: str("Q") });
+      });
+    });
+  };
+  try {
+    look(mainTrack(), "Main");
+    ids(song.get("tracks")).forEach(function (id) { const t = new LiveAPI("id " + id); look(t, String(one(t, "name"))); });
+  } catch (e) { post("aria_eqs: " + e + "\n"); }
+  send("aria_eqs", { bands: out });
 }
 
 // Parse a parameter's display string: "3.10 kHz" -> 3100, "-4.0 dB" -> -4, "0.71" -> 0.71.
@@ -489,6 +521,7 @@ function eq_continue() {
     return;
   }
   ariaAdded.push(Number(device.id));
+  try { device.set("name", ARIA_EQ); } catch (e) { post("Couldn't name the EQ Eight: " + e + "\n"); }
   applyEq(device, true, p.freq, p.gain, p.q, p.index, p.opts);
 }
 
@@ -520,6 +553,9 @@ function isFlat(b) {
   return g !== null && Math.abs(g) < 0.05;
 }
 
+const EQ_LIMIT = 6;   // dB: the most one band moves, however many asks add to it (the same limit as one ask)
+const whereName = function (index) { return index === undefined || index < 0 ? "Main" : "\"" + one(trackAt(index), "name") + "\""; };
+
 function applyEq(device, added, freq, gain, q, index, opts) {
   opts = opts || { shape: "bell", steep: false };
   const bands = bandParams(device);
@@ -531,6 +567,31 @@ function applyEq(device, added, freq, gain, q, index, opts) {
       const b = bands[order[i]];
       if (b && b["Filter On"] && one(b["Filter On"], "value") === 1 &&
           SHAPES[opts.shape].test(letters(b["Filter Type"].call("str_for_value", one(b["Filter Type"], "value"))))) band = order[i];
+    }
+  }
+  // A bell or shelf near one Aria already set (within half an octave) deepens that band instead of stacking a new one
+  // on top (Ian, Nov 1: five -3 dB bells at one frequency dug a -15 dB hole). One band stops at EQ_LIMIT.
+  let was = null;
+  if (opts.shape === "bell" || /shelf/.test(opts.shape)) {
+    let best = null;
+    for (let i = 0; i < order.length; i++) {
+      const b = bands[order[i]];
+      if (!b || BAND_KNOBS.some(function (k) { return !b[k]; }) || one(b["Filter On"], "value") !== 1 || isFlat(b)) continue;
+      if (!SHAPES[opts.shape].test(letters(b["Filter Type"].call("str_for_value", one(b["Filter Type"], "value"))))) continue;
+      const f = displayed(b["Frequency"], one(b["Frequency"], "value"));
+      const apart = f > 0 ? Math.abs(Math.log(f / freq) / Math.LN2) : 99;
+      if (apart <= 0.5 && (!best || apart < best.apart)) best = { n: order[i], apart: apart };
+    }
+    if (best) {
+      const b = bands[best.n], g0 = displayed(b["Gain"], one(b["Gain"], "value"));
+      if ((gain < 0 && g0 <= -EQ_LIMIT + 0.05) || (gain > 0 && g0 >= EQ_LIMIT - 0.05)) {
+        send("eq_done", { ok: false, text: "Band " + best.n + " on " + whereName(index) + " is already " + (gain < 0 ? "-" : "+") + EQ_LIMIT +
+                          " dB there. More EQ would hollow it out: turn the track " + (gain < 0 ? "down" : "up") + " or change the other sound instead." });
+        return;
+      }
+      band = best.n;
+      was = g0;
+      gain = Math.max(-EQ_LIMIT, Math.min(EQ_LIMIT, g0 + gain));
     }
   }
   // A free band: switched off, or on but doing nothing (a fresh EQ Eight has bands 1 to 4 on, flat at 0 dB)
@@ -573,9 +634,10 @@ function applyEq(device, added, freq, gain, q, index, opts) {
     q: setByDisplay(b["Q"], q)
   };
   b["Filter On"].set("value", 1);
-  const where = index === undefined || index < 0 ? "Main" : "\"" + one(trackAt(index), "name") + "\"";
-  const what = hasGain ? shapeName + " " + shown.gain + " at " + shown.freq + ", Q " + shown.q : shapeName + " at " + shown.freq;
-  send("eq_done", { ok: true, band: Number(band), added: added, shown: shown,
+  const where = whereName(index);
+  const what = hasGain ? shapeName + (was !== null ? " now " : " ") + shown.gain + " at " + shown.freq + ", Q " + shown.q +
+                         (was !== null ? " (was " + was.toFixed(1) + " dB)" : "") : shapeName + " at " + shown.freq;
+  send("eq_done", { ok: true, band: Number(band), added: added, shown: shown, was: was,
                     text: (added ? "Added an EQ Eight on " + where + ". " : "On " + where + ": ") + "band " + band + " " + what + "." });
 }
 
@@ -799,9 +861,15 @@ function volume(trackIndex, changeDb) {
   const now = displayed(fader, before);
   if (now === null) { send("volume_done", { ok: false, text: "Aria couldn't read that track's volume." }); return; }
   const target = Math.min(6, now + changeDb);
+  // Nov 1: "up 2 dB, now 5.999 dB" when it was already at the top. Say it can't go higher, so Muse tries another tool
+  if (changeDb > 0 && target - now < 0.1) {
+    send("volume_done", { ok: false, text: "\"" + one(track, "name") + "\" is already at +6 dB, as loud as its fader goes. Cut the sounds around it instead." });
+    return;
+  }
   undoStack.push({ kind: "params", params: [{ id: Number(fader.id), value: before }], what: "volume", track: trackIndex });
   const shown = setByDisplay(fader, target);
-  send("volume_done", { ok: true, text: "\"" + one(track, "name") + "\" " + (changeDb > 0 ? "up" : "down") + " " + Math.abs(changeDb) + " dB, now " + shown + "." });
+  const moved = Math.round(Math.abs(target - now) * 10) / 10;
+  send("volume_done", { ok: true, text: "\"" + one(track, "name") + "\" " + (changeDb > 0 ? "up" : "down") + " " + moved + " dB, now " + shown + "." });
 }
 
 // ---------- Spike S1: what each device on a track exposes to the Live API ----------

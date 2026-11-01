@@ -445,7 +445,7 @@ def muse_image_file(image_id: str):
 
 
 class FixRequest(BaseModel):
-    stage: str                            # "fix", "retry" or "report"
+    stage: str                            # "fix" or "report"
     context: dict = {}
     results: list | None = None           # after a Check again: each problem's {index, kind, hz_range, change_db}
 

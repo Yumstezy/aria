@@ -371,11 +371,21 @@ Muse answers with `screenshot_steps {what, seen: [text], steps: [text]}` (what t
 
 ### Fix my whole mix (Nov 1)
 
-`fix_mix {}`: the producer asked to fix the whole mix. Accepted only with findings. The bridge runs it as a loop in the queue:
+`fix_mix {}`: the producer asked to fix the whole mix. Accepted only with findings. The bridge runs it in the queue, with one replay (Ian, Nov 1: two rounds meant hearing the same bars twice):
 
 1. `POST /muse/fix {stage: "fix", context}`: Muse fixes the strongest problems (at most 4) with `eq_band`, `track_volume`, `track_eq` or `track_device`, checked like any Ask Muse call. Applied with Undo.
 2. Check again (the same bars, `POST /mix/before-after`).
-3. If any problem's `change_db` is above -3: `POST /muse/fix {stage: "retry", context, results}`, where `results` is the before-and-after `problems` list. Muse adds a little more on what didn't move (a new bell adds to the first). Applied, then Check again.
-4. `POST /muse/fix {stage: "report", context, results}`: no tools, Muse says how it went from `results` only.
+3. `POST /muse/fix {stage: "report", context, results}`, where `results` is the before-and-after `problems` list: no tools, Muse says how it went from `results` only.
+
+Pressing it again is the next try. It builds on the first because of how Aria's EQ works (Nov 1, below).
+
+### The EQ bands Aria already set (Nov 1)
+
+Every Ask Muse and Fix my whole mix context carries `aria_eq: [{track, band, shape, freq, gain, q}]`, read from Live by `aria_eqs` → `aria_eqs {bands}` (Main is `"Main"`, tracks by name, values as Live shows them; bands that are off or flat are left out).
+
+- The EQ Eight Aria adds is named "Aria EQ". Aria finds it by that name, so a reloaded set or device reuses it instead of adding another.
+- A bell or shelf within half an octave of a band Aria set, with the same shape, deepens that band (`gain` is the extra amount). It doesn't take a new band. The reply says `now -5.00 dB ... (was -3.0 dB)`, and `eq_done` carries `was`.
+- One band stops at ±6 dB. Past that, `eq_done` is `ok: false` and says to turn the track down or change the other sound. Muse's prompt says the same: when a sound needs more than about 6 dB less, use `track_volume`, a `low_cut`, or cut the other sound.
+- `track_volume` past the fader's +6 dB is `ok: false` too, instead of reporting a move that didn't happen.
 
 `POST /muse/fix` returns `{reply, actions, problems, error}`; each `results` item gets `fixed` (change_db <= -3) before Muse sees it. Each step is an exchange with `auto: true` and the step's label as `request`; the report's exchange carries `results`, which the chat shows as one line per problem.
