@@ -1,0 +1,3 @@
+{
+  "redirects": [{ "source": "/judges", "destination": "https://aria-judges.vercel.app", "permanent": false }]
+}

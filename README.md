@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://aria-sigma-gilt.vercel.app/judges"><b>For judges</b></a> ·
+  <a href="https://aria-judges.vercel.app"><b>For judges</b></a> ·
   <a href="https://aria-sigma-gilt.vercel.app">Product page</a> ·
   <a href="#try-it">Try it</a> ·
   <a href="#results">Results</a> ·
@@ -25,7 +25,7 @@
 
 <br>
 
-<img src="site/public/img/judges/home.png" alt="Aria's Home in the full window, on a real song">
+<img src="judges/public/img/home.png" alt="Aria's Home in the full window, on a real song">
 
 <p align="center"><sub>Home, full window, on Ian's own song: what to fix, the reference, the song's parts and the live analyzer. Every screenshot in this README is the real app with real results.</sub></p>
 
@@ -68,7 +68,7 @@ Meta's models do the work you see, in every screen. Not a chat box on the side.
 
 Records 16 bars of your Main track, splits it into its parts, and finds what clashes or sticks out: buried sounds, mud, harsh hits, ringing notes, bass clicks, tracks that fight. Each problem is marked on the spectrum by its kind (icon) and its range (color, lows red to highs violet). Compare with a reference song, part for part: *"Against their Drop."*
 
-<img src="site/public/img/judges/mixcheck.png" alt="Mix check against a reference song">
+<img src="judges/public/img/mixcheck.png" alt="Mix check against a reference song">
 
 <table>
 <tr>
@@ -81,10 +81,10 @@ Records 16 bars of your Main track, splits it into its parts, and finds what cla
 *Here: a planted harsh boost, 6.9 dB less after the fix.*
 
 </td>
-<td width="50%"><img src="site/public/img/judges/fixed.png" alt="Before and after, a problem confirmed fixed"></td>
+<td width="50%"><img src="judges/public/img/fixed.png" alt="Before and after, a problem confirmed fixed"></td>
 </tr>
 <tr>
-<td width="50%"><img src="site/public/img/judges/ask.png" alt="Ask Muse making changes in Live"></td>
+<td width="50%"><img src="judges/public/img/ask.png" alt="Ask Muse making changes in Live"></td>
 <td width="50%" valign="top">
 
 ### Ask Muse
@@ -105,10 +105,10 @@ Two loops flamming? Aria finds every hit to the millisecond, moves each one onto
 *A perc loop following a kick loop: worst hit 15.5 ms off, now 0.*
 
 </td>
-<td width="50%"><img src="site/public/img/judges/groove.png" alt="Groove match result"></td>
+<td width="50%"><img src="judges/public/img/groove.png" alt="Groove match result"></td>
 </tr>
 <tr>
-<td width="50%"><img src="site/public/img/judges/vocal.png" alt="Vocal sync with the kick"></td>
+<td width="50%"><img src="judges/public/img/vocal.png" alt="Vocal sync with the kick"></td>
 <td width="50%" valign="top">
 
 ### Vocal sync
@@ -125,13 +125,13 @@ Drop in an acapella. Aria reads its original tempo and key, puts its first beat 
 
 Aria hears the whole song once, finds its parts on a 4-bar grid, and Muse Spark names them. Rename or move them, then add them to Live as markers. Every Mix check then knows which part it heard, and compares your drop with their drop.
 
-<img src="site/public/img/judges/arrangement.png" alt="The parts of two songs, named by Muse Spark">
+<img src="judges/public/img/arrangement.png" alt="The parts of two songs, named by Muse Spark">
 
 ### Live analyzer
 
 Your Main track as it plays: a sixth-octave spectrum against your reference, loudness to the BS.1770 standard, a polar stereo view with a phase meter, and a waveform colored by where the sound is (red lows, green highs).
 
-<img src="site/public/img/judges/analyzer.png" alt="Live analyzer">
+<img src="judges/public/img/analyzer.png" alt="Live analyzer">
 
 ---
 
@@ -234,7 +234,7 @@ Then open Live and drag **Aria** onto the Main track, last. Aria starts its engi
 
 - Engine tests: `cd engine && .venv/bin/pytest` (153 passing)
 - Screens: `cd ui && npm install && npm run build` (the built pages in `ui/dist/` are committed, so running Aria never needs Node)
-- Websites: `cd site && npm run build` (the product page and `/judges`)
+- Websites: `cd site && npm run build` (the product page) and `cd judges && npm run build` (the judges' page, its own Vercel project)
 - The JSON between device, bridge, engine and screens: [`docs/contracts.md`](docs/contracts.md)
 - Where things stand, day by day: [`docs/status.md`](docs/status.md)
 
@@ -249,7 +249,8 @@ device/    Aria.amxd and Aria Ear.amxd, the bridge (bridge.js), Live API helpers
 engine/    the FastAPI engine: clarity, reference, sections, groove, vocal, Muse Spark, voice, with tests
 ui/        the screens (React), built to ui/dist for Live's web view
 ml/        the rated-mix model: data manifest, measurements, training, results, and the next experiment
-site/      the product page and the judges' page
+site/      the product page
+judges/    the judges' page (its own Vercel project, aria-judges.vercel.app)
 design/    the design system and screen references
 docs/      build steps, contracts, the rubric, status
 ```

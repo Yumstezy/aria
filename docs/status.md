@@ -536,3 +536,5 @@ Pass: in Live, three typed requests work in a row, each with a working Undo: "ju
 
 ## Blockers
 - None yet.
+
+**Judges' page (Oct 31): its own site at https://aria-judges.vercel.app** (Vercel project "aria-judges"). Code in `judges/`; redeploy with `vercel deploy --prod --yes` from `judges/`. The nav and hero are the 21st.dev SaaS template Ian picked; the hero shows a drawing of Aria in Live (the Aria screens in it are real screenshots). "How it works" follows one real problem through Hear, Explain, Fix, Prove, with charts from `judges/src/real.json` (Mix check on Ian's drop; Before and after on the planted test mix). The old `/judges` on the product site redirects there. Next: Ian's demo video goes in `judges/public/` and `DEMO_VIDEO` in `judges/src/App.tsx`.
