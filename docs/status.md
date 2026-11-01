@@ -4,6 +4,10 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 1, 5 PM: release v0.2.0 is the download.** Ian had run "Install Aria" from an old download (~/Downloads/Aria 2, v0.1.0) at 4:19. That pointed Aria, its engine and the Live helper back at the old code, so his 4:31 tests ran without the day's fixes. Fixed:
+- Old downloads deleted, the old engine stopped, and the full install rerun from the repo (devices copied, 26 racks, current helper). Live's index lists Aria and Aria Ear.
+- Release v0.2.0 published from 075b8ff. https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip now serves it (checked byte for byte).
+
 **Nov 1, evening: buried-sound advice on an unleveled mix.** Ian's test set had KICK at -9.4 LUFS and LEADS at -24.4. Aria rightly found LEADS covered, but Muse raised the leads three times, because it couldn't see the levels. Now:
 - Track-mode findings carry every track's loudness (`levels_lufs`).
 - Muse's rule: when the covers are 6 dB or more louder, turn the loudest down, and raise a buried fader at most once.
