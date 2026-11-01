@@ -263,9 +263,8 @@ whole mix: a ringing note, harsh hits, or a frequency the producer names. Never 
 (like a buried vocal) or mud: cutting the whole mix there cuts the buried sound too and makes it worse.
 
 For a buried sound or mud, act on the producer's own tracks (context.tracks, by exact name):
-- a buried sound (like a buried vocal): see "A buried sound" below; when the levels are close, lift its own track
-  in that range with track_eq (bell +2 dB, broad q) and/or dip the track covering it there (a cut of 2 to 4 dB,
-  broad q). Aria never takes a fader past +6 dB; when one is there, use the EQ lift instead.
+- a buried sound (like a buried vocal): make space, as in "A buried or covered sound" below: cut the track covering
+  it in that range (2 to 4 dB, broad q), and shape the buried sound with EQ. Don't raise its fader.
 - mud: there is already too much in that range, so never raise anything there. Cut the track that crowds it,
   usually the bass or the biggest synth or pad, with track_eq in that range (2 to 4 dB, broad q).
 context.aria_eq lists the EQ bands Aria has already set (track, band, shape, freq, gain), as Live shows them. A new
@@ -299,11 +298,16 @@ Pick the tool that fits the problem, the way a mix engineer would. EQ is one too
 - Harsh only on some hits (a harsh finding on a few bars): Multiband Dynamics on that track (Above Threshold High
   -20 dB, Above Ratio High 3) so it only pulls down when it gets harsh. Harsh all the time: a bell cut.
 - A ringing note: notch or a narrow bell (q 6 to 8) at its frequency.
-- A buried sound: first look at levels_lufs on the finding (each track's loudness while it plays). If the tracks
-  covering it are 6 dB or more louder than it, the mix is out of balance: turn the loudest cover down with
-  track_volume (2 to 4 dB), don't raise the buried one. Otherwise lift the buried sound's own range with track_eq
-  (bell +2 dB) and dip the cover in that range, or duck the cover with a light sidechain. Raise a buried track's
-  fader at most once: if context.recent shows Aria already raised it, use another tool.
+- A buried or covered sound: make space for it, don't make it louder. Mixing fits sounds together; raising a fader
+  to fight another sound only makes the mix louder and closer to clipping. In this order:
+  1. Cut the sound that covers it, in the range where it covers it: track_eq on the cover (a bell cut of 2 to 4 dB,
+     broad q), like the top end of the bass under a lead, or a pad under a vocal. If the cover doesn't need that
+     range at all, cut it away (a high_cut on the bass above where its body ends, a low_cut on a pad).
+  2. Shape the buried sound with EQ so it carries: clear its own mud (a bell cut around 250 to 400 Hz) or a small
+     bell lift (+2 dB at most) where it should be heard.
+  3. If the covers are 6 dB or more louder than it (levels_lufs on the finding), turn the loudest cover down with
+     track_volume (2 to 4 dB).
+  Never raise a fader to fix a buried or covered sound. Raise one only when the producer asks for something louder.
 - Drums or a kick that don't punch through: Aria Kick Mix, Aria Kick Enhance or Aria Punch Through on the kick or
   drums track, or Drum Buss (Transients up). Uneven hits: Aria Kick Glue or a Compressor.
 - A thin or unsteady bass: Aria Bass Thicken (Aria Wide Bass when it should spread up top but stay centered low).
@@ -919,17 +923,26 @@ def ask(request, context, client=None, image=None):
                 "error": "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."}
     text = json.dumps({"context": context, "request": request})
     user = [{"type": "text", "text": text}, {"type": "image_url", "image_url": {"url": image}}] if image else text
-    try:
-        res = client.chat.completions.create(
-            model=os.environ.get("MUSE_MODEL", "muse-spark-1.3"), max_tokens=MAX_TOKENS, reasoning_effort="minimal",
-            tools=TOOLS, tool_choice="auto",
-            messages=[{"role": "system", "content": PROMPT}, {"role": "user", "content": user}])
-    except OpenAIError as e:
-        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "reads": [], "dropped": 0, "problems": [],
-                "error": f"Muse Spark is unavailable right now ({type(e).__name__})."}
-    if not res.choices:
-        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "reads": [], "dropped": 0, "problems": [], "error": "Muse Spark returned an empty reply."}
-    out = interpret(res.choices[0].message, context, request)
+    # "Fix this for the whole song: ..." (a Fix it button) always wants a change. Meta's API takes only tool_choice
+    # "auto", so when Muse answers one with words and no change, it gets one more try (Nov 1)
+    wants_fix = request.lower().startswith("fix this")
+    for attempt in range(2 if wants_fix else 1):
+        try:
+            res = client.chat.completions.create(
+                model=os.environ.get("MUSE_MODEL", "muse-spark-1.3"), max_tokens=MAX_TOKENS, reasoning_effort="minimal",
+                tools=TOOLS, tool_choice="auto",
+                messages=[{"role": "system", "content": PROMPT}, {"role": "user", "content": user}])
+        except OpenAIError as e:
+            return {"reply": None, "actions": [], "suggestions": [], "guides": [], "reads": [], "dropped": 0, "problems": [],
+                    "error": f"Muse Spark is unavailable right now ({type(e).__name__})."}
+        if not res.choices:
+            return {"reply": None, "actions": [], "suggestions": [], "guides": [], "reads": [], "dropped": 0, "problems": [], "error": "Muse Spark returned an empty reply."}
+        out = interpret(res.choices[0].message, context, request)
+        if out["actions"] or out["suggestions"] or not wants_fix:
+            break
+    if wants_fix and not out["actions"] and not out["suggestions"]:
+        out["reply"] = None   # "Fixing your leads" with nothing done would promise a change that never happened
+        out["problems"] = out["problems"] or ["Muse didn't pick a change for that one. Press Fix it again."]
     out["error"] = (None if (out["reply"] or out["actions"] or out["suggestions"] or out["guides"] or out["reads"])
                     else " ".join(out["problems"]) or "Muse Spark didn't answer that one.")
     # Local engine log only (~/Library/Logs/Aria/engine.log): what was asked and what Muse did
@@ -975,8 +988,9 @@ def fix_round(stage, context, results=None, client=None):
         return {"reply": None, "actions": [], "problems": [], "error": "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."}
     request = {"fix": "Fix my whole mix.", "report": "How did it go?"}[stage]
     extra = {"tools": FIX_TOOLS, "tool_choice": "auto"} if stage != "report" else {}
-    # A fix round that names no change gets one more try (Nov 1: Muse said "Fixing the buried leads" and sent nothing)
-    for attempt in range(2 if stage == "fix" else 1):
+    # A fix round that names no change gets up to two more tries (Nov 1: Muse said "Fixing the buried leads" and sent
+    # nothing; Meta's API takes only tool_choice "auto", so a tool call can't be required)
+    for attempt in range(3 if stage == "fix" else 1):
         try:
             res = client.chat.completions.create(
                 model=os.environ.get("MUSE_MODEL", "muse-spark-1.3"), max_tokens=MAX_TOKENS, reasoning_effort="minimal", **extra,

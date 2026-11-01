@@ -9,7 +9,13 @@ Updated at the end of each session: what passed, what's next, any blocker.
 - Muse's rule: when the covers are 6 dB or more louder, turn the loudest down, and raise a buried fader at most once.
 - Rerun on Ian's own 4:31 recordings: "Fix it" turned KICK down 3 dB in 3 of 3 runs (once with a bass cut). Fix all did it too.
 - A fix round that names no change now asks again, and never shows "Fixing…" with nothing done.
-- Still to look at: Ian's idea that sidechain ducking makes tracks look buried (a ducked track is quieter for part of every beat).
+- Sidechain (Ian was right): his vocal dips about 7 dB right after every kick, and those dips counted as "buried". Now a sound that dips just after each kick has those moments left out (a sidechain, or a part that plays between the kicks; either way it isn't playing there). On his 4:31 check the vocal's buried finding went away and the leads' stayed. They really were covered: the kick was 15 dB louder. The leads finding on his own finished mix (sidechained leads) went away too.
+- Make space, don't raise (Ian: "you want to fit all the sounds, not overpower"). Muse's order for a buried sound:
+  1. Cut the cover where it overlaps (like the top of the bass).
+  2. Shape the buried sound with EQ.
+  3. Turn a too-loud cover down.
+  It never raises a fader to fix one. On Ian's recordings, 7 of 7 runs carved space (bass -3 dB at 275 Hz, kick -3 dB at 650 to 700 Hz, the leads' own mud at 300 Hz, kick down 3 dB), and none raised a fader.
+- Meta's API takes only tool_choice "auto", so a Fix it or Fix all answered with words and no change is asked again, up to 3 times for Fix all. If there's still no change, Aria says so instead of "Fixing…".
 
 Also fixed: Live's browser doesn't index links, so the User Library's Aria folder looked empty and Name my tracks couldn't find Aria Ear. install.sh now copies the two devices. A release zip built from today's code was test-installed into a scratch home: devices copied, 26 racks, the helper, the engine. It isn't uploaded yet.
 

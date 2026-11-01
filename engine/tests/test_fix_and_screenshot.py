@@ -136,7 +136,16 @@ def test_every_rack_file_is_in_the_catalog():
 def test_a_fix_round_with_no_change_asks_again_then_says_so():
     seen = []
     out = ask.fix_round("fix", CONTEXT, client=client_for("Fixing the buried leads.", seen=seen))
-    assert len(seen) == 2 and out["actions"] == [] and out["reply"] is None and "Fix all" in out["error"]
+    assert len(seen) == 3 and out["actions"] == [] and out["reply"] is None and "Fix all" in out["error"]
+
+
+def test_a_fix_it_answered_with_words_only_asks_again_then_says_so():
+    seen = []
+    out = ask.ask("Fix this for the whole song: LEADS buried (150 Hz to 1 kHz).", CONTEXT, client=client_for("Fixing your leads.", seen=seen))
+    assert len(seen) == 2 and out["reply"] is None and "Fix it again" in out["error"]
+    seen = []
+    ask.ask("what's wrong with my mix", CONTEXT, client=client_for("The harsh hits at 3.4 kHz.", seen=seen))
+    assert len(seen) == 1   # a question gets words, once
 
 
 def test_track_mode_findings_carry_each_tracks_loudness(tmp_path):

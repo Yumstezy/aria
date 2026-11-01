@@ -14,6 +14,8 @@ producer's own tracks by name.
 Everything is measured inside this mix, so no reference is needed. Near-silent
 stretches are ignored. Nothing is reported unless it clears the thresholds.
 """
+import re
+
 import numpy as np
 from scipy.signal import stft
 
@@ -59,6 +61,43 @@ def _present(name, sound, own_level, mix_level, relative, playing):
     x = np.asarray(sound, dtype=np.float64)
     return 20 * np.log10(np.sqrt(np.mean(x ** 2)) + 1e-12) > SILENT_DBFS
 MIN_SHARE = 0.5        # covered for at least this share of the time it plays there
+DUCK_DB = 4.0          # a sound this much quieter just after each kick than later in the beat is sidechained to it
+DUCK_S = 0.15          # and the ducked moments, left out of "covered", are this long after each kick (Ian, Nov 1:
+                       # his vocal dips about 7 dB after every kick, and those dips were counted as the vocal buried)
+KICK_NAME = re.compile(r"kick|\bkik\b|\bbd\b", re.I)
+
+
+def _ducked(levels_total, names, loud, frame_s, tempo):
+    """{name: frames to leave out}: for each sound that dips just after every kick, the moments right after the kicks.
+    That's a sidechain, or a part that plays between the kicks (an off-beat bass); either way the sound isn't playing
+    there, so it can't be covered there. The kick is the track named like one, else the drums. Sounds that don't dip
+    aren't touched."""
+    trig = next((n for n in names if KICK_NAME.search(n)), None) or next((n for n in names if n.lower() == "drums"), None)
+    out = {n: np.zeros(len(loud), bool) for n in names}
+    if trig is None:
+        return out
+    t = levels_total[trig]
+    hits = np.where(loud & (t > t[loud].max() - 12) & (np.r_[0, np.diff(t)] > 6))[0]
+    hits = hits[np.r_[True, np.diff(hits) > 2]] if len(hits) else hits   # one per kick (a hit can rise over two frames)
+    w = max(2, int(round(DUCK_S / frame_s)))
+    beat = max(w + 3, int(round((60.0 / (tempo or 120.0)) / frame_s)))
+    hits = hits[hits + beat < len(t)]
+    if len(hits) < 8:
+        return out
+    after = np.zeros(len(t), bool)
+    for i in hits:
+        after[i:i + w + 1] = True
+    for n in names:
+        if n == trig:
+            continue
+        e = levels_total[n]
+        # The frame of the hit itself is blurred by the analysis window, so the dip is measured from the next one
+        dip = np.mean([e[i + w + 1:i + beat].mean() - e[i + 1:i + w + 1].mean() for i in hits])
+        if dip >= DUCK_DB:
+            out[n] = after
+    return out
+
+
 TOP_N = 3
 
 CLICK_HOP = 256
@@ -105,6 +144,7 @@ def masking(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, releva
     loud = mix_total >= mix_total.max() - QUIET_DB
     mix_level = 10 * np.log10(np.mean(np.sum(totals, axis=0)[loud]) + 1e-12)
     bars = _frame_bars(times, tempo, start_beat, beats_per_bar)
+    ducked = _ducked(levels_total, names, loud, times[1] - times[0], tempo) if len(times) > 1 else {n: np.zeros(len(loud), bool) for n in names}
 
     findings = []
     for victim in names:
@@ -123,7 +163,7 @@ def masking(sounds, rate, tempo=None, start_beat=None, beats_per_bar=4.0, releva
             if typical[r] < strongest - MATTERS_DB:
                 continue  # this range isn't where this sound lives
             mine = levels[victim][r]
-            plays = loud & (mine >= mine[loud].max() - ACTIVE_DB) & (mine >= mix_range[r] - (AUDIBLE_DB if relative else TRACK_AUDIBLE_DB))
+            plays = loud & ~ducked[victim] & (mine >= mine[loud].max() - ACTIVE_DB) & (mine >= mix_range[r] - (AUDIBLE_DB if relative else TRACK_AUDIBLE_DB))
             if plays.sum() < 4:
                 continue
             best = None
