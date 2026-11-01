@@ -289,4 +289,3 @@ docs/      build steps, contracts, the rubric, status
 
 - **No commercial music** anywhere in the repo or the video. The 99 rated mixes were given to us or released for free for us to use; only their measurements are in the repo, never the audio.
 - **Fonts:** the system font on Mac, Geist bundled under the OFL.
-- **Split mode** uses Meta's Demucs (code MIT). Its model weights' license is unclear, per its author, so they're downloaded on first use for the prototype and never included here.
