@@ -191,7 +191,7 @@ export default function App() {
         </>}
       >
         <LiveMockup />
-        <p className="mt-5 text-center text-[13px] text-faint">A drawing of Aria in Live. The Aria screens in it are real screenshots.</p>
+        <p className="mt-5 text-center text-[13px] text-faint">A drawing of Aria in Live. The clips are Ian's song, drawn from its stems, with the parts Muse Spark named on it. The Aria screens are real screenshots.</p>
       </Hero>
 
       {DEMO_VIDEO && (

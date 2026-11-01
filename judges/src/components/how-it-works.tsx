@@ -1,6 +1,7 @@
 // "How it works" (Oct 31): replaces the Proof list, which Ian said "doesn't really show what we do". One real problem
 // followed through Aria's loop: it hears it, Muse Spark says it, the fix happens in Live, Aria measures again.
-// Every line and number comes from real.json: Mix check on Ian's drop against THE WEEKEND (steps 1 to 3), and Before
+// Every line and number comes from real.json: Mix check on Ian's drop against a reference track (steps 1 to 3; Ian, Oct 31: call it what it is, not the song's
+// name, so Muse's summary shows [the reference track] where it named the file), and Before
 // and after on our test mix with a planted harsh boost (step 4), as the step says.
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -65,7 +66,7 @@ function Hear() {
         <path d={path(h.hz, h.ref, s.y)} fill="none" stroke="#6ea8ff" strokeWidth={1.6} strokeDasharray="5 4" opacity={0.85} />
         <path d={path(h.hz, h.mine, s.y)} fill="none" stroke="#f5c451" strokeWidth={2} />
       </svg>
-      <Legend items={[["Your drop", "#f5c451"], ["Reference: THE WEEKEND", "#6ea8ff", true]]} />
+      <Legend items={[["Your drop", "#f5c451"], ["Reference track", "#6ea8ff", true]]} />
     </>
   );
 }
