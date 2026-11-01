@@ -1,0 +1,94 @@
+ARIA: HOW TO INSTALL
+====================
+
+Aria is an AI co-producer that runs inside Ableton Live. It listens to your
+mix, tells you what to fix in plain words, and can make the fix for you.
+
+
+WHAT YOU NEED
+-------------
+
+- A Mac
+- Ableton Live 12 Suite (Aria is a Max for Live device, and Suite includes Max for Live)
+- Python 3.11 (free, see step 1)
+- A Meta Model API key, for Muse Spark's advice (Aria still works without one,
+  but only shows its measurements)
+
+
+STEP 1. Install Python 3.11 (skip this if you already have it)
+--------------------------------------------------------------
+
+Go to https://www.python.org/downloads/macos/ and download the newest
+"Python 3.11" macOS installer. Open it and click through. That's it.
+
+
+STEP 2. Put the Aria folder somewhere it can stay
+-------------------------------------------------
+
+Move this whole Aria folder to a place you won't delete it from, like your
+Documents folder. Live finds Aria through this folder, so if you move or
+delete it later, Aria disappears from Live.
+
+
+STEP 3. Double-click "Install Aria"
+-----------------------------------
+
+It's in this folder. A Terminal window opens and does everything:
+it sets up Aria's engine and puts Aria into Live's browser.
+
+The first time, your Mac may say it can't open it because it came from
+the internet. If so: right-click "Install Aria", choose Open, then Open again.
+
+It downloads Aria's audio tools, so it can take a few minutes.
+When it's done it opens a small text file called .env.
+
+
+STEP 4. Add your Muse Spark key
+-------------------------------
+
+In the .env file that opened, find the line:
+
+    MODEL_API_KEY=
+
+Paste your Meta Model API key right after the = sign, with no spaces, then
+save the file (Cmd + S) and close it.
+
+No key yet? You can skip this. Aria still shows what it measured.
+To add it later, open the Aria folder, then engine, then .env.
+(It's a hidden file: press Cmd + Shift + . in Finder to see it.)
+
+
+STEP 5. Put Aria on your Main track
+-----------------------------------
+
+1. Open Ableton Live. If it was already open, quit and open it again.
+2. In Live's browser on the left, click User Library, then open:
+   Presets > Audio Effects > Max Audio Effect > Aria
+3. Drag "Aria" onto your Main track. Put it last, after any other effects.
+4. Play your song and press Check on the Aria device.
+
+Aria starts its engine by itself. You don't need to run anything else.
+
+
+OPTIONAL: let Aria name your tracks
+-----------------------------------
+
+In Live, once: Settings > Link, Tempo & MIDI > Control Surface: choose
+"Aria" (leave Input and Output on None). This lets Aria put its listener,
+Aria Ear, on your key tracks for you.
+
+
+IF SOMETHING LOOKS WRONG
+------------------------
+
+- The Aria device is blank: Live's audio is probably off. Open
+  Settings > Audio and pick an audio output device, then try again.
+- "Python 3.11 not found": do step 1, then double-click "Install Aria" again.
+- Aria says advice is unavailable: your key is missing or wrong. Check step 4,
+  then quit and reopen Live.
+- Aria isn't in Live's browser: quit and reopen Live. If it's still missing,
+  double-click "Install Aria" again.
+
+
+More about Aria: https://aria-judges.vercel.app
+Code and help: https://github.com/Yumstezy/aria
