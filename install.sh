@@ -53,8 +53,13 @@ fi
 UL="${UL:-$HOME/Music/Ableton/User Library}"
 DEST="$UL/Presets/Audio Effects/Max Audio Effect/Aria"
 mkdir -p "$DEST"
-# Links, not copies: each device and the scripts it loads, from this folder (an older install's copies are replaced)
-for f in "Aria.amxd" "Aria Ear.amxd" bridge.js live.js scope.js ear.js; do
+# The devices are copies: Live's browser doesn't index links (Nov 1: the folder looked empty to Live, so "Name my
+# tracks" couldn't find Aria Ear). The scripts they load are links, so a change to them needs no reinstall.
+for f in "Aria.amxd" "Aria Ear.amxd"; do
+  rm -f "$DEST/$f"
+  cp "$REPO/device/$f" "$DEST/$f"
+done
+for f in bridge.js live.js scope.js ear.js; do
   [ -e "$DEST/$f" ] && [ ! -L "$DEST/$f" ] && rm "$DEST/$f"
   ln -sfn "$REPO/device/$f" "$DEST/$f"
 done
