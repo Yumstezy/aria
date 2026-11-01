@@ -157,9 +157,9 @@ const MISSES = [
 ];
 
 const TEAM: [string, string, string][] = [
-  ["Ian Barrie", "Everything: product, sound, the build, testing in Live every day", "https://github.com/Yumstezy"],
-  ["Dylan Haman", "Product manager", "https://github.com/Hamqnn"],
-  ["Raghav Agarwal", "The mix model: the rated mixes, the measurements, the experiments", "https://github.com/RaghavAgarwal18"],
+  ["Ian Barrie", "Built Aria end to end: the engine and its Muse Spark integration, the screens inside Live and the websites, and the Max for Live devices. Designed the product, tested it in Live every day, and now leads security.", "https://github.com/Yumstezy"],
+  ["Dylan Haman", "Product manager: organized the team, ran planning and check-ins, and kept the build on schedule. Set priorities and coordinated the hand-offs to the submission.", "https://github.com/Hamqnn"],
+  ["Raghav Agarwal", "Built the mix model: the rated mixes, their measurements, and the ordinal model with its ship rule. Ran the Audiobox side experiment and reported what it showed.", "https://github.com/RaghavAgarwal18"],
 ];
 
 // Getting Aria into Live: what's in Aria-mac.zip and what "Install Aria" does (install.sh)

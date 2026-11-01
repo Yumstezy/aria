@@ -15,6 +15,7 @@ export const GrooveIcon = (p: P) => (
 );
 export const ReferenceIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} {...p}><rect x="3" y="6" width="5" height="12" rx="1.5" /><rect x="10" y="6" width="11" height="12" rx="1.5" /></svg>;
 export const MicIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={2} {...p}><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>;
+export const ImageIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={2} {...p}><rect x="3.5" y="4.5" width="17" height="15" rx="2.5" /><circle cx="9" cy="10" r="1.6" /><path d="M20.5 16l-5-5-8.5 8.5" /></svg>;
 export const CloseIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={2.2} {...p}><path d="M6 6l12 12M18 6L6 18" /></svg>;
 export const SendIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={2.25} {...p}><path d="M5 12h14M13 6l6 6-6 6" /></svg>;
 export const CheckIcon = (p: P) => <svg viewBox="0 0 24 24" {...line} strokeWidth={2.4} {...p}><path d="M5 12.5l4.5 4.5L19 7" /></svg>;

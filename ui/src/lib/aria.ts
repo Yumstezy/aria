@@ -84,10 +84,18 @@ export interface Suggestion { type: Action["type"]; args: Action["args"]; why: s
 export interface GuideBand { band: number; shape: string; freq_hz: number; gain_db: number; q: number; dynamic_db?: number }
 /** How a third-party plugin should look: Aria draws it, the producer sets it (Aria can't turn third-party plugins). */
 export interface Guide { plugin: string; track: string | null; preset: string | null; about: string; source: "preset" | "aria"; bands: GuideBand[] }
+/** What Muse read off a screenshot the producer attached, and what to change in it (Nov 1) */
+export interface ScreenRead { what: string; seen: string[]; steps: string[] }
+/** One problem's range after Fix my whole mix, measured by Check again at the same loudness */
+export interface FixResult { index: number; kind: string | null; hz_range: [number | null, number | null]; change_db: number | null }
 export interface Exchange {
   request: string; reply: string | null; done: Done[]; suggestions: Suggestion[]; error: string | null; notes: string[];
   problems?: string[];   // calls Aria dropped, and why
   guides?: Guide[];
+  reads?: ScreenRead[];
+  image_id?: string | null;   // the screenshot sent with the request
+  auto?: boolean;             // a step of Fix my whole mix: Muse working on its own, not a request
+  results?: FixResult[];      // the last step of Fix my whole mix: how each problem's range moved
   at?: number;
 }
 
@@ -95,6 +103,7 @@ export interface Exchange {
 export function outcome(x: Exchange): { text: string; bad: boolean } {
   if (x.reply) return { text: x.reply, bad: false };
   if (x.guides?.length) return { text: `How it should look in ${x.guides[0].plugin}`, bad: false };
+  if (x.reads?.length) return { text: `Read your screenshot: ${x.reads[0].what}`, bad: false };
   if (x.error) return { text: x.error, bad: true };
   if (x.problems?.length) return { text: x.problems[0], bad: true };
   const failed = x.done.find((d) => !d.ok);
@@ -106,7 +115,7 @@ export function outcome(x: Exchange): { text: string; bad: boolean } {
 }
 
 interface State {
-  ask: { open: boolean; pending: string | null; log: Exchange[] };
+  ask: { open: boolean; pending: string | null; pendingAuto?: boolean; pendingImage?: string | null; log: Exchange[] };
   engine: { state: EngineState; text: string };
   progress: Progress | null;
   result: Result | null;
@@ -292,10 +301,10 @@ export function connect() {
     on<Result>("mix_result", (r) => set({ result: known(r), progress: null, error: null, beforeAfter: null, fixes: {} }));   // a new check: a new "before", nothing fixed yet
     on<{ text: string }>("error", (e) => set({ error: e?.text || "Something went wrong.", progress: null }));
     on<{ bar: number; name: string }>("marker_done", (m) => set({ marker: m }));
-    on<{ request: string | null }>("ask_pending", (p) => {
+    on<{ request: string | null; auto?: boolean; image_id?: string | null }>("ask_pending", (p) => {
       // The answer already arrived in ask_log: keep the thread as it is (no flicker)
       if (p.request === null && !state.ask.pending) return;
-      set({ ask: { ...state.ask, pending: p.request } });
+      set({ ask: { ...state.ask, pending: p.request, pendingAuto: !!p.auto, pendingImage: p.image_id ?? null } });
       if (p.request === null) askQueued();
     });
     // The bridge owns the history (saved on this Mac) and sends all of it on every change.
@@ -454,25 +463,48 @@ let grooveBusyTimer: ReturnType<typeof setTimeout> | undefined;
 let queued: string | null = null;
 function askQueued() { const q = queued; queued = null; if (q) askMuse(q); }
 
-export async function askMuse(text: string) {
+export async function askMuse(text: string, imageId: string | null = null) {
   text = text.trim();
   if (!text) return;
   if (state.ask.pending) { queued = text; notice("Muse will do that next."); return; }   // never drop a request
-  if (send("ask", { text })) { set({ ask: { ...state.ask, pending: text } }); return; }
+  if (send("ask", { text, image_id: imageId })) { set({ ask: { ...state.ask, pending: text, pendingAuto: false, pendingImage: imageId } }); return; }
   // Development in a normal browser: ask the engine directly. Nothing is applied without Live.
   set({ ask: { ...state.ask, pending: text } });
   try {
     const r = state.result;
     const res = await fetch(ENGINE + "/muse/ask", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, context: { findings: r?.clarity.findings ?? [], bars: null, tempo: r?.recording.tempo ?? null, playhead_bar: null, markers: [] } }),
+      body: JSON.stringify({ text, image_id: imageId, context: { findings: r?.clarity.findings ?? [], bars: null, tempo: r?.recording.tempo ?? null, playhead_bar: null, markers: [] } }),
     });
     const body = await res.json();
     const done: Done[] = (body.actions ?? []).map((a: Action) => ({ ...a, ok: false, text: `Would ${a.type.replace("_", " ")} in Live (not connected).` }));
-    set({ ask: { ...state.ask, pending: null, log: [...state.ask.log, { request: text, reply: body.reply, done, suggestions: body.suggestions ?? [], problems: body.problems ?? [], error: body.error, notes: [] }] } });
+    set({ ask: { ...state.ask, pending: null, log: [...state.ask.log, { request: text, reply: body.reply, done, suggestions: body.suggestions ?? [], guides: body.guides ?? [],
+                                                                         reads: body.reads ?? [], image_id: imageId, problems: body.problems ?? [], error: body.error ?? body.detail ?? null, notes: [] }] } });
   } catch {
     set({ ask: { ...state.ask, pending: null, log: [...state.ask.log, { request: text, reply: null, done: [], suggestions: [], error: "The engine is not running.", notes: [] }] } });
   }
+}
+
+// ---------- Show Muse a screenshot (Nov 1) ----------
+// The page sends the picture straight to the engine (Max can't carry an image) and the request carries its id.
+// Big screenshots are scaled down first: Muse reads a plugin fine at 1600 px, and it's a fraction of the upload.
+const SHOT_MAX = 1600;
+export const screenshotUrl = (id: string) => `${ENGINE}/muse/image/${id}`;
+
+export async function sendScreenshot(file: Blob): Promise<string> {
+  if (!/^image\/(png|jpeg|jpg|webp|gif|heic)/.test(file.type)) throw new Error("Pick a screenshot (PNG or JPEG).");
+  const bitmap = await createImageBitmap(file);
+  const k = Math.min(1, SHOT_MAX / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * k); canvas.height = Math.round(bitmap.height * k);
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const jpeg = await new Promise<Blob>((ok, bad) => canvas.toBlob((b) => (b ? ok(b) : bad(new Error("Couldn't read that picture."))), "image/jpeg", 0.88));
+  let res: Response;
+  try { res = await fetch(ENGINE + "/muse/image", { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: jpeg }); }
+  catch { throw new Error("The engine is not running."); }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.image_id) throw new Error(body.detail || "Aria couldn't keep that picture.");
+  return body.image_id as string;
 }
 
 export function answerSuggestion(exchange: number, index: number, yes: boolean) {
@@ -551,6 +583,13 @@ export function fixAgain(p: { name: string; short: string; where: string }, chan
 // its problem changed; a change that was undone puts the problem back in To fix.
 function fixesAfter(log: Exchange[], newest: Exchange | null): Record<string, FixState> {
   const fixes = { ...state.fixes };
+  // A Fix my whole mix round that changed something: every problem in the check is now waiting for Check again
+  if (newest?.auto && newest.done.some((d) => d.ok) && state.result) {
+    for (const p of problemsOfResult(state.result)) {
+      const key = problemKey(p);
+      if (fixes[key]?.state !== "fixed") fixes[key] = { state: "changed", what: newest.done.filter((d) => d.ok).map((d) => d.text).join(" "), at: newest.at };
+    }
+  }
   if (newest && fixing.has(newest.request)) {
     const key = fixing.get(newest.request)!;
     fixing.delete(newest.request);

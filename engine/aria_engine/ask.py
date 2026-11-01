@@ -22,6 +22,9 @@ SHAPES = ["bell", "low_cut", "high_cut", "low_shelf", "high_shelf", "notch"]
 NO_GAIN = ("low_cut", "high_cut", "notch")
 RECENT = 3        # earlier exchanges Muse sees, so "it" and "that" make sense
 MAX_SETTINGS = 8
+MAX_WHAT = 80      # a screenshot's one-line description
+MAX_STEP = 140     # one setting seen, or one step, read from a screenshot
+MAX_STEPS = 6
 
 # Live's stock devices Aria can add or adjust (beside EQ Eight, which has its own tools), with the
 # knobs Muse uses most. Names are Live's own (its control-surface bank definitions); units are what
@@ -193,6 +196,21 @@ TOOLS = [
         "name": "add_part_markers", "description": "Add a named marker at the start of each part Aria found by hearing the whole song.",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
+        "name": "fix_mix", "description": "The producer asked to fix the whole mix (\"fix my whole mix\", \"fix everything\", \"fix it all\"): "
+                                           "Aria fixes the strongest problems in context.findings itself, plays the same bars again to "
+                                           "measure what changed, and tries once more on anything that didn't get better. Needs findings.",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "screenshot_steps", "description": "Only when the producer attached a screenshot: what it shows, the settings in it "
+                                                    "that matter for what they asked, and exactly what to change, step by step.",
+        "parameters": {"type": "object", "properties": {
+            "what": {"type": "string", "maxLength": MAX_WHAT, "description": "What the screenshot shows, like \"FabFilter Pro-Q 3 on a vocal\"."},
+            "seen": {"type": "array", "maxItems": MAX_STEPS, "items": {"type": "string", "maxLength": MAX_STEP},
+                     "description": "The settings you can read in it that matter, as shown (\"Band 3: bell, +4.5 dB at 2.4 kHz\")."},
+            "steps": {"type": "array", "maxItems": MAX_STEPS, "items": {"type": "string", "maxLength": MAX_STEP},
+                      "description": "What to change in it, one move per step, in the plugin's own words."}},
+            "required": ["what", "steps"]}}},
+    {"type": "function", "function": {
         "name": "undo", "description": "Undo the last change Aria made in Live.",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
@@ -284,9 +302,18 @@ If you can't do what they ask with these tools, say so plainly and don't call a 
 context.recent holds the last few exchanges (what they asked, what you did). Use it for "it", "that" and "again":
 "it" is usually the track from the last request.
 
-"Fix everything", "do what it needs" or "what would you change": don't ask which track. Offer one fix per finding in
-context.findings, each as a "suggest" with a short why, strongest first, at most 3. They say yes to the ones they want,
-so your reply offers them ("Here are three fixes, strongest first"), never "fixing everything".
+"Fix my whole mix", "fix everything" or "fix it all": call fix_mix and no other tool. Aria fixes the strongest problems
+itself, checks the same bars again and tries once more on what didn't get better. Your reply says that's what happens
+next ("Fixing the strongest problems, then I'll check the same bars"). With no findings, say to run a Mix check first.
+"Do what it needs" or "what would you change": don't ask which track. Offer one fix per finding in context.findings,
+each as a "suggest" with a short why, strongest first, at most 3, and your reply offers them, never "fixing everything".
+
+When the producer attaches a screenshot (a third-party plugin, an EQ, a synth, a mixer, Live itself), look at it closely.
+Call screenshot_steps: what it shows, the settings you can read in it that matter for what they asked (as shown, with
+their numbers), and exactly what to change, one move per step, in that plugin's own words ("Pull band 3 down to 0 dB").
+Tie it to context.findings when one covers the same range. Only describe what you can actually read in the picture; if
+you can't read something, say so. Aria can't turn third-party plugins: the producer makes these moves.
+Your reply is one short sentence on the most important thing you see. Don't promise to check or do anything more.
 Mute, solo, tempo and deleting a marker happen right away with Undo, like any change they ask for.
 
 A request can ask for several things ("make it louder and cut the low end"). Call a tool for every part, in this
@@ -662,9 +689,33 @@ def check_action(name, args, tracks=(), plugins=()):
     return None
 
 
-def _one_call(name, args, context, request, tracks, plugins, actions, suggestions, shown, problems, dropped):
+def check_read(args):
+    """A screenshot_steps call, trimmed to its limits: {what, seen, steps}, or None when there's nothing to show."""
+    clip = lambda v, n: re.sub(r"\s*[\u2014\u2013]\s*", ", ", str(v).strip())[:n]
+    what = clip(args.get("what", ""), MAX_WHAT)
+    lines = lambda k: [clip(x, MAX_STEP) for x in (args.get(k) or []) if isinstance(x, str) and x.strip()][:MAX_STEPS]
+    steps = lines("steps")
+    return {"what": what, "seen": lines("seen"), "steps": steps} if what and steps else None
+
+
+def _one_call(name, args, context, request, tracks, plugins, actions, suggestions, shown, problems, dropped, reads=None):
     """One tool call from Muse: checked, then added to what runs, what's suggested or what's drawn.
     Returns the dropped count. A call that doesn't fit is dropped with a plain reason."""
+    if name == "fix_mix":
+        if context.get("findings"):
+            actions.append({"type": "fix_mix", "args": {}})
+        else:
+            dropped += 1
+            problems.append("Run a Mix check first, so Aria knows what to fix.")
+        return dropped
+    if name == "screenshot_steps":
+        r = check_read(args) if context.get("screenshot") else None
+        if r and reads is not None:
+            reads.append(r)
+        else:
+            dropped += 1
+            problems.append("Muse described a screenshot Aria didn't send, so Aria skipped it.")
+        return dropped
     if name == "plugin_guide":
         g = check_guide(args, tracks)
         if g:
@@ -730,7 +781,7 @@ def _one_call(name, args, context, request, tracks, plugins, actions, suggestion
 
 def interpret(message, context, request):
     """Turn Muse's reply into {reply, actions, suggestions, dropped, problems}. Exposed for tests."""
-    actions, suggestions, dropped, problems, shown = [], [], 0, [], []
+    actions, suggestions, dropped, problems, shown, reads = [], [], 0, [], [], []
     tracks = [t["name"] if isinstance(t, dict) else str(t) for t in context.get("tracks") or []]
     plugins = plugin_names(context)
     for call in getattr(message, "tool_calls", None) or []:
@@ -744,7 +795,7 @@ def interpret(message, context, request):
             problems.append(f"Muse sent {name.replace('_', ' ')} in a shape Aria can't read, so Aria skipped it.")
             continue
         try:
-            dropped = _one_call(name, args, context, request, tracks, plugins, actions, suggestions, shown, problems, dropped)
+            dropped = _one_call(name, args, context, request, tracks, plugins, actions, suggestions, shown, problems, dropped, reads)
         except (KeyError, TypeError, ValueError, AttributeError):
             dropped += 1
             problems.append(f"Muse sent {name.replace('_', ' ')} with values Aria can't use, so Aria skipped it.")
@@ -753,12 +804,13 @@ def interpret(message, context, request):
     if reply:
         reply = re.sub(r"\s*[\u2014\u2013]\s*", ", ", reply)   # no em or en dashes in anything the producer reads
     if reply:
-        allowed = _allowed(context, request, actions + [{"args": s["args"]} for s in suggestions] + [{"args": g} for g in shown])
+        # What Muse read off the producer's own screenshot counts too: it's shown beside the picture, as read from it
+        allowed = _allowed(context, request, actions + [{"args": s["args"]} for s in suggestions] + [{"args": g} for g in shown] + [{"args": r} for r in reads])
         if any(round(n, 2) not in allowed for n in _numbers(reply)):
             reply = None   # cited a number we don't have; the actions themselves still stand
     if problems:
         reply = None   # it may describe the part that was dropped; the done pills and the reasons say what really happened
-    return {"reply": reply, "actions": actions, "suggestions": suggestions, "guides": shown, "dropped": dropped, "problems": problems}
+    return {"reply": reply, "actions": actions, "suggestions": suggestions, "guides": shown, "reads": reads, "dropped": dropped, "problems": problems}
 
 
 # Everyday names for the split parts, so Muse never says "other"
@@ -791,34 +843,98 @@ def friendly(context, request=""):
     return out
 
 
-def ask(request, context, client=None):
-    """Returns {reply, actions, suggestions, dropped, problems, error}."""
+def _client(client):
+    if client is not None:
+        return client
+    key = os.environ.get("MODEL_API_KEY", "").strip()
+    return OpenAI(api_key=key, base_url=os.environ.get("MUSE_BASE_URL", "https://api.meta.ai/v1"), timeout=TIMEOUT_SEC, max_retries=1) if key else None
+
+
+def ask(request, context, client=None, image=None):
+    """Returns {reply, actions, suggestions, guides, reads, dropped, problems, error}.
+    image: a screenshot the producer attached, as a data URL. Muse Spark looks at it (Nov 1)."""
     request = (request or "").strip()
     context = friendly(context or {}, request)
+    if image:
+        context["screenshot"] = True
     if not request:
-        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "dropped": 0, "problems": [], "error": "Say what you'd like Muse to do."}
-    key = os.environ.get("MODEL_API_KEY", "").strip()
-    if client is None and not key:
-        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "dropped": 0, "problems": [],
-                "error": "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."}
+        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "reads": [], "dropped": 0, "problems": [], "error": "Say what you'd like Muse to do."}
+    client = _client(client)
     if client is None:
-        client = OpenAI(api_key=key, base_url=os.environ.get("MUSE_BASE_URL", "https://api.meta.ai/v1"),
-                        timeout=TIMEOUT_SEC, max_retries=1)
+        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "reads": [], "dropped": 0, "problems": [],
+                "error": "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."}
+    text = json.dumps({"context": context, "request": request})
+    user = [{"type": "text", "text": text}, {"type": "image_url", "image_url": {"url": image}}] if image else text
     try:
         res = client.chat.completions.create(
             model=os.environ.get("MUSE_MODEL", "muse-spark-1.3"), max_tokens=MAX_TOKENS, reasoning_effort="minimal",
             tools=TOOLS, tool_choice="auto",
-            messages=[{"role": "system", "content": PROMPT},
-                      {"role": "user", "content": json.dumps({"context": context, "request": request})}])
+            messages=[{"role": "system", "content": PROMPT}, {"role": "user", "content": user}])
     except OpenAIError as e:
-        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "dropped": 0, "problems": [],
+        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "reads": [], "dropped": 0, "problems": [],
                 "error": f"Muse Spark is unavailable right now ({type(e).__name__})."}
     if not res.choices:
-        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "dropped": 0, "problems": [], "error": "Muse Spark returned an empty reply."}
+        return {"reply": None, "actions": [], "suggestions": [], "guides": [], "reads": [], "dropped": 0, "problems": [], "error": "Muse Spark returned an empty reply."}
     out = interpret(res.choices[0].message, context, request)
-    out["error"] = (None if (out["reply"] or out["actions"] or out["suggestions"] or out["guides"])
+    out["error"] = (None if (out["reply"] or out["actions"] or out["suggestions"] or out["guides"] or out["reads"])
                     else " ".join(out["problems"]) or "Muse Spark didn't answer that one.")
     # Local engine log only (~/Library/Logs/Aria/engine.log): what was asked and what Muse did
     print(f"ask: {request!r} -> actions={out['actions']} suggestions={len(out['suggestions'])} guides={[(g['plugin'], g['preset']) for g in out['guides']]} "
           f"dropped={out['dropped']} problems={out['problems']} reply={out['reply']!r} error={out['error']!r}", flush=True)
     return out
+
+
+# ---------- Fix my whole mix (Nov 1): Muse fixes, Aria measures, Muse tries again on what didn't move ----------
+# The device runs the loop: a "fix" round, Check again, a "retry" round on what isn't Fixed yet, Check again, and a
+# "report". Each round is one Muse call. The fixes go through the same checks and limits as any Ask Muse request.
+FIXED_DB = -3.0          # 3 dB or more lower in its range, at the same loudness, is Fixed (the same rule as the screens)
+FIX_MAX = 4              # fixes in the first round, strongest problems first
+FIX_TOOLS = [t for t in TOOLS if t["function"]["name"] in ("eq_band", "track_volume", "track_eq", "track_device")]
+FIX_STAGES = ("fix", "retry", "report")
+
+FIX_PROMPT = PROMPT + """
+
+You are running "Fix my whole mix". The producer asked for it, so your fixes happen right away, with Undo.
+stage "fix": fix the strongest problems in context.findings, at most """ + str(FIX_MAX) + """, one fix per problem, strongest first,
+using the rules above (buried sounds and mud on the producer's own tracks, ringing notes and harsh hits on Main).
+Reply in one short sentence on what you changed.
+stage "retry": context.results says how much each problem's range changed after your first fixes ("change_db", at the
+same loudness; """ + str(FIXED_DB) + """ dB or lower is Fixed) and context.recent says what you did. For each problem that isn't Fixed, try
+once more: a deeper cut on the same track, or the other track in that range. Your first cut stays in place, and a new
+bell at the same frequency adds to it, so give only the extra amount (another -2 dB, not the new total). Leave Fixed
+problems alone. Reply in one short sentence.
+stage "report": call no tools. In two short sentences, tell the producer how it went: which problems are Fixed and
+which didn't move enough, using only the numbers in context.results."""
+
+
+def fix_round(stage, context, results=None, client=None):
+    """One round of Fix my whole mix. Returns {reply, actions, problems, error}."""
+    if stage not in FIX_STAGES:
+        return {"reply": None, "actions": [], "problems": [], "error": f"Unknown stage {stage!r}."}
+    context = friendly(context or {}, "")
+    if not context.get("findings"):
+        return {"reply": None, "actions": [], "problems": [], "error": "Run a Mix check first, so Aria knows what to fix."}
+    if results is not None:
+        context["results"] = [{**r, "fixed": r.get("change_db") is not None and r["change_db"] <= FIXED_DB} for r in results]
+    client = _client(client)
+    if client is None:
+        return {"reply": None, "actions": [], "problems": [], "error": "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."}
+    request = {"fix": "Fix my whole mix.", "retry": "Try again on what isn't Fixed yet.", "report": "How did it go?"}[stage]
+    extra = {"tools": FIX_TOOLS, "tool_choice": "auto"} if stage != "report" else {}
+    try:
+        res = client.chat.completions.create(
+            model=os.environ.get("MUSE_MODEL", "muse-spark-1.3"), max_tokens=MAX_TOKENS, reasoning_effort="minimal", **extra,
+            messages=[{"role": "system", "content": FIX_PROMPT},
+                      {"role": "user", "content": json.dumps({"stage": stage, "context": context, "request": request})}])
+    except OpenAIError as e:
+        return {"reply": None, "actions": [], "problems": [], "error": f"Muse Spark is unavailable right now ({type(e).__name__})."}
+    if not res.choices:
+        return {"reply": None, "actions": [], "problems": [], "error": "Muse Spark returned an empty reply."}
+    out = interpret(res.choices[0].message, context, request)
+    # Only fixes run here: anything else Muse called (it shouldn't) is dropped
+    actions = [a for a in out["actions"] if a["type"] in ("eq_band", "track_volume", "track_eq", "track_device")][:FIX_MAX]
+    if stage == "report":
+        actions = []
+    print(f"fix {stage}: actions={actions} problems={out['problems']} reply={out['reply']!r}", flush=True)
+    return {"reply": out["reply"], "actions": actions, "problems": out["problems"],
+            "error": None if (out["reply"] or actions) else " ".join(out["problems"]) or "Muse Spark didn't answer that one."}

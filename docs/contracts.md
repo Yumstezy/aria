@@ -310,7 +310,7 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
 ### Ask Muse messages (as built, Oct 27)
 
 - UI to device:
-  - `ask {text}`: one request. The bridge adds context and calls `POST /muse/ask`.
+  - `ask {text, image_id?}`: one request. The bridge adds context and calls `POST /muse/ask`. `image_id`: a screenshot the page already sent to the engine (Nov 1).
   - `answer {exchange, index, yes, at}`: the producer answered a suggestion. Yes runs it. `at` (the exchange's time) finds it even after the history has shifted.
   - `undo`: undo the last change Aria made.
   - `clear_history`
@@ -324,7 +324,7 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
   - `minimize` / `restore`: a docked window becomes a 44 x 132 tab on its edge (a popped-out chat hides too); `restore` brings both back as they were.
   - `set_theme {theme: "sky" | "night"}`: the Light / Dark switch. The bridge saves it in `window.json`, puts it in every page's URL (`?theme=`) and sends `theme` to every page.
 - Device to UI:
-  - `ask_pending {request | null}`
+  - `ask_pending {request | null, auto?, image_id?}`: `auto` marks a step of Fix my whole mix (shown as a line, not your message).
   - `theme {theme}`: apply this theme now.
   - `undo_next {i, kind: "d" | "s", k} | null`: the change Undo will undo next (exchange index, a done item or an accepted suggestion, its index). Only that pill offers Undo; an undone change has `undone: true`. Null after a reload or when the top step isn't a pill (Home's Mark bar).
   - `layout {mode, side}`: where the bridge placed the window. `placed {}`: a window was just placed, so a page that slid out comes back even when its size didn't change.
@@ -332,7 +332,7 @@ Over `jweb`, in both directions, as `window.max.outlet(name, jsonString)` and `b
   - `focus_ask {}`: put the cursor in Ask Muse's input (the mapped key was pressed).
   - `session {tempo, signature, markers: [{bar, name}], chain: {on_main, after}}`: about the set, sent on `ready`, after a check and after every ask. The window uses it for the header and the "Move Aria last on Main" warning.
   - `ask_log [exchange]`: the whole history, sent on `ready` and on every change. The bridge owns it and saves it in `~/Library/Application Support/Aria/ask-history.json` (last 100).
-  - An exchange is `{request, reply, done: [{type, args, ok, text}], suggestions: [{type, args, why, answered?, result?: {ok, text}}], guides: [guide], problems: [text], error, notes: [text], at}`.
+  - An exchange is `{request, reply, done: [{type, args, ok, text}], suggestions: [{type, args, why, answered?, result?: {ok, text}}], guides: [guide], reads: [read], image_id?, auto?, results?, problems: [text], error, notes: [text], at}`.
 
 `set_section {name, first_bar, last_bar}` (Step 6, Oct 28): sections are Live's markers. The engine turns it into marker actions: the name at `first_bar`; a `delete_marker` for each marker inside the new section; and, unless a marker already sits at `last_bar + 1`, one there with the name of the section that was playing there ("After <name>" when nothing was marked), so the rest of the song keeps its names. Each is its own Undo.
 
@@ -346,7 +346,7 @@ Actions Muse may call: `jump_to`, `add_marker`, `eq_band`, `track_volume`, `trac
 
 `plugin_guide {plugin, track?, preset?, bands?}` (Oct 27, replaces `track_plugin`, which is on hold): Aria can't add or turn third-party plugins, so Muse shows how one should look. `context.plugin_presets` maps each plugin the request names (newest version only) to up to 8 of the producer's presets that fit, each `{name, folder, about, curve}` (curve: its biggest moves in words). Muse passes `preset` (Aria reads its real bands from the file) or its own `bands` (`[{shape, freq_hz, gain_db, q}]`, up to 8). The engine returns it in `guides: [{plugin, track, preset, about, source: "preset" | "aria", bands: [{band, shape, freq_hz, gain_db, q, dynamic_db}]}]`; nothing is applied in Live. The exchange keeps `guides`, and Ask Muse draws the curve and lists the bands. Only Pro-Q 3 and 4 text presets give bands.
 
-`POST /muse/ask` returns `{reply, actions, suggestions, dropped, problems, error}`. `problems` gives one plain sentence per dropped call. When calls were dropped and none ran, `reply` is null, so a reply never claims a change that didn't happen.
+`POST /muse/ask {text, context, image_id?}` returns `{reply, actions, suggestions, guides, reads, dropped, problems, error}`. `problems` gives one plain sentence per dropped call. When calls were dropped and none ran, `reply` is null, so a reply never claims a change that didn't happen.
 
 ## Answer key
 
@@ -362,3 +362,20 @@ Actions Muse may call: `jump_to`, `add_marker`, `eq_band`, `track_volume`, `trac
   "loops": []
 }
 ```
+
+### Show Muse a screenshot (Nov 1)
+
+The page sends the picture straight to the engine, like the voice clip, because Max can't carry an image: `POST /muse/image` with the raw PNG or JPEG as the body (under 8 MB; the page scales it to 1600 px and sends a JPEG) returns `{image_id}` (32 hex). `GET /muse/image/{image_id}` serves it back for the chat. They're kept in `~/Library/Application Support/Aria/images/`. The request goes through the bridge as `ask {text, image_id}`, and the engine attaches the picture to Muse's message as an `image_url` part.
+
+Muse answers with `screenshot_steps {what, seen: [text], steps: [text]}` (what the picture shows, the settings it can read that matter, the moves to make, up to 6 each), returned as `reads: [{what, seen, steps}]`. It's only accepted when a screenshot was sent. Numbers in `reads` count as known for the reply's number check: they were read off the producer's own screen and are shown beside it, labeled as read by Muse Spark. Nothing is applied in Live.
+
+### Fix my whole mix (Nov 1)
+
+`fix_mix {}`: the producer asked to fix the whole mix. Accepted only with findings. The bridge runs it as a loop in the queue:
+
+1. `POST /muse/fix {stage: "fix", context}`: Muse fixes the strongest problems (at most 4) with `eq_band`, `track_volume`, `track_eq` or `track_device`, checked like any Ask Muse call. Applied with Undo.
+2. Check again (the same bars, `POST /mix/before-after`).
+3. If any problem's `change_db` is above -3: `POST /muse/fix {stage: "retry", context, results}`, where `results` is the before-and-after `problems` list. Muse adds a little more on what didn't move (a new bell adds to the first). Applied, then Check again.
+4. `POST /muse/fix {stage: "report", context, results}`: no tools, Muse says how it went from `results` only.
+
+`POST /muse/fix` returns `{reply, actions, problems, error}`; each `results` item gets `fixed` (change_db <= -3) before Muse sees it. Each step is an exchange with `auto: true` and the step's label as `request`; the report's exchange carries `results`, which the chat shows as one line per problem.

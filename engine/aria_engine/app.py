@@ -1,11 +1,15 @@
+import base64
 import os
+import re
 import threading
+import uuid
 from contextlib import asynccontextmanager
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import pyloudnorm as pyln
@@ -390,12 +394,79 @@ def groove_vocal(req: VocalRequest):
 class AskRequest(BaseModel):
     text: str
     context: dict = {}
+    image_id: str | None = None          # a screenshot sent first to POST /muse/image (Nov 1)
+
+
+# Screenshots the producer shows Muse (Nov 1). The page sends them straight here (Max can't carry an image), and the
+# request through the bridge carries only the id. Kept on this Mac, with the other Aria files.
+IMAGE_DIR = Path.home() / "Library" / "Application Support" / "Aria" / "images"
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+IMAGE_TYPES = {b"\x89PNG": ("png", "image/png"), b"\xff\xd8\xff": ("jpg", "image/jpeg")}
+IMAGE_ID = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _image_kind(raw):
+    return next((v for magic, v in IMAGE_TYPES.items() if raw.startswith(magic)), None)
+
+
+def _image_type(f):
+    return "image/png" if f.suffix == ".png" else "image/jpeg"
+
+
+def _image_file(image_id):
+    """The saved screenshot for an id, or None. Ids are Aria's own (32 hex), so no path can get through."""
+    if not image_id or not IMAGE_ID.match(image_id):
+        return None
+    return next((p for p in (IMAGE_DIR / f"{image_id}.{ext}" for ext, _ in IMAGE_TYPES.values()) if p.exists()), None)
+
+
+@app.post("/muse/image")
+async def muse_image(request: Request):
+    """A screenshot to show Muse (PNG or JPEG, the raw file as the body). Returns its id."""
+    raw = await request.body()
+    if not raw or len(raw) > MAX_IMAGE_BYTES:
+        raise HTTPException(400, "Send a PNG or JPEG screenshot under 8 MB as the request body.")
+    kind = _image_kind(raw)
+    if not kind:
+        raise HTTPException(400, "Aria can read PNG and JPEG screenshots.")
+    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    image_id = uuid.uuid4().hex
+    (IMAGE_DIR / f"{image_id}.{kind[0]}").write_bytes(raw)
+    return {"image_id": image_id}
+
+
+@app.get("/muse/image/{image_id}")
+def muse_image_file(image_id: str):
+    """The screenshot, for the chat to show beside what Muse read from it."""
+    f = _image_file(image_id)
+    if not f:
+        raise HTTPException(404, "No such screenshot.")
+    return FileResponse(f, media_type=_image_type(f))
+
+
+class FixRequest(BaseModel):
+    stage: str                            # "fix", "retry" or "report"
+    context: dict = {}
+    results: list | None = None           # after a Check again: each problem's {index, kind, hz_range, change_db}
 
 
 @app.post("/muse/ask")
 def muse_ask(req: AskRequest):
-    """Ask Muse: returns checked tool calls for the device to apply, and suggestions."""
-    return ask.ask(req.text, req.context)
+    """Ask Muse: returns checked tool calls for the device to apply, and suggestions. With image_id, Muse sees the
+    screenshot too."""
+    image = None
+    if req.image_id:
+        f = _image_file(req.image_id)
+        if not f:
+            raise HTTPException(400, "Aria lost that screenshot. Attach it again.")
+        image = f"data:{_image_type(f)};base64,{base64.b64encode(f.read_bytes()).decode()}"
+    return ask.ask(req.text, req.context, image=image)
+
+
+@app.post("/muse/fix")
+def muse_fix(req: FixRequest):
+    """One round of Fix my whole mix: Muse's fixes, checked against the same menu and limits as Ask Muse."""
+    return ask.fix_round(req.stage, req.context, req.results)
 
 
 @app.post("/voice/transcribe")

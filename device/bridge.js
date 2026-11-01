@@ -312,7 +312,7 @@ function serial(fn) {
 // The UI shows Undo on the top one only; an undone change is marked, never offered again.
 let changeStack = [];   // [{ i: exchange's at, kind: "d" | "s", k }]
 // The newer tools put their own step on the Undo stack (groove, vocal, markers), or change nothing (checks)
-const UNDOABLE = (type) => !["jump_to", "check_mix", "undo", "route_sidechain", "vocal_sync", "groove_match", "check_again", "hear_song", "add_part_markers"].includes(type);
+const UNDOABLE = (type) => !["jump_to", "check_mix", "undo", "route_sidechain", "vocal_sync", "groove_match", "check_again", "hear_song", "add_part_markers", "fix_mix"].includes(type);
 function sendUndoNext() {
   const top = changeStack[changeStack.length - 1];
   const i = top ? askLog.findIndex((x) => x.at === top.at) - logShownFrom : -1;   // counted in what the window has
@@ -697,11 +697,65 @@ async function recheck() {
       tempo: c.tempo, bars: BARS, findings: c.findings }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200) throw new UserError((res.json && res.json.detail) || `The engine couldn't compare them (HTTP ${res.status}).`);
     toUI("before_after", { ...res.json, start_bar: c.start_bar });
+    return res.json;   // Fix my whole mix reads it
   } catch (e) {
     toUI("before_after_progress", { step: "error", text: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
+    return null;
   } finally {
     busy = false;
   }
+}
+
+// ---------- Fix my whole mix (Nov 1) ----------
+// Muse fixes the strongest problems, Aria plays the same bars again and measures each problem's range at the same
+// loudness, Muse tries once more on what didn't move, Aria measures again, and Muse says how it went. Every change goes
+// through the same checks as Ask Muse and onto the Undo stack. Runs inside the queue, one step after another.
+const FIXED_DB = -3;   // the screens' rule: 3 dB or more lower is Fixed
+
+async function fixMix() {
+  if (!lastCheck || !lastCheck.findings.length) {
+    askLog.push({ request: "Fix my whole mix", auto: true, reply: null, done: [], suggestions: [], problems: [], notes: [], at: Date.now(),
+                  error: "Run a Mix check first, so Aria knows what to fix." });
+    logChanged();
+    return;
+  }
+  let results = null;
+  for (const stage of ["fix", "retry"]) {
+    if (results && results.every((r) => r.change_db !== null && r.change_db <= FIXED_DB)) break;   // all Fixed already
+    const entry = await fixStep(stage, results, stage === "fix" ? "Round 1: fixing the strongest problems" : "Round 2: trying again on what didn't move");
+    if (!entry.done.some((d) => d.ok)) break;   // nothing changed, so nothing to measure
+    const after = await recheck();
+    if (!after) break;
+    results = after.problems;
+  }
+  if (results) await fixStep("report", results, "How it went");
+}
+
+async function fixStep(stage, results, label) {
+  toUI("ask_pending", { request: label, auto: true });
+  const at = Date.now();
+  let entry;
+  try {
+    await ensureEngine();
+    const context = await askContext();
+    const res = await request("POST", "/muse/fix", { stage, context, results }, ANALYZE_TIMEOUT_MS);
+    if (res.status !== 200 || !res.json) throw new UserError(`Muse couldn't answer (HTTP ${res.status}).`);
+    const done = [];
+    for (const action of res.json.actions) {
+      try { done.push({ ...action, ...(await apply(action, context.tracks)) }); }
+      catch (e) { done.push({ ...action, ok: false, text: e.message }); }
+    }
+    entry = { request: label, auto: true, reply: done.length && done.every((d) => !d.ok) ? null : res.json.reply, done, suggestions: [],
+              problems: res.json.problems || [], error: res.json.error, notes: [], at, ...(stage === "report" ? { results } : {}) };
+    noteChanges(at, done);
+  } catch (e) {
+    entry = { request: label, auto: true, reply: null, done: [], suggestions: [], problems: [], notes: [], at,
+              error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` };
+  }
+  askLog.push(entry);
+  logChanged();
+  toUI("ask_pending", { request: null });
+  return entry;
 }
 
 // ---------- Groove match (build step 9) ----------
@@ -1171,6 +1225,10 @@ async function apply(action, tracks = []) {
       return { ok: true, text: `Matched "${groove.moving.track_name}" ${groove.anchor ? `to "${groove.anchor.track_name}"` : "to the grid"}: worst hit ${r.before.max_ms ?? "?"} ms off, now ` +
                                `${r.after.max_ms ?? "?"} ms${r.in_time ? ", in time" : ""}. The new loop is on a track under it; the original is kept, muted.` };
     } catch (e) { grooveOver(e); }
+    case "fix_mix":
+      if (!lastCheck) return { ok: false, text: "Run a Mix check first, so Aria knows what to fix." };
+      serial(fixMix);   // queued: it starts once this answer is in
+      return { ok: true, text: `Fixing your whole mix next: the strongest problems, then bars ${lastCheck.start_bar} to ${lastCheck.start_bar + BARS - 1} again.` };
     case "check_again":
       if (!lastCheck) return { ok: false, text: "Run a Mix check first, then Aria can check the same bars again." };
       serial(recheck);
@@ -1228,14 +1286,15 @@ async function listDevices(trackName) {
 // A request that comes in while Muse is still on the last one waits its turn in the queue (Ian, Oct 30: dropping it
 // left the window loading for an answer that never came)
 Max.addHandler("ask", (s) => {
-  let text;
-  try { text = decode(s).text; } catch (e) { return; }
+  let text, imageId;
+  try { ({ text, image_id: imageId } = decode(s)); } catch (e) { return; }
   if (!text) return;
-  return serial(() => runAsk(text));
+  return serial(() => runAsk(text, imageId || null));
 });
 
-async function runAsk(text) {
-  toUI("ask_pending", { request: text });
+// imageId: a screenshot the page already sent to the engine (Nov 1). Muse sees it with the request.
+async function runAsk(text, imageId = null) {
+  toUI("ask_pending", { request: text, image_id: imageId });
   if (/^\/devices\b/i.test(text)) {
     try {
       const out = await listDevices(text.replace(/^\/devices\s*/i, "").trim());
@@ -1250,8 +1309,8 @@ async function runAsk(text) {
   try {
     await ensureEngine();
     const context = await askContext();
-    const res = await request("POST", "/muse/ask", { text, context }, ANALYZE_TIMEOUT_MS);
-    if (res.status !== 200 || !res.json) throw new UserError(`Muse couldn't answer (HTTP ${res.status}).`);
+    const res = await request("POST", "/muse/ask", { text, context, image_id: imageId }, ANALYZE_TIMEOUT_MS);
+    if (res.status !== 200 || !res.json) throw new UserError((res.json && res.json.detail) || `Muse couldn't answer (HTTP ${res.status}).`);
     const done = [];
     for (const action of res.json.actions) {
       // A sidechain's routing only follows its own Compressor
@@ -1264,10 +1323,10 @@ async function runAsk(text) {
     const at = Date.now();
     // Everything failed in Live: the reply would say it was done
     askLog.push({ request: text, reply: done.length && done.every((d) => !d.ok) ? null : reply, done, suggestions, guides: res.json.guides || [],
-                  problems: res.json.problems || [], error: res.json.error, notes: [], at });
+                  reads: res.json.reads || [], image_id: imageId, problems: res.json.problems || [], error: res.json.error, notes: [], at });
     noteChanges(at, done);
   } catch (e) {
-    askLog.push({ request: text, reply: null, done: [], suggestions: [], problems: [], notes: [], at: Date.now(),
+    askLog.push({ request: text, reply: null, done: [], suggestions: [], problems: [], notes: [], at: Date.now(), image_id: imageId,
                   error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` });
   } finally {
     logChanged();                                   // the answer first, then pending clears: no blink

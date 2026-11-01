@@ -3,15 +3,17 @@
 // or its own small window when popped out. Both show the same history, which the bridge saves on this Mac.
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, setAskOpen, soundName, toggleVoice, undoLast, useAria, useAriaSel, type Finding, type Guide, type GuideBand, type Suggestion } from "@/lib/aria";
+import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, screenshotUrl, sendScreenshot, setAskOpen, soundName, toggleVoice, undoLast, useAria, useAriaSel, type Finding, type FixResult, type Guide, type GuideBand, type Result, type ScreenRead, type Suggestion } from "@/lib/aria";
+import { problemsOf } from "@/lib/problems";
 import { EqCurve } from "@/components/eq-curve";
-import { BackIcon, CheckIcon, CloseIcon, MicIcon, SendIcon, UndoIcon } from "@/components/icons";
+import { BackIcon, CheckIcon, CloseIcon, ImageIcon, MicIcon, SendIcon, UndoIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
 // Starting points built from what Aria found and what's playing, so the first ask is one tap.
 // Not every song has a vocal: the reverb idea goes to whichever lead part is there.
 function starters(findings: Finding[], playing: Record<string, unknown> | null): string[] {
   const out: string[] = [];
+  if (findings.length) out.push("Fix my whole mix");
   const ringing = findings.find((f) => f.kind === "resonance" || f.kind === "harsh");
   if (ringing) out.push(`Tame the ${hz(ringing.hz!)} ${ringing.kind === "harsh" ? "harsh hits" : "ringing note"}`);
   const buried = findings.find((f) => f.kind === "masking" && f.masked !== "other");
@@ -94,6 +96,65 @@ function GuideCard({ g }: { g: Guide }) {
   );
 }
 
+/** What Muse read off the producer's screenshot, and the moves to make in it. The producer makes them. */
+function ReadCard({ r }: { r: ScreenRead }) {
+  return (
+    <div className="cp-suggest" style={{ gap: 8 }}>
+      <span className="cp-cap">In your screenshot</span>
+      <span className="cp-tile-title">{r.what}</span>
+      {r.seen.length > 0 && (
+        <ul className="m-0 grid list-none gap-1 p-0">
+          {r.seen.map((x, k) => <li key={k} className="cp-meta">{x}</li>)}
+        </ul>
+      )}
+      <ol className="m-0 grid list-none gap-1 p-0">
+        {r.steps.map((x, k) => (
+          <li key={k} className="flex items-start gap-2 text-[12px] leading-4">
+            <i className="grid size-[18px] shrink-0 place-items-center rounded-full bg-action text-[10px] font-bold not-italic text-on-action">{k + 1}</i>
+            <span className="pt-px">{x}</span>
+          </li>
+        ))}
+      </ol>
+      <span className="cp-meta">Read from your screenshot by Muse Spark. Aria can't turn third-party plugins, so you make these moves.</span>
+    </div>
+  );
+}
+
+/** How each problem's range moved after Fix my whole mix: measured by Check again, at the same loudness */
+function FixResults({ results, result }: { results: FixResult[]; result: Result | null }) {
+  const problems = result ? problemsOf(result) : [];
+  const seen = new Set<string>();
+  return (
+    <>
+      {results.map((c) => {
+        const f = result?.clarity.findings[c.index];
+        const p = f && problems.find((x) => x.findings.includes(f));
+        const name = p ? `${p.name}, ${p.where}` : c.hz_range[0] && c.hz_range[1] ? `${hz(c.hz_range[0])} to ${hz(c.hz_range[1])}` : "A problem";
+        if (seen.has(name)) return null;
+        seen.add(name);
+        const fixed = c.change_db !== null && c.change_db <= -3;
+        const moved = c.change_db === null ? "not measured" : c.change_db < 0 ? `${Math.abs(c.change_db).toFixed(1)} dB lower` : `${c.change_db.toFixed(1)} dB higher`;
+        return <Did key={c.index} ok={fixed} text={`${name}: ${moved}${fixed ? ", Fixed" : ", not enough yet"}`} />;
+      })}
+    </>
+  );
+}
+
+/** Your message, with the screenshot you sent beside it */
+function UserBubble({ text, image }: { text: string; image?: string | null }) {
+  return (
+    <div className="cp-bubble is-user" style={image ? { display: "grid", gap: 6 } : undefined}>
+      {image && <img src={screenshotUrl(image)} alt="Your screenshot" className="block max-h-[140px] w-auto max-w-full rounded-[8px] object-contain" />}
+      {text}
+    </div>
+  );
+}
+
+/** A step of Fix my whole mix: Muse working on its own, so it reads as a line, not something you said */
+function Step({ text }: { text: string }) {
+  return <span className="cp-cap" style={{ marginTop: 4 }}>{text}</span>;
+}
+
 /** The conversation: one reply per request, at most one card per suggestion, never two the same. */
 export function AskThread({ className }: { className?: string }) {
   const ask = useAriaSel((s) => s.ask), result = useAriaSel((s) => s.result), undoNext = useAriaSel((s) => s.undoNext);
@@ -129,10 +190,12 @@ export function AskThread({ className }: { className?: string }) {
         const notes = x.notes;
         return (
           <div key={i} className="cp-msgs">
-            <div className="cp-bubble is-user">{x.request}</div>
+            {x.auto ? <Step text={x.request} /> : <UserBubble text={x.request} image={x.image_id} />}
             {x.reply ? <div className="cp-bubble is-bot"><span>{x.reply}</span></div>
               : x.error ? <Did ok={false} text={x.error} /> : null}
+            {(x.reads ?? []).map((r, k) => <ReadCard key={"r" + k} r={r} />)}
             {(x.guides ?? []).map((g, k) => <GuideCard key={"g" + k} g={g} />)}
+            {x.results && <FixResults results={x.results} result={result} />}
             {x.done.map((d, k) => <Did key={k} ok={d.ok} text={d.text} undo={undoAt === `${i}d${k}`} undone={d.undone} />)}
             {/* Calls Aria skipped, so a reply never looks done when it wasn't */}
             {x.reply && (x.problems ?? []).map((p, k) => <Did key={"p" + k} ok={false} text={p} />)}
@@ -164,7 +227,7 @@ export function AskThread({ className }: { className?: string }) {
 
       {ask.pending && (
         <div className="cp-msgs">
-          <div className="cp-bubble is-user">{ask.pending}</div>
+          {ask.pendingAuto ? <Step text={ask.pending} /> : <UserBubble text={ask.pending} image={ask.pendingImage} />}
           <div className="cp-bubble is-bot" aria-label="Muse is thinking" style={{ display: "flex", gap: 4, padding: "13px 14px" }}>
             {[0, 1, 2].map((d) => <motion.i key={d} className="size-1.5 rounded-full bg-on-action" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1, repeat: Infinity, delay: d * 0.15 }} />)}
           </div>
@@ -177,8 +240,24 @@ export function AskThread({ className }: { className?: string }) {
 export function AskInput({ autoFocus }: { autoFocus?: boolean }) {
   const { ask, askFocus, voice } = useAria();
   const [text, setText] = useState("");
-  const placeholder = voice.error ?? (voice.state === "listening" ? "Listening. Tap the mic again to send."
-    : voice.state === "hearing" ? "Muse is turning that into words…" : "Ask, or tell Muse what to change");
+  // A screenshot to show Muse with the next request (Nov 1): picked, or pasted, sent to the engine right away
+  const [shot, setShot] = useState<{ id: string | null; preview: string; error?: string } | null>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const attach = async (file: Blob | null | undefined) => {
+    if (!file) return;
+    const preview = URL.createObjectURL(file);
+    setShot({ id: null, preview });
+    try { const id = await sendScreenshot(file); setShot((s) => (s?.preview === preview ? { id, preview } : s)); }
+    catch (e) { setShot((s) => (s?.preview === preview ? { id: null, preview, error: (e as Error).message } : s)); }
+  };
+  const onPaste = (e: React.ClipboardEvent) => {
+    const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith("image/"));
+    if (item) { e.preventDefault(); attach(item.getAsFile()); }
+  };
+  const ready = !!text.trim() && (!shot || !!shot.id);
+  const placeholder = shot?.error ?? voice.error ?? (voice.state === "listening" ? "Listening. Tap the mic again to send."
+    : voice.state === "hearing" ? "Muse is turning that into words…"
+    : shot ? (shot.id ? "What should Muse look for?" : "Sending the screenshot…") : "Ask, or tell Muse what to change");
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => { if (autoFocus) input.current?.focus(); }, [autoFocus, askFocus]);
   // Up and down walk through what you asked before, like a terminal (Ian, Oct 31): newest first, each request
@@ -196,14 +275,29 @@ export function AskInput({ autoFocus }: { autoFocus?: boolean }) {
     requestAnimationFrame(() => { const el = input.current; if (el) el.setSelectionRange(el.value.length, el.value.length); });
   };
   return (
-    <form className="cp-composer" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { askMuse(text); setText(""); past.current = { at: -1, draft: "" }; } }}>
-      <button type="button" className={cn("cp-icon-btn", voice.state === "listening" && "is-live")} aria-pressed={voice.state === "listening"}
-              aria-label={voice.state === "listening" ? "Send what you said" : "Talk to Muse"} title={voice.state === "listening" ? "Send what you said" : "Talk to Muse"}
-              disabled={voice.state === "hearing" || !!ask.pending} onClick={toggleVoice}><MicIcon /></button>
-      <input ref={input} value={text} onChange={(e) => { setText(e.target.value); past.current.at = -1; }} onKeyDown={recall} placeholder={placeholder} aria-label="Ask Muse"
-             className={voice.error ? "placeholder:!text-hot" : undefined} />
-      <button type="submit" className={cn("cp-icon-btn", text.trim() && "is-on")} disabled={!text.trim() || !!ask.pending} aria-label="Send"><SendIcon /></button>
-    </form>
+    <div className="grid gap-1.5">
+      {shot && (
+        <div className="flex items-center gap-2 px-1">
+          <img src={shot.preview} alt="Screenshot for Muse" className="h-10 w-auto max-w-[96px] rounded-[6px] object-cover" style={{ opacity: shot.id ? 1 : 0.5 }} />
+          <span className={cn("cp-meta", shot.error && "!text-hot")}>{shot.error ?? (shot.id ? "Muse will see this screenshot" : "Sending…")}</span>
+          <button type="button" className="cp-icon-btn" style={{ width: 24, height: 24, marginLeft: "auto" }} aria-label="Remove the screenshot" onClick={() => setShot(null)}><CloseIcon style={{ width: 11, height: 11 }} /></button>
+        </div>
+      )}
+      <form className="cp-composer" onPaste={onPaste} onSubmit={(e) => {
+        e.preventDefault();
+        if (ready) { askMuse(text, shot?.id ?? null); setText(""); setShot(null); past.current = { at: -1, draft: "" }; }
+      }}>
+        <button type="button" className={cn("cp-icon-btn", voice.state === "listening" && "is-live")} aria-pressed={voice.state === "listening"}
+                aria-label={voice.state === "listening" ? "Send what you said" : "Talk to Muse"} title={voice.state === "listening" ? "Send what you said" : "Talk to Muse"}
+                disabled={voice.state === "hearing" || !!ask.pending} onClick={toggleVoice}><MicIcon /></button>
+        <button type="button" className="cp-icon-btn" aria-label="Show Muse a screenshot" title="Show Muse a screenshot (or paste one)"
+                disabled={!!ask.pending} onClick={() => picker.current?.click()}><ImageIcon /></button>
+        <input ref={picker} type="file" accept="image/png,image/jpeg" hidden onChange={(e) => { attach(e.target.files?.[0]); e.target.value = ""; }} />
+        <input ref={input} value={text} onChange={(e) => { setText(e.target.value); past.current.at = -1; }} onKeyDown={recall} placeholder={placeholder} aria-label="Ask Muse"
+               className={voice.error || shot?.error ? "placeholder:!text-hot" : undefined} />
+        <button type="submit" className={cn("cp-icon-btn", ready && "is-on")} disabled={!ready || !!ask.pending} aria-label="Send"><SendIcon /></button>
+      </form>
+    </div>
   );
 }
 

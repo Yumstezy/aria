@@ -21,7 +21,7 @@ import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIco
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
 import { FIXED_DB, fixAgain, problemKey, send, undoLast, type Exchange, type FixState } from "@/lib/aria";
 import { onScope } from "@/lib/aria";
-import { ANALYZER_HZ, addArrangementMarkers, barsLabel, checkMix, clearReference, editArrangement, hearSong, onAnalyzer, recheck, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
+import { ANALYZER_HZ, askMuse, addArrangementMarkers, barsLabel, checkMix, clearReference, editArrangement, hearSong, onAnalyzer, recheck, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
          partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Part, type RefCompare, type Result, type SongParts } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
@@ -1024,6 +1024,8 @@ function Rise({ i, className, children }: { i: number; className?: string; child
 const amountText = (p: Problem) => (p.amount.unit.startsWith("%") ? `${p.amount.value}%` : p.amount.unit === "dB under" ? `−${p.amount.value} dB` : `${p.amount.value} dB`);
 const fixWithMuse = (p: Problem) => { fixIt(p); setAskOpen(true); };
 const fixAgainWithMuse = (p: Problem, change: number | null) => { fixAgain(p, change); setAskOpen(true); };
+// Fix my whole mix (Nov 1): Muse fixes the strongest problems, Aria checks the same bars, Muse tries again on the rest
+const fixAllWithMuse = () => { askMuse("Fix my whole mix"); setAskOpen(true); };
 
 /** To fix and done (Oct 30, Ian: fixed problems "stay in the way"): a problem Muse made a change for leaves To fix;
     one Check again found barely changed ("still") comes back. */
@@ -1062,6 +1064,7 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
             <span className="cp-cap">To fix</span>
             <span className="ae-big"><CountUp value={list.length} /></span>
             <div className="mt-2 flex flex-wrap gap-1.5">{list.map((p, i) => <button key={i} className="ae-kind" style={{ color: colorOf(p) }} title={p.name} aria-label={p.name} onClick={() => show(i)}>{iconFor(p)}</button>)}</div>
+            {list.length > 1 && <button className="cp-btn cp-btn-sm mt-auto self-start" style={{ marginTop: 10 }} onClick={fixAllWithMuse}>Fix all {list.length}</button>}
           </section>
         </Rise>
         <Rise i={1}>
