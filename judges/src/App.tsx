@@ -2,7 +2,7 @@
 // The nav and hero are the SaaS template Ian picked; the hero's picture is a drawing of Aria running in Live until
 // the demo video is in. Every number was measured on real audio and every screenshot is the app on Ian's own song,
 // loops and vocal (CLAUDE.md, "No invented data").
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { Hero, ButtonLink, ArrowRight } from "@/components/ui/saa-s-template";
 import { LiquidNavbar, type LiquidNavItem } from "@/components/ui/liquid-glass-navbar";
@@ -171,13 +171,40 @@ const GET: [string, ReactNode][] = [
 
 /* ---------- the page ---------- */
 
+// Which section you're in, for the navbar (Ian, Nov 1: "the nav bar change when u scroll depending on where ur at"):
+// the last one whose top has passed 40% of the window
+function useSectionInView(ids: string[]) {
+  const [at, setAt] = useState(0);
+  const hold = useRef(0);   // after a click, the nav stays on the pick while the page scrolls past the others
+  useEffect(() => {
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      if (performance.now() < hold.current) return;
+      const line = window.innerHeight * 0.4;
+      let i = 0;
+      ids.forEach((id, k) => { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top <= line) i = k; });
+      setAt(i);
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(check); };
+    check();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); cancelAnimationFrame(frame); };
+  }, [ids]);
+  const pick = (i: number) => { hold.current = performance.now() + 1200; setAt(i); };
+  return [at, pick] as const;
+}
+const NAV_IDS = NAV.map((n) => n.href!.slice(1));
+
 export default function App() {
+  const [navAt, setNavAt] = useSectionInView(NAV_IDS);
   return (
     <main className="min-h-screen bg-black text-white">
       <header className="fixed inset-x-0 top-0 z-50 bg-gradient-to-b from-black via-black/70 to-transparent pb-5">
         <div className="mx-auto flex max-w-[1160px] items-center gap-4 px-6 pt-4">
           <a href="#" className="flex items-center gap-2.5 text-[17px] font-semibold"><span className="mark size-[22px]" />Aria</a>
-          <div className="flex flex-1 justify-center"><LiquidNavbar tone="dark" items={NAV} /></div>
+          <div className="flex flex-1 justify-center"><LiquidNavbar tone="dark" items={NAV} active={navAt} onChange={(i) => setNavAt(i)} /></div>
           <a href={DOWNLOAD} className="hidden h-10 items-center gap-2 rounded-[10px] bg-white px-4 text-[14px] font-medium text-black sm:inline-flex">{I.download(16)}Download</a>
         </div>
       </header>

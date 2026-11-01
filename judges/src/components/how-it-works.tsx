@@ -3,8 +3,8 @@
 // Every line and number comes from real.json: Mix check on Ian's drop against a reference track (steps 1 to 3; Ian, Oct 31: call it what it is, not the song's
 // name, so Muse's summary shows [the reference track] where it named the file), and Before
 // and after on our test mix with a planted harsh boost (step 4), as the step says.
-import { useEffect, useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion, useInView } from "motion/react";
 import { cn } from "@/lib/utils";
 import real from "@/real.json";
 
@@ -149,15 +149,20 @@ const STEP_MS = 7000;
 export function HowItWorks() {
   const [at, setAt] = useState(0);
   const [auto, setAuto] = useState(true);   // steps move on by themselves until someone picks one
+  // They start at step 1 when the section scrolls into view, and wait while it's off screen (Ian, Nov 1: "this part
+  // doesn't start at one when u scroll")
+  const box = useRef<HTMLDivElement>(null);
+  const seen = useInView(box, { amount: 0.4 });
+  useEffect(() => { if (seen && auto) setAt(0); }, [seen]);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!auto) return;
+    if (!auto || !seen) return;
     const t = setTimeout(() => setAt((at + 1) % STEPS.length), STEP_MS);
     return () => clearTimeout(t);
-  }, [at, auto]);
+  }, [at, auto, seen]);
   const View = STEPS[at].view;
 
   return (
-    <div className="mt-12 grid gap-6 lg:grid-cols-[380px_1fr]">
+    <div ref={box} className="mt-12 grid gap-6 lg:grid-cols-[380px_1fr]">
       <div className="grid content-start gap-2">
         {STEPS.map((s, i) => (
           <button key={s.key} type="button" onClick={() => { setAt(i); setAuto(false); }}
@@ -166,7 +171,7 @@ export function HowItWorks() {
             <span className="font-mono text-[12px] text-faint">{i + 1} · {s.key}</span>
             <b className={cn("mt-1 block text-[19px] font-medium tracking-[-0.02em]", i !== at && "text-muted")}>{s.title}</b>
             {i === at && <p className="m-0 mt-2 text-[14.5px] leading-relaxed text-muted">{s.text}</p>}
-            {i === at && auto && (
+            {i === at && auto && seen && (
               <motion.span key={`bar${at}`} className="absolute bottom-0 left-0 h-[2px] bg-white/50" initial={{ width: "0%" }} animate={{ width: "100%" }}
                            transition={{ duration: STEP_MS / 1000, ease: "linear" }} />
             )}
