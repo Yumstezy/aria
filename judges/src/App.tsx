@@ -9,6 +9,7 @@ import { LiquidNavbar, type LiquidNavItem } from "@/components/ui/liquid-glass-n
 import { GlowCard, type Accent } from "@/components/ui/glow-card";
 import { LiveMockup } from "@/components/ui/live-mockup";
 import { HowItWorks } from "@/components/how-it-works";
+import { TryIt } from "@/components/try-it";
 import { cn } from "@/lib/utils";
 
 const GITHUB = "https://github.com/Yumstezy/aria";
@@ -113,6 +114,7 @@ function AskCard() {
 
 // The product site's liquid glass navbar (Ian, Oct 31: "take the nav bar from the first site")
 const NAV: LiquidNavItem[] = [
+  { label: "Try it", href: "#try", icon: I.speech(), fx: "pop" },
   { label: "How", href: "#how", icon: I.wave(), fx: "wave" },
   { label: "Meta AI", href: "#meta", icon: I.spark(), fx: "spin" },
   { label: "Tools", href: "#tools", icon: I.knob(), fx: "spin" },
@@ -228,6 +230,11 @@ export default function App() {
           </Rise>
         </Section>
       )}
+
+      <Section id="try" label="Try it" title="Hear Aria fix a real mix." dim="Right here, no Ableton needed."
+               sub="Ian's own house demo, 16 bars, before mixing. Press play, mute and solo the tracks, then step through what Aria found and changed, and switch between Before and After. Every step was recorded from a real run.">
+        <TryIt />
+      </Section>
 
       <Section id="how" label="How it works" title="One problem, start to finish." dim="Heard, explained, fixed, proved."
                sub="This is a real one, from Ian's own song. Aria's loop is the same for every problem it finds.">

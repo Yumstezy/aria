@@ -1,0 +1,63 @@
+{
+ "recorded": "Mix check: Aria's engine and Muse Spark on Nov 1, 2026, 3:44 PM, on the files in test-pack/sample (the same check Live runs). The steps after it are filled in from Ian's run in Live.",
+ "reference": "Finished mix (reference).wav: Ian's own finished mix of the same 16 bars",
+ "steps": [
+  {
+   "id": "check",
+   "kind": "check",
+   "label": "Mix check",
+   "ask": null,
+   "reply": "Your low mids sit fuller than the reference in these bars.",
+   "note": {
+    "short": "Low mids sound boxy and crowded",
+    "text": "Your low mids are fuller than Finished mix (reference).wav. That is +4.7 dB from 220 to 350 Hz around 310 Hz, so that area feels boxy."
+   },
+   "finding": {
+    "kind": "reference",
+    "hz": 310,
+    "hz_range": [
+     220,
+     350
+    ],
+    "diff_db": 4.7,
+    "bars": [
+     1,
+     16
+    ]
+   },
+   "bands": [
+    {
+     "name": "Sub",
+     "diff_db": -0.9
+    },
+    {
+     "name": "Bass",
+     "diff_db": -0.9
+    },
+    {
+     "name": "Low mids",
+     "diff_db": 0.9
+    },
+    {
+     "name": "Mids",
+     "diff_db": 0.5
+    },
+    {
+     "name": "Upper mids",
+     "diff_db": -0.2
+    },
+    {
+     "name": "Highs",
+     "diff_db": 1.4
+    },
+    {
+     "name": "Air",
+     "diff_db": 1.7
+    }
+   ],
+   "done": [],
+   "devices": [],
+   "audio": null
+  }
+ ]
+}
