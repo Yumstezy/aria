@@ -861,9 +861,10 @@ function volume(trackIndex, changeDb) {
   const now = displayed(fader, before);
   if (now === null) { send("volume_done", { ok: false, text: "Aria couldn't read that track's volume." }); return; }
   const target = Math.min(6, now + changeDb);
-  // Nov 1: "up 2 dB, now 5.999 dB" when it was already at the top. Say it can't go higher, so Muse tries another tool
+  // Nov 1: "up 2 dB, now 5.999 dB" when it was already at the top. +6 dB is Aria's own ceiling (Ian: nothing should go
+  // louder than that); past it, lifting the sound's own range with EQ is the better tool, so say so
   if (changeDb > 0 && target - now < 0.1) {
-    send("volume_done", { ok: false, text: "\"" + one(track, "name") + "\" is already at +6 dB, as loud as its fader goes. Cut the sounds around it instead." });
+    send("volume_done", { ok: false, text: "\"" + one(track, "name") + "\" is already at +6 dB, the most Aria raises a fader. Boost the part of it you want to hear with EQ instead." });
     return;
   }
   undoStack.push({ kind: "params", params: [{ id: Number(fader.id), value: before }], what: "volume", track: trackIndex });

@@ -386,6 +386,6 @@ Every Ask Muse and Fix my whole mix context carries `aria_eq: [{track, band, sha
 - The EQ Eight Aria adds is named "Aria EQ". Aria finds it by that name, so a reloaded set or device reuses it instead of adding another.
 - A bell or shelf within half an octave of a band Aria set, with the same shape, deepens that band (`gain` is the extra amount). It doesn't take a new band. The reply says `now -5.00 dB ... (was -3.0 dB)`, and `eq_done` carries `was`.
 - One band stops at ±6 dB. Past that, `eq_done` is `ok: false` and says to turn the track down or change the other sound. Muse's prompt says the same: when a sound needs more than about 6 dB less, use `track_volume`, a `low_cut`, or cut the other sound.
-- `track_volume` past the fader's +6 dB is `ok: false` too, instead of reporting a move that didn't happen.
+- `track_volume` never takes a fader past +6 dB, Aria's own ceiling (Ian: nothing should be louder). There it's `ok: false` and says to boost the part you want with EQ. For a buried sound Muse lifts that track's own range with `track_eq` (bell +2 dB) before raising the whole track.
 
 `POST /muse/fix` returns `{reply, actions, problems, error}`; each `results` item gets `fixed` (change_db <= -3) before Muse sees it. Each step is an exchange with `auto: true` and the step's label as `request`; the report's exchange carries `results`, which the chat shows as one line per problem.

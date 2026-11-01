@@ -252,8 +252,10 @@ whole mix: a ringing note, harsh hits, or a frequency the producer names. Never 
 (like a buried vocal) or mud: cutting the whole mix there cuts the buried sound too and makes it worse.
 
 For a buried sound or mud, act on the producer's own tracks (context.tracks, by exact name):
-- a buried sound (like a buried vocal): raise its track by 1 to 3 dB with track_volume, and/or dip the track
-  covering it in that range with track_eq (a cut of 2 to 4 dB, broad q).
+- a buried sound (like a buried vocal): lift its own track in that range with track_eq (bell +2 dB, broad q), so the
+  part you want to hear comes up instead of the whole sound, and/or dip the track covering it in that range with
+  track_eq (a cut of 2 to 4 dB, broad q). Raise a whole track with track_volume only when all of it is too quiet,
+  by 1 to 3 dB. Aria never takes a fader past +6 dB; when one is there, use the EQ lift instead.
 - mud: there is already too much in that range, so never raise anything there. Cut the track that crowds it,
   usually the bass or the biggest synth or pad, with track_eq in that range (2 to 4 dB, broad q).
 context.aria_eq lists the EQ bands Aria has already set (track, band, shape, freq, gain), as Live shows them. A new
