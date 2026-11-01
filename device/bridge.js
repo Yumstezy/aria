@@ -235,14 +235,14 @@ process.on("unhandledRejection", stray);
 
 const REMOTE = { host: "127.0.0.1", port: Number(process.env.ARIA_REMOTE_PORT) || 8766 };   // tests use another port
 const REMOTE_TIMEOUT_MS = 8000;
-const REMOTE_OFF = "To add Ears for you, Aria's helper has to be on: in Live, Settings > Link, Tempo & MIDI > Control Surface, pick Aria.";
+const REMOTE_OFF = "To add Ears and Aria's racks, Aria's helper has to be on: in Live, Settings > Link, Tempo & MIDI > Control Surface, pick Aria.";
 
 function remote(cmd) {
   return new Promise((resolve, reject) => {
     const sock = net.createConnection(REMOTE);
     let buf = "";
     const fail = (text) => { sock.destroy(); reject(new UserError(text)); };
-    sock.setTimeout(REMOTE_TIMEOUT_MS, () => fail("Live took too long to add the Ear."));
+    sock.setTimeout(REMOTE_TIMEOUT_MS, () => fail("Live took too long to add it."));
     sock.on("error", () => fail(REMOTE_OFF));
     sock.on("connect", () => sock.write(JSON.stringify(cmd) + "\n"));
     sock.on("data", (d) => {
@@ -1200,7 +1200,15 @@ async function apply(action, tracks = []) {
       return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track), a.shape || "bell", a.steep ? 1 : 0, a.mode || "aria");
     case "track_device":
       return await askLive("device", "device_done", trackIndex(a.track), encodeURIComponent(a.device), encodeURIComponent(JSON.stringify(a.settings || [])),
-                           0, a.mode === "change" ? "change" : "add");
+                           0, a.mode === "change" ? "change" : "add", encodeURIComponent(a.label || ""));
+    // One of Aria's racks (Nov 1): Aria's helper loads it from the User Library, then live.js sets its macros
+    case "aria_rack": {
+      const index = trackIndex(a.track);
+      const r = await remote({ cmd: "load_rack", track: index, name: a.rack });
+      if (!r.ok) return { ok: false, text: r.text || `Live didn't add ${a.rack}.` };
+      const macros = (a.macros || []).map((m) => ({ param: m.name, percent: m.value }));
+      return await askLive("device", "device_done", index, encodeURIComponent(a.rack), encodeURIComponent(JSON.stringify(macros)), 1, "rack");
+    }
     case "route_sidechain":
       return await askLive("route_sidechain", "route_done", trackIndex(a.track), encodeURIComponent(a.from_track));
     case "delete_marker":

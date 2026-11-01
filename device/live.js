@@ -685,10 +685,21 @@ function findPlugin(track, name) {
 // addedFlag is 1 when the bridge just had Live load this plugin, so Undo removes it.
 // mode "add" puts on a new device even when the track has one (the producer's own is never touched);
 // "change" changes the one Aria added, else the last one of that kind.
-function device(trackIndex, nameText, settingsText, addedFlag, mode) {
+function device(trackIndex, nameText, settingsText, addedFlag, mode, labelText) {
   const name = decodeURIComponent(String(nameText));
   const settings = JSON.parse(decodeURIComponent(settingsText || "%5B%5D"));
+  const label = labelText ? decodeURIComponent(String(labelText)) : "";
   const track = trackAt(trackIndex);
+  // One of Aria's racks, just loaded by Aria's helper under its Aria name: the newest device with that name
+  if (mode === "rack") {
+    const devs = ids(track.get("devices"));
+    for (let i = devs.length - 1; i >= 0; i--) {
+      const d = new LiveAPI("id " + devs[i]);
+      if (String(one(d, "name")) === name) { applyDevice(d, true, trackIndex, name, settings); return; }
+    }
+    send("device_done", { ok: false, text: name + " didn't show up on that track." });
+    return;
+  }
   if (!STOCK[name]) {
     const plug = findPlugin(track, name);
     if (!plug) { send("device_done", { ok: false, missing: true, text: name + " isn't on that track." }); return; }
@@ -698,7 +709,7 @@ function device(trackIndex, nameText, settingsText, addedFlag, mode) {
   const found = mode === "add" ? null : findStock(track, name);
   if (found) { applyDevice(found, false, trackIndex, name, settings); return; }
   pendingDevice = { index: trackIndex, name: name, settings: settings, tries: (INSERT_AS[name] || [name]).slice(),
-                    before: ids(track.get("devices")) };
+                    before: ids(track.get("devices")), label: label };
   insertNext();
 }
 
@@ -720,6 +731,8 @@ function device_continue() {
   if (!found && p.tries.length) { insertNext(); return; }
   pendingDevice = null;
   if (!found) { send("device_done", { ok: false, text: "Aria couldn't add a " + p.name + ". Put one on that track, then ask again." }); return; }
+  // Ian, Nov 1: what Aria adds is named "Aria <what it does>", so the producer knows it's Aria's
+  try { found.set("name", p.label || (p.name === "EQ Eight" ? ARIA_EQ : "Aria " + p.name)); } catch (e) { post("Couldn't name the " + p.name + ": " + e + "\n"); }
   applyDevice(found, true, p.index, p.name, p.settings);
 }
 
@@ -765,7 +778,10 @@ function applyDevice(dev, added, index, name, settings, top) {
     if (!m) { missed.push(st.param); return; }
     const p = m.api, before = one(p, "value");
     keep.push({ id: Number(p.id), value: before });
-    if (one(p, "is_quantized") === 1) {
+    if (st.percent !== undefined) {   // a rack's macro: percent of its travel (Live's 0 to 127)
+      const lo = one(p, "min"), hi = one(p, "max");
+      p.set("value", lo + (hi - lo) * Math.max(0, Math.min(100, Number(st.percent))) / 100);
+    } else if (one(p, "is_quantized") === 1) {
       const v = menuValue(p, st);
       if (v < 0) { keep.pop(); missed.push(st.param + " " + (st.option || st.value)); return; }
       p.set("value", v);

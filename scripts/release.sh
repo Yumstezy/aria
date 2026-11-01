@@ -10,7 +10,7 @@ OUT=release/Aria-mac.zip
 rm -f "$OUT"
 git archive --format=zip --prefix=Aria/ -o "$OUT" HEAD -- \
   "Install Aria.command" install.sh \
-  "device/Aria.amxd" "device/Aria Ear.amxd" device/bridge.js device/live.js device/scope.js device/ear.js device/remote \
+  "device/Aria.amxd" "device/Aria Ear.amxd" device/bridge.js device/live.js device/scope.js device/ear.js device/racks device/remote \
   ui/dist \
   engine/aria_engine engine/requirements.txt engine/requirements-split.txt engine/run.sh engine/.env.example
 # The install guide, as "Read me first.txt" at the top of the folder (Ian, Nov 1: the zip's readme should be simple

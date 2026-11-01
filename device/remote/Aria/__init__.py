@@ -3,6 +3,7 @@ each key track, which only the browser can do (Live's API inserts only Live's ow
 plugins is on hold: Aria shows how they should look instead (engine/aria_engine/guides.py).
 
   {"cmd": "load_ear", "track": 3}  -> {"ok": true, "name": "Aria Ear", "index": 2}
+  {"cmd": "load_rack", "track": 3, "name": "Aria Kick Mix"}  -> the same, for one of Aria's racks (Nov 1)
 
 
 Max for Live can't reach Live's browser, so it can't add a third-party plugin. A Remote Script can:
@@ -131,6 +132,14 @@ class Aria(ControlSurface):
                 self._reply(c, {"ok": False, "missing": True, "text": "Aria Ear isn't in the User Library. Run install.sh again."})
             else:
                 self._load(c, int(msg.get("track", -1)), "Aria Ear", ear)
+        elif cmd == "load_rack":
+            # Aria's racks (Nov 1): Ian's racks of stock devices, installed in the User Library as "Aria <name>"
+            name = str(msg.get("name", ""))
+            rack = self._user_item(name)
+            if not rack:
+                self._reply(c, {"ok": False, "missing": True, "text": "%s isn't in the User Library. Run install.sh again." % name})
+            else:
+                self._load(c, int(msg.get("track", -1)), name, rack)
         elif cmd == "load":
             self._load(c, int(msg.get("track", -1)), str(msg.get("name", "")))
         else:
@@ -161,7 +170,8 @@ class Aria(ControlSurface):
         return self._plugins
 
     def _user_item(self, name):
-        """A device in the User Library's Presets folder by name ("Aria Ear" finds "Aria Ear.amxd"), or None."""
+        """A device in the User Library's Presets folder by name ("Aria Ear" finds "Aria Ear.amxd", "Aria Kick Mix" finds
+        "Aria Kick Mix.adg"), or None."""
         want = key(name)
         try:
             presets = [c for c in self.application().browser.user_library.children if key(c.name) == "presets"]
@@ -170,7 +180,7 @@ class Aria(ControlSurface):
 
         def walk(item, depth):
             for child in item.children:
-                base = child.name[:-5] if child.name.lower().endswith(".amxd") else child.name
+                base = child.name.rsplit(".", 1)[0] if child.name.lower().endswith((".amxd", ".adg", ".adv")) else child.name
                 if child.is_loadable and key(base) == want:
                     return child
                 if depth < 5 and not child.is_loadable:

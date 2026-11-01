@@ -10,7 +10,7 @@ import re
 
 from openai import OpenAI, OpenAIError
 
-from aria_engine import guides
+from aria_engine import guides, racks
 
 TIMEOUT_SEC = 20
 MAX_TOKENS = 1200
@@ -165,6 +165,17 @@ TOOLS = [
             "from_track": {"type": "string", "description": "The track it listens to, usually the kick (exact name)."},
             "amount": {"type": "string", "enum": ["light", "medium", "heavy"], "description": "How much it ducks. Default medium."}},
             "required": ["track", "from_track"]}}},
+    {"type": "function", "function": {
+        "name": "aria_rack", "description": "Load one of Aria's racks (Ian's racks of Live's stock devices, listed in the prompt) onto a "
+                                            "track or Main, and set its macros. It shows in Live under its Aria name.",
+        "parameters": {"type": "object", "properties": {
+            "track": {"type": "string", "description": "Exact track name from context.tracks, or Main."},
+            "rack": {"type": "string", "enum": list(racks.RACKS)},
+            "macros": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
+                "name": {"type": "string", "description": "The macro's name, as listed for that rack."},
+                "value": {"type": "number", "minimum": 0, "maximum": 100, "description": "Percent of the macro's travel."}},
+                "required": ["name", "value"]}}},
+            "required": ["track", "rack"]}}},
     # Groove match, vocal sync, Before and after and Arrangement, asked for in words (Oct 31)
     {"type": "function", "function": {
         "name": "vocal_sync", "description": "Put a vocal or acapella on the song's beat: Aria reads its original tempo and key, puts its beat 1 "
@@ -276,6 +287,31 @@ Other effects use Live's stock devices, which every producer has, with track_dev
 {STOCK_LINES}
 "Add" or "put on" a device means a new one (mode add), even if the track already has one: never change the
 producer's own device unless they ask to change it (mode change). context.tracks lists each track's devices.
+Pick the tool that fits the problem, the way a mix engineer would. EQ is one tool of many:
+- Kick or drums clash with the bass (a clash finding between them, at any frequency): always sidechain the bass,
+  from the kick track if there is one, else from the drums track, so the bass ducks on every hit (amount medium;
+  heavy for hard dance). This is what Kickstart-style ducking does. Never fix this clash with EQ alone; a 2 to 3 dB
+  cut on the bass in the clash range may come with the sidechain, as a second fix.
+- Two other sounds clash in one range: cut the less important one there (track_eq, 2 to 4 dB, broad q), or
+  sidechain it lightly to the important one when they hit together (a pad under a vocal or a lead).
+- Mud (too much around 200 to 500 Hz): low_cut the tracks that don't need lows (synths, pads, keys, vocals, hats,
+  FX; 100 to 200 Hz, gentle) before cutting the bass. A cut removes what's in the way; a bell only turns it down.
+- Low end smeared or wide: Utility Bass Mono On with Bass Freq 120 Hz on the bass or Main.
+- Harsh only on some hits (a harsh finding on a few bars): Multiband Dynamics on that track (Above Threshold High
+  -20 dB, Above Ratio High 3) so it only pulls down when it gets harsh. Harsh all the time: a bell cut.
+- A ringing note: notch or a narrow bell (q 6 to 8) at its frequency.
+- A buried sound: lift its own range with track_eq, and duck what covers it with a light sidechain or a cut there.
+- Drums or a kick that don't punch through: Aria Kick Mix, Aria Kick Enhance or Aria Punch Through on the kick or
+  drums track, or Drum Buss (Transients up). Uneven hits: Aria Kick Glue or a Compressor.
+- A thin or unsteady bass: Aria Bass Thicken (Aria Wide Bass when it should spread up top but stay centered low).
+- A synth that needs cleaning up: Aria Synth FX with Low Cut and Compress (leave its effects at 0 unless asked).
+In one Fix my whole mix, use the tool each problem calls for, not the same one for all of them.
+
+Aria's racks (Ian's own, built from Live's stock devices; load them with aria_rack, set macros 0 to 100):
+""" + racks.lines() + """
+Use a rack when it does the job better than one device. The effect racks (Aria Transition Wash, Fake Out, Endless
+Smile, Bass FX and the like) only when the producer asks for that effect.
+
 Everyday starting points when they give no numbers (say what you used):
 - compress a vocal: Compressor Threshold -18 dB, Ratio 3, Attack 10 ms, Release 100 ms
 - glue the drums or the mix: Glue Compressor Threshold -15 dB, Ratio 2, Attack 10 ms, Makeup 2 dB
@@ -330,8 +366,8 @@ Every change Aria makes (EQ, volume, devices) is on the track for the whole song
 listened to. Never say a change is limited to some bars ("in bars 55 to 70"); say what changes on which track.
 A "suggest" waits for their yes, so offer it ("I can add air with EQ Eight instead"), never say it's done or happening.
 
-Reply in one or two short sentences. No emojis, no em dashes.""".replace(
-    "{STOCK_LINES}", "\n".join(f"- {name}: {knobs}" for name, knobs in STOCK.items()))
+Reply in one or two short sentences. No emojis, no em dashes."""
+PROMPT = PROMPT.replace("{STOCK_LINES}", "\n".join(f"- {name}: {knobs}" for name, knobs in STOCK.items()))
 
 
 def _numbers(text):
@@ -509,7 +545,7 @@ def sidechain_steps(args, tracks):
     threshold = DUCK.get(args.get("amount") or "medium", DUCK["medium"])
     settings = [{"param": "S/C On", "option": "On"}, {"param": "Threshold", "value": threshold}, {"param": "Ratio", "value": 4.0},
                 {"param": "Attack", "value": 1.0}, {"param": "Release", "value": 150.0}]
-    return [{"type": "track_device", "args": {"track": track, "device": "Compressor", "settings": settings, "mode": "add"}},   # its own, never theirs
+    return [{"type": "track_device", "args": {"track": track, "device": "Compressor", "settings": settings, "mode": "add", "label": "Aria Sidechain"}},   # its own, never theirs
             {"type": "route_sidechain", "args": {"track": track, "from_track": source}}]
 
 
@@ -740,6 +776,14 @@ def _one_call(name, args, context, request, tracks, plugins, actions, suggestion
             dropped += 1
             problems.append(why_dropped(str(args.get("action")), args.get("args"), tracks, plugins))
         return dropped
+    if name == "aria_rack":
+        cleaned = racks.check(args, tracks, match_track)
+        if cleaned:
+            actions.append({"type": "aria_rack", "args": cleaned})
+        else:
+            dropped += 1
+            problems.append(f'Aria has no rack called "{args.get("rack")}" or no track called "{args.get("track")}", or a macro it doesn\'t have.')
+        return dropped
     if name == "sidechain":
         steps = sidechain_steps(args, tracks)
         if steps:
@@ -897,14 +941,17 @@ def ask(request, context, client=None, image=None):
 # call, and the fixes go through the same checks and limits as any Ask Muse request.
 FIXED_DB = -3.0          # 3 dB or more lower in its range, at the same loudness, is Fixed (the same rule as the screens)
 FIX_MAX = 4              # fixes in the first round, strongest problems first
-FIX_TOOLS = [t for t in TOOLS if t["function"]["name"] in ("eq_band", "track_volume", "track_eq", "track_device")]
+FIX_KINDS = ("eq_band", "track_volume", "track_eq", "track_device", "sidechain", "aria_rack")
+FIX_TOOLS = [t for t in TOOLS if t["function"]["name"] in FIX_KINDS]
+FIX_ACTIONS = ("eq_band", "track_volume", "track_eq", "track_device", "route_sidechain", "aria_rack")   # sidechain is two steps
 FIX_STAGES = ("fix", "report")
 
 FIX_PROMPT = PROMPT + """
 
 You are running "Fix my whole mix". The producer asked for it, so your fixes happen right away, with Undo.
 stage "fix": fix the strongest problems in context.findings, at most """ + str(FIX_MAX) + """, one fix per problem, strongest first,
-using the rules above (buried sounds and mud on the producer's own tracks, ringing notes and harsh hits on Main).
+using the rules above: the tool each problem calls for (sidechain, cuts, Multiband Dynamics, Utility, Aria's racks,
+EQ), on the producer's own tracks, and Main only for ringing notes and harsh hits in the whole mix.
 If context.aria_eq shows Aria already cut a problem's range, this is another try: add a little more there (only the
 extra amount), or use another tool if that band is at -6 dB. Reply in one short sentence on what you changed.
 stage "report": call no tools. In two short sentences, tell the producer how it went: which problems are Fixed and
@@ -936,7 +983,7 @@ def fix_round(stage, context, results=None, client=None):
         return {"reply": None, "actions": [], "problems": [], "error": "Muse Spark returned an empty reply."}
     out = interpret(res.choices[0].message, context, request)
     # Only fixes run here: anything else Muse called (it shouldn't) is dropped
-    actions = [a for a in out["actions"] if a["type"] in ("eq_band", "track_volume", "track_eq", "track_device")][:FIX_MAX]
+    actions = [a for a in out["actions"] if a["type"] in FIX_ACTIONS][:2 * FIX_MAX]
     if stage == "report":
         actions = []
     print(f"fix {stage}: actions={actions} problems={out['problems']} reply={out['reply']!r}", flush=True)

@@ -101,3 +101,33 @@ def test_muse_sees_the_bands_aria_already_set_and_there_is_one_round():
     assert json.loads(seen[0]["messages"][1]["content"])["context"]["aria_eq"] == bands
     assert "context.aria_eq" in seen[0]["messages"][0]["content"]
     assert "Unknown stage" in ask.fix_round("retry", CONTEXT, client=client_for("x"))["error"]
+
+
+def test_fix_all_can_sidechain_and_load_arias_racks():
+    tools = [t["function"]["name"] for t in ask.FIX_TOOLS]
+    assert "sidechain" in tools and "aria_rack" in tools
+    ctx = {**CONTEXT, "tracks": [{"name": "KICK"}, {"name": "BASS"}, {"name": "VOCAL"}]}
+    out = ask.fix_round("fix", ctx, client=client_for(
+        "Ducked the bass under the kick and gave the kick more punch.",
+        call("sidechain", track="BASS", from_track="KICK"),
+        call("aria_rack", track="KICK", rack="Aria Kick Mix", macros=[{"name": "GLUE", "value": 40}, {"name": "cut boxy", "value": 50}])))
+    assert [a["type"] for a in out["actions"]] == ["track_device", "route_sidechain", "aria_rack"]
+    assert out["actions"][0]["args"]["label"] == "Aria Sidechain"
+    assert out["actions"][2]["args"] == {"track": "KICK", "rack": "Aria Kick Mix",
+                                         "macros": [{"name": "GLUE", "value": 40.0}, {"name": "CUT BOXY", "value": 50.0}]}
+
+
+def test_a_rack_or_macro_aria_doesnt_have_is_dropped():
+    tracks = {**CONTEXT, "tracks": [{"name": "KICK"}]}
+    for bad in ({"rack": "Aria Nope"}, {"rack": "Aria Kick Mix", "macros": [{"name": "Volume", "value": 50}]},
+                {"rack": "Aria Kick Mix", "macros": [{"name": "GLUE", "value": 140}]}):
+        out = ask.ask("punch up the kick", tracks, client=client_for("", call("aria_rack", track="KICK", **bad)))
+        assert out["actions"] == [] and out["dropped"] == 1
+
+
+def test_every_rack_file_is_in_the_catalog():
+    from pathlib import Path
+    from aria_engine import racks
+    files = {p.stem for p in (Path(__file__).resolve().parents[2] / "device" / "racks").glob("*.ad[gv]")}
+    assert files == set(racks.RACKS)
+    assert all(f"- {name}: " in ask.PROMPT for name in racks.RACKS)

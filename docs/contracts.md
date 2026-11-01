@@ -379,6 +379,19 @@ Muse answers with `screenshot_steps {what, seen: [text], steps: [text]}` (what t
 
 Pressing it again is the next try. It builds on the first because of how Aria's EQ works (Nov 1, below).
 
+### Aria's racks, the full toolbox in Fix all, and Aria names (Nov 1)
+
+- `aria_rack {track, rack, macros: [{name, value}]}`: one of Ian's racks, built only from Live's stock devices. The catalog is `engine/aria_engine/racks.py`, the files are in `device/racks/` and the copier is `device/tools/make_aria_racks.py`. Each catalog entry says what the rack does and what each macro moves, read from the macro mappings in the files. `value` is 0 to 100, a percent of the macro's travel. The engine checks that the rack and each macro name exist.
+- The bridge sends Aria's helper `{"cmd": "load_rack", "track", "name"}` (port 8766), which loads it from the User Library. install.sh copies the racks to Presets > Audio Effects > Audio Effect Rack > Aria. Then live.js `device <track> <name> <macros> 1 rack` finds the newest device with that name and sets the macros (`{param, percent}`). Undo removes the rack.
+- Fix my whole mix can now use `sidechain` and `aria_rack` too, beside the EQ tools, `track_volume` and `track_device`. Muse's prompt has a playbook that picks the tool by problem:
+  - kick or drums vs bass: always a sidechain
+  - mud: low cuts first
+  - harsh only on some hits: Multiband Dynamics
+  - ringing: a notch
+  - a buried sound: an EQ lift plus a light duck or cut on what covers it
+  - punch, thin bass or a messy synth: Aria's racks
+- Names: what Aria adds is "Aria <what it does>". The racks carry their Aria name inside the file. A stock device Aria adds is renamed "Aria <device>", or by its label (`track_device` `label`, e.g. "Aria Sidechain"). An EQ Eight is "Aria EQ".
+
 ### The EQ bands Aria already set (Nov 1)
 
 Every Ask Muse and Fix my whole mix context carries `aria_eq: [{track, band, shape, freq, gain, q}]`, read from Live by `aria_eqs` → `aria_eqs {bands}` (Main is `"Main"`, tracks by name, values as Live shows them; bands that are off or flat are left out).

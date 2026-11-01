@@ -4,6 +4,19 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 1, later: the full toolbox, and Ian's racks as Aria's racks.** Ian: Fix all only ever used EQ (it could only reach the EQ tools, volume and one device, and its prompt said EQ). Now:
+- Fix all can also sidechain and load Aria's racks. Muse's prompt picks the tool by problem (see contracts).
+- Real Muse, 4 runs on drums vs bass, mud and harsh hits: every run sidechained BASS to KICK, low-cut the pad and put Multiband Dynamics on Main. Asked "my kick doesn't punch through" it loaded Aria Punch Through; "make my bass thicker" got Aria Bass Thicken.
+- Ian's 26 racks (his own work, only stock devices) are in `device/racks/` as "Aria <what it does>". Each catalog entry says what every macro moves. install.sh and the release copy them into the User Library. They're already in Ian's User Library, and his Live helper is updated.
+- Everything Aria adds gets an Aria name ("Aria Sidechain", "Aria Compressor", "Aria EQ").
+- 165 engine tests pass.
+- Manual checks for Ian:
+  1. Quit and reopen Live. The helper is only read at startup, and Control Surface must be Aria.
+  2. In the browser: User Library > Presets > Audio Effects > Audio Effect Rack > Aria lists 26 Aria racks. Drag one onto a track to check it loads and is titled with its Aria name.
+  3. Remove and add Aria. Ask "my kick doesn't punch through the mix". Aria Punch Through loads on the kick track, and Undo removes it.
+  4. Ask "sidechain the bass to the kick". The new Compressor's title should read "Aria Sidechain". If it still says "Compressor", Live doesn't let code rename devices; tell me and I'll drop the renaming.
+  5. Run a Mix check with a drums and bass clash, then Fix all. Expect a sidechain on the bass and a mix of other tools, not only EQ.
+
 **Nov 1, afternoon: Fix my whole mix after Ian's first runs in Live.** Ian found three things.
 - It played the 16 bars twice. That was the retry round, so it's gone: one fix round, one replay, then the report. Pressing Fix all again is the next try.
 - Every ask stacked new bells (five -3 dB bells at one frequency dug a -15 dB hole, and some asks added a whole new EQ Eight). Aria's list of the EQs it added was lost each time live.js reloaded. Now:

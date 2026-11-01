@@ -60,6 +60,12 @@ for f in "Aria.amxd" "Aria Ear.amxd" bridge.js live.js scope.js ear.js; do
 done
 echo "Aria and Aria Ear are in Live's browser: User Library > Presets > Audio Effects > Max Audio Effect > Aria"
 
+# Aria's racks (Nov 1): Ian's racks of Live's stock devices, as "Aria <what it does>". Aria's helper loads them by name.
+RACKS="$UL/Presets/Audio Effects/Audio Effect Rack/Aria"
+mkdir -p "$RACKS"
+cp "$REPO/device/racks/"*.ad[gv] "$RACKS/"
+echo "Aria's racks are in Live's browser: User Library > Presets > Audio Effects > Audio Effect Rack > Aria"
+
 # Where this folder is, for the bridge (it finds the engine and the screens from here)
 mkdir -p "$HOME/Library/Application Support/Aria"
 printf '{"repo": "%s"}\n' "$REPO" > "$HOME/Library/Application Support/Aria/install.json"
