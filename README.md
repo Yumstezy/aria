@@ -85,10 +85,11 @@ Meta's models do the work you see, in every screen. Not a chat box on the side.
 | Model | What it does in Aria |
 |---|---|
 | **Muse Spark** `muse-spark-1.3` | Turns the engine's measurements into plain advice and a concrete fix, as JSON that Aria validates. It only ever sees measured numbers. |
-| | **Drives Live through tool calling: 21 actions.** EQ, volume, 20 stock devices, sidechain, markers and sections, tempo, mute, solo, plugin guides, groove match, vocal sync, Check again, hearing the song, Undo. |
+| | **Drives Live through tool calling: 24 tools.** EQ, volume, 20 stock devices, 26 custom racks, sidechain, markers and sections, tempo, mute, solo, plugin guides, groove match, vocal sync, Check again, hearing the song, Undo. |
+| | **Picks the right tool, like a mix engineer.** Drums fighting the bass get a sidechain, mud gets low cuts, harsh hits that come and go get Multiband Dynamics, a weak kick gets a punch rack. It knows each stock device's knobs and what every macro on Aria's racks moves. |
 | | **Asks instead of guessing.** A real reply from testing: *"Which vocal track do you mean, VOCAL TEST or Vox 2?"* |
 | | **Names the parts of a song** (Intro, Build, Drop, Break, Outro) from their measured loudness and shape. |
-| | **Fixes the whole mix, then checks its own work.** "Fix my whole mix": Muse fixes the strongest problems, Aria plays the same bars again and measures each one, Muse tries once more on what didn't move, then reports what's Fixed, from the measurements only. |
+| | **Fixes the whole mix, then checks its own work.** "Fix my whole mix": Muse fixes the strongest problems with whatever each one needs, Aria plays the same bars again and measures each one, then Muse reports what's Fixed, from the measurements only. Press it again and it builds on its own changes instead of stacking new ones. |
 | | **Looks at your screen.** Attach a screenshot of any plugin and Muse reads its settings and says exactly what to change. On a test shot of EQ Eight it read *band 4, 3.62 kHz, -3.50 dB, Q 6.00* and tied it to the harsh spot Aria had measured. |
 | **Muse Voice Transcribe** `muse-voice-transcribe-1.0` | Hold the mapped key and say it. *"Cut the mud on the bass"* came back as text in 1.4 s, then ran like a typed request. |
 | **Audiobox Aesthetics** | Scored all 99 rated mixes as a feature for the mix model. A side experiment, [reported honestly](#what-didnt-work): it didn't beat loudness, so it didn't ship. |
@@ -125,6 +126,8 @@ Records 16 bars of your Main track, splits it into its parts, and finds what cla
 ### Ask Muse
 
 Type or say what you want. *"Make the drums crispier." "Sync my vocal to the kick." "Tighten the bongo to the kick at 70%."* It happens right away, each change with Undo. Anything Muse suggests on its own waits for a yes.
+
+Aria comes with 26 custom racks built from Live's stock devices, for kicks, bass, synths, space and transitions. *"My kick doesn't punch through"* loads Aria Punch Through. Everything Aria adds is named for what it does, like Aria Sidechain, so you can tell it apart from your own devices.
 
 *Real requests from testing, typos and all, with what Aria did in green.*
 
