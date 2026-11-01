@@ -232,7 +232,7 @@ export default function App() {
       )}
 
       <Section id="try" label="Try it" title="Hear Aria fix a real mix." dim="Right here, no Ableton needed."
-               sub="Ian's own house demo, 16 bars, before mixing. Press play, mute and solo the tracks, then step through what Aria found and changed, and switch between Before and After. Every step was recorded from a real run.">
+               sub="Ian's own house demo, 16 bars, before mixing. Press Check mix, then Fix all, then ask Muse for more in the chat, and flip Before and After to hear what changed. Mute and solo any track. It replays a real run in Live, step by step.">
         <TryIt />
       </Section>
 
