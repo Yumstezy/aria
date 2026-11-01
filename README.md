@@ -215,6 +215,10 @@ Found by using Aria on real songs inside Live, every day of the build.
 
 You need a Mac, **Ableton Live 12 Suite** (Max for Live) and **Python 3.11** (`brew install python@3.11`).
 
+**Download:** get [Aria-mac.zip](https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip) from the [latest release](https://github.com/Yumstezy/aria/releases/latest). Unzip it, move the Aria folder where it will stay (Live's browser links to it), and double-click **Install Aria**. The first time, macOS may block it because it came from the internet: right-click it and choose Open. It runs the same script as below and opens `engine/.env` for your key.
+
+**Or from the code:**
+
 ```sh
 git clone https://github.com/Yumstezy/aria
 cd aria

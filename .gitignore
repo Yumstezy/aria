@@ -28,3 +28,6 @@ test-pack/mixes/
 # Website build tooling (site/dist is built by Vercel)
 site/node_modules/
 site/dist/
+
+# The release zip (scripts/release.sh), uploaded to GitHub releases, not committed
+release/

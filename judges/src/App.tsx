@@ -4,7 +4,8 @@
 // loops and vocal (CLAUDE.md, "No invented data").
 import { useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { Navigation, Hero, ButtonLink, ArrowRight, type NavLink } from "@/components/ui/saa-s-template";
+import { Hero, ButtonLink, ArrowRight } from "@/components/ui/saa-s-template";
+import { LiquidNavbar, type LiquidNavItem } from "@/components/ui/liquid-glass-navbar";
 import { GlowCard, type Accent } from "@/components/ui/glow-card";
 import { LiveMockup } from "@/components/ui/live-mockup";
 import { HowItWorks } from "@/components/how-it-works";
@@ -12,6 +13,9 @@ import { cn } from "@/lib/utils";
 
 const GITHUB = "https://github.com/Yumstezy/aria";
 const PRODUCT = "https://aria-sigma-gilt.vercel.app";
+// The newest release's zip on GitHub: the devices, the engine and a double-click installer (scripts/release.sh makes it)
+const DOWNLOAD = "https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip";
+const RELEASES = "https://github.com/Yumstezy/aria/releases/latest";
 // The demo video, when Ian has recorded it: a file in public/ (like "/demo.mp4"). The section shows only once it's set.
 const DEMO_VIDEO: string | null = null;
 
@@ -24,6 +28,11 @@ const I = {
   mic: (s?: number) => svg(<><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>, s),
   check: (s?: number) => svg(<path d="M5 12.5l4.5 4.5L19 7" />, s),
   speech: (s?: number) => svg(<path d="M5 5h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-4 3v-3H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z" />, s),
+  wave: (s?: number) => svg(<path d="M3 15c3 0 3-7 6-7s3 9 6 9 3-6 6-6" />, s),
+  knob: (s?: number) => svg(<><circle cx="12" cy="12" r="7" /><path d="M12 12 15.5 8.5" /></>, s),
+  split: (s?: number) => svg(<path d="M4 6h6l4 6-4 6H4M20 6h-4M20 18h-4M14 12h6" />, s),
+  user: (s?: number) => svg(<><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>, s),
+  download: (s?: number) => svg(<path d="M12 4v11M7 10l5 5 5-5M5 20h14" />, s),
   github: (s?: number) => svg(<path d="M9 19c-4 1.5-4-2-6-2.5m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.8 2.7 5.8 3 5.8 3a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.4 9.4c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21" />, s),
 };
 
@@ -102,12 +111,13 @@ function AskCard() {
 
 /* ---------- content ---------- */
 
-const NAV: NavLink[] = [
-  { label: "How it works", href: "#how" },
-  { label: "Meta AI", href: "#meta" },
-  { label: "Tools", href: "#tools" },
-  { label: "Build", href: "#build" },
-  { label: "Team", href: "#team" },
+// The product site's liquid glass navbar (Ian, Oct 31: "take the nav bar from the first site")
+const NAV: LiquidNavItem[] = [
+  { label: "How", href: "#how", icon: I.wave(), fx: "wave" },
+  { label: "Meta AI", href: "#meta", icon: I.spark(), fx: "spin" },
+  { label: "Tools", href: "#tools", icon: I.knob(), fx: "spin" },
+  { label: "Build", href: "#build", icon: I.split(), fx: "pop" },
+  { label: "Team", href: "#team", icon: I.user(), fx: "pop" },
 ];
 
 const META: [string, string, Accent, ReactNode][] = [
@@ -152,26 +162,32 @@ const TEAM: [string, string, string][] = [
   ["Raghav Agarwal", "The mix model: the rated mixes, the measurements, the experiments", "https://github.com/RaghavAgarwal18"],
 ];
 
+// Getting Aria into Live: what's in Aria-mac.zip and what "Install Aria" does (install.sh)
+const GET: [string, ReactNode][] = [
+  ["Download and unzip", <>Move the Aria folder where it will stay, like Documents. Live's browser links to it.</>],
+  ["Double-click Install Aria", <>It sets up the engine and puts Aria in Live's browser. The first time, macOS may ask: right-click it and choose Open.</>],
+  ["Drag Aria onto Main", <>In Live: User Library, Presets, Audio Effects, Max Audio Effect, Aria. Drop it last on your Main track and press Check mix.</>],
+];
+
 /* ---------- the page ---------- */
 
 export default function App() {
   return (
     <main className="min-h-screen bg-black text-white">
-      <Navigation
-        logo={<a href="#" className="flex items-center gap-2.5"><span className="mark size-[22px]" />Aria</a>}
-        links={NAV}
-        actions={<>
-          <ButtonLink variant="ghost" size="sm" href={GITHUB}>{I.github(15)}GitHub</ButtonLink>
-          <ButtonLink variant="default" size="sm" href="#how">How it works</ButtonLink>
-        </>}
-      />
+      <header className="fixed inset-x-0 top-0 z-50">
+        <div className="mx-auto flex max-w-[1160px] items-center gap-4 px-6 pt-4">
+          <a href="#" className="flex items-center gap-2.5 text-[17px] font-semibold"><span className="mark size-[22px]" />Aria</a>
+          <div className="flex flex-1 justify-center"><LiquidNavbar tone="dark" items={NAV} /></div>
+          <a href={DOWNLOAD} className="hidden h-10 items-center gap-2 rounded-[10px] bg-white px-4 text-[14px] font-medium text-black sm:inline-flex">{I.download(16)}Download</a>
+        </div>
+      </header>
 
       <Hero
         title={<>Aria hears your mix,<br />and fixes it in Ableton.</>}
         sub={<>An AI co-producer that runs inside Live, on your Main track. It finds the sounds that clash or stick out, Meta's Muse Spark explains them and makes the fix, and Aria measures again to prove it worked.</>}
         cta={<>
-          <ButtonLink variant="gradient" size="lg" className="rounded-lg" href="#how">See how it works<ArrowRight /></ButtonLink>
-          <ButtonLink variant="ghost" size="lg" className="rounded-lg" href={GITHUB}>{I.github(17)}Code on GitHub</ButtonLink>
+          <ButtonLink variant="gradient" size="lg" className="rounded-lg" href={DOWNLOAD}>{I.download(17)}Download for Mac</ButtonLink>
+          <ButtonLink variant="ghost" size="lg" className="rounded-lg" href="#how">See how it works<ArrowRight /></ButtonLink>
         </>}
       >
         <LiveMockup />
@@ -265,6 +281,23 @@ export default function App() {
         </Rise>
       </Section>
 
+      <Section id="get" label="Get Aria" title="Download, double-click, drag." dim="Then it's in Live's browser."
+               sub={<>For a Mac with Ableton Live 12 Suite (Max for Live) and Python 3.11. Add your Meta Model API key for Muse Spark's advice; without it Aria still shows what it measured.</>}>
+        <div className="mt-12 grid gap-3 md:grid-cols-3">
+          {GET.map(([title, text], i) => (
+            <Rise key={title} delay={i * 0.06} className="rounded-[18px] border border-edge bg-card p-6">
+              <span className="font-mono text-[12px] text-faint">{i + 1}</span>
+              <b className="mt-1 block text-[18px] font-medium tracking-[-0.02em]">{title}</b>
+              <p className="m-0 mt-2 text-[14.5px] leading-relaxed text-muted">{text}</p>
+            </Rise>
+          ))}
+        </div>
+        <Rise className="mt-8 flex flex-wrap items-center gap-3">
+          <ButtonLink variant="gradient" size="lg" className="rounded-lg" href={DOWNLOAD}>{I.download(17)}Download for Mac</ButtonLink>
+          <a href={RELEASES} className="text-[14px] text-muted underline-offset-4 hover:text-white hover:underline">Release notes on GitHub</a>
+        </Rise>
+      </Section>
+
       <section id="team" className="scroll-mt-20 border-t border-hairline py-24">
         <div className="mx-auto max-w-[1160px] px-6">
           <Rise>
@@ -283,7 +316,8 @@ export default function App() {
             ))}
           </div>
           <Rise className="mt-12 flex flex-wrap gap-3">
-            <ButtonLink variant="gradient" size="lg" className="rounded-lg" href={GITHUB}>{I.github(17)}Code on GitHub</ButtonLink>
+            <ButtonLink variant="gradient" size="lg" className="rounded-lg" href={DOWNLOAD}>{I.download(17)}Download for Mac</ButtonLink>
+            <ButtonLink variant="ghost" size="lg" className="rounded-lg" href={GITHUB}>{I.github(17)}Code on GitHub</ButtonLink>
             <ButtonLink variant="ghost" size="lg" className="rounded-lg" href={PRODUCT}>The product page<ArrowRight /></ButtonLink>
           </Rise>
         </div>
