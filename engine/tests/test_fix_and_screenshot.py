@@ -131,3 +131,24 @@ def test_every_rack_file_is_in_the_catalog():
     files = {p.stem for p in (Path(__file__).resolve().parents[2] / "device" / "racks").glob("*.ad[gv]")}
     assert files == set(racks.RACKS)
     assert all(f"- {name}: " in ask.PROMPT for name in racks.RACKS)
+
+
+def test_a_fix_round_with_no_change_asks_again_then_says_so():
+    seen = []
+    out = ask.fix_round("fix", CONTEXT, client=client_for("Fixing the buried leads.", seen=seen))
+    assert len(seen) == 2 and out["actions"] == [] and out["reply"] is None and "Fix all" in out["error"]
+
+
+def test_track_mode_findings_carry_each_tracks_loudness(tmp_path):
+    import numpy as np, soundfile as sf
+    from aria_engine import app as A
+    rate, t = 44100, np.arange(44100 * 4) / 44100
+    paths = {}
+    for name, amp in (("KICK", 0.5), ("LEADS", 0.05)):   # test tones: the lead 20 dB under the kick
+        p = tmp_path / f"{name}.wav"
+        sf.write(p, np.stack([amp * np.sin(2 * np.pi * 300 * t)] * 2, 1), rate)
+        paths[name] = str(p)
+    mix = sum(sf.read(p, always_2d=True)[0] for p in paths.values())
+    out = A.find_tracks(paths, rate, mix, {"tempo": 120.0, "start_beat": 0.0})
+    assert out["levels_lufs"]["KICK"] - out["levels_lufs"]["LEADS"] == 20.0
+    assert all(f["levels_lufs"] == out["levels_lufs"] for f in out["findings"] if f["kind"] in ("masking", "clash"))

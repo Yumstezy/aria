@@ -4,6 +4,15 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 1, evening: buried-sound advice on an unleveled mix.** Ian's test set had KICK at -9.4 LUFS and LEADS at -24.4. Aria rightly found LEADS covered, but Muse raised the leads three times, because it couldn't see the levels. Now:
+- Track-mode findings carry every track's loudness (`levels_lufs`).
+- Muse's rule: when the covers are 6 dB or more louder, turn the loudest down, and raise a buried fader at most once.
+- Rerun on Ian's own 4:31 recordings: "Fix it" turned KICK down 3 dB in 3 of 3 runs (once with a bass cut). Fix all did it too.
+- A fix round that names no change now asks again, and never shows "Fixing…" with nothing done.
+- Still to look at: Ian's idea that sidechain ducking makes tracks look buried (a ducked track is quieter for part of every beat).
+
+Also fixed: Live's browser doesn't index links, so the User Library's Aria folder looked empty and Name my tracks couldn't find Aria Ear. install.sh now copies the two devices. A release zip built from today's code was test-installed into a scratch home: devices copied, 26 racks, the helper, the engine. It isn't uploaded yet.
+
 **Nov 1, later: the full toolbox, and Ian's racks as Aria's racks.** Ian: Fix all only ever used EQ (it could only reach the EQ tools, volume and one device, and its prompt said EQ). Now:
 - Fix all can also sidechain and load Aria's racks. Muse's prompt picks the tool by problem (see contracts).
 - Real Muse, 4 runs on drums vs bass, mud and harsh hits: every run sidechained BASS to KICK, low-cut the pad and put Multiband Dynamics on Main. Asked "my kick doesn't punch through" it loaded Aria Punch Through; "make my bass thicker" got Aria Bass Thicken.

@@ -141,6 +141,15 @@ def find_clarity(audio, rate, tempo, start_beat, beats_per_bar):
 TRACKS_TOP_N = 4
 
 
+def track_loudness(x, rate):
+    """A track's integrated loudness in LUFS, or None when it's silent (or too short to gate)."""
+    try:
+        v = pyln.Meter(rate).integrated_loudness(x)
+    except ValueError:
+        return None
+    return round(float(v), 1) if np.isfinite(v) else None
+
+
 def find_tracks(paths, rate, audio, timing, playing=None):
     """Key tracks mode: the producer's own tracks, by name. Clashes first (neither track stands clear),
     then a track covered by another, then what the master shows."""
@@ -159,9 +168,15 @@ def find_tracks(paths, rate, audio, timing, playing=None):
     # The producer's own tracks have no separation bleed: quiet isn't absent, only silence (or Live's "no clips") is
     found_clash = stems.clashes(sounds, rate, relative=False, playing=playing, **timing)
     found_cover = stems.masking(sounds, rate, relative=False, playing=playing, **timing)
+    # How loud each track is while it plays (LUFS, gated, so a vocal that sings half the bars isn't counted as quiet).
+    # Ian, Nov 1: on an unleveled mix every buried track got raised, because Muse couldn't see that the covering
+    # tracks were simply too loud. With the levels on each finding it can turn the loud one down instead.
+    levels = {name: track_loudness(x, rate) for name, x in sounds.items()}
     for f in found_clash + found_cover:
         f.pop("score", None)
+        f["levels_lufs"] = levels
     master["findings"] = (found_clash + found_cover + master["findings"])[:TRACKS_TOP_N]
+    master["levels_lufs"] = levels
     master["mode"] = "tracks"
     master["tracks"] = list(sounds)
     master["spectra"] = stems.spectra(sounds, rate, relative=False, playing=playing)
