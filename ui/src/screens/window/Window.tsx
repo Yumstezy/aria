@@ -751,14 +751,16 @@ const RISE_S = 0.025, FALL_S = 0.15, PEAK_FALL_DB_S = 12;
 // The analyzer's own color, violet (Ian, Oct 31: the gold "is kinda ugly"; after the spectrum he showed from iZotope)
 const AN_COLOR = "var(--trk-4)";
 
-/** A frame's color from where its sound is: the share of power below 200 Hz (red), 200 Hz to 2 kHz (orange) and
-    above 2 kHz (green), mixed. A kick or bass reads red, hats and air green (Ian, Oct 31, after rekordbox). */
+/** A frame's color from where its sound is: its lows (below 200 Hz, red), mids (200 Hz to 2 kHz, pink) and highs
+    (above 2 kHz, cyan), mixed by their share and lifted to full brightness, so the height alone carries the level.
+    A kick or bass reads red, a vocal or synth pink, hats cyan (Ian, Nov 2, after pro DJ software's waveforms). */
 function bandColor(db: number[]): [number, number, number] {
   let lo = 0, mi = 0, hi = 0;
   // Weighted as the spectrum is drawn (tipped up toward the highs), or the bass wins every frame of an EDM mix
   db.forEach((d, i) => { const f = ANALYZER_HZ[i], p = 10 ** ((d + tilt(f)) / 10); if (f < 200) lo += p; else if (f < 2000) mi += p; else hi += p; });
   const t = lo + mi + hi || 1, [a, b, c] = [lo / t, mi / t, hi / t];
-  return [Math.round(255 * a + 255 * b + 61 * c), Math.round(77 * a + 170 * b + 220 * c), Math.round(77 * a + 40 * b + 132 * c)];
+  const rgb = [255 * a + 240 * b + 56 * c, 64 * a + 64 * b + 196 * c, 40 * a + 200 * b + 255 * c], top = Math.max(...rgb, 1);
+  return rgb.map((v) => Math.round((v * 255) / top)) as [number, number, number];
 }
 
 /** Where the sound sits, like a polar stereo meter (Ian, Oct 31): a half circle, L to R, each dot a sample pair from
@@ -898,8 +900,9 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
       const want = Math.ceil((Math.max(-6, ...pk) + 3) / 6) * 6;
       if (want > g.top || want < g.top - 9) setTop(want);
       if (now - lastLevel > 1000) { lastLevel = now; setLevel(avg.current); setPlaying(true); }
-      // The waveform: the last WAVE_FRAMES peaks, newest on the right, mirrored, each bar colored by where its sound
-      // is (red lows, orange mids, green highs), like DJ software (Ian, Oct 31)
+      // The waveform: the last WAVE_FRAMES frames, newest on the right, mirrored, like pro DJ
+      // software (Ian, Nov 2): each frame's level (all bands), which moves with the beat, colored by where its sound is
+      // (bandColor)
       const cv = waveEl.current;
       if (cv && wave.current.length > 1) {
         const ctx = cv.getContext("2d"), dpr = window.devicePixelRatio || 1, cw = cv.clientWidth, ch = cv.clientHeight;
@@ -907,23 +910,25 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
           if (cv.width !== Math.round(cw * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           ctx.clearRect(0, 0, cw, ch);
-          // Smooth scroll: between frames the whole shape slides left by the time since the last one (50 ms a step),
-          // so it moves every screen frame like the spectrum, not in jumps
+          // Smooth scroll: between frames everything slides left by the time since the last one (50 ms a step), so it
+          // moves every screen frame like the spectrum, not in jumps
           const w = wave.current, step = cw / (WAVE_FRAMES - 1), mid = ch / 2;
           const slide = Math.min(1, (now - waveAt.current) / 50) * step;
           const xOf = (i: number) => (i + WAVE_FRAMES - w.length) * step - slide;
-          const hOf = (db: number) => Math.max(0.5, Math.min(1, (db + 15) / 15) * (mid - 3));
-          // the color flows along the shape: one gradient stop a frame
-          const grad = ctx.createLinearGradient(0, 0, cw, 0);
-          w.forEach((fr, i) => { const x = xOf(i) / cw; if (x >= 0 && x <= 1) grad.addColorStop(x, `rgb(${fr.rgb[0]},${fr.rgb[1]},${fr.rgb[2]})`); });
-          ctx.beginPath();
-          ctx.moveTo(xOf(0), mid - hOf(w[0].db));
-          for (let i = 1; i < w.length; i++) { const xm = (xOf(i - 1) + xOf(i)) / 2; ctx.quadraticCurveTo(xOf(i - 1), mid - hOf(w[i - 1].db), xm, mid - (hOf(w[i - 1].db) + hOf(w[i].db)) / 2); }
-          ctx.lineTo(xOf(w.length - 1), mid - hOf(w[w.length - 1].db));
-          for (let i = w.length - 1; i > 0; i--) { const xm = (xOf(i - 1) + xOf(i)) / 2; ctx.quadraticCurveTo(xOf(i), mid + hOf(w[i].db), xm, mid + (hOf(w[i - 1].db) + hOf(w[i].db)) / 2); }
-          ctx.lineTo(xOf(0), mid + hOf(w[0].db));
-          ctx.closePath();
-          ctx.globalAlpha = 0.9; ctx.fillStyle = grad; ctx.fill(); ctx.globalAlpha = 1;
+          // Heights are linear amplitude against the loudest of the last seconds, like DJ software, so a beat's
+          // few dB of movement show as shape. Only the level: a mastered drop's sample peak sits near 0 dB every frame.
+          const hOf = (db: number) => Math.max(0.5, Math.min(1, 10 ** (db / 20)) * (mid - 3));
+          // Each frame's slice runs to the next frame's, so the shape is continuous (Max sends 20 frames a second;
+          // separate bars read as a barcode), and each slice keeps its own frame's color
+          const slice = (x0: number, h0: number, x1: number, h1: number) => {
+            ctx.beginPath(); ctx.moveTo(x0, mid - h0); ctx.lineTo(x1, mid - h1); ctx.lineTo(x1, mid + h1); ctx.lineTo(x0, mid + h0); ctx.closePath(); ctx.fill();
+          };
+          for (let i = 0; i < w.length - 1; i++) {
+            const x0 = xOf(i), x1 = xOf(i + 1) + 0.5, a = w[i], b = w[i + 1], rgb = a.rgb.join(",");
+            if (x1 < 0) continue;
+            ctx.fillStyle = `rgb(${rgb})`;
+            slice(x0, hOf(a.db), x1, hOf(b.db));
+          }
           // the newest moment glows at the right edge
           const last = w[w.length - 1], lx = xOf(w.length - 1);
           ctx.shadowBlur = 10; ctx.shadowColor = `rgb(${last.rgb.join(",")})`; ctx.fillStyle = "rgba(255,255,255,0.9)";
@@ -970,8 +975,8 @@ function LiveAnalyzer({ narrow, compact, onOpen }: { narrow: boolean; compact?: 
         <section className="cp-tile cp-card" style={{ gap: 6, gridColumn: narrow ? "1 / -1" : undefined }}>
           <div className="flex items-baseline gap-2"><span className="cp-cap">Waveform</span>
             <span className="ml-auto flex gap-2.5 font-mono text-[10.5px] text-ink-faint">
-              <span style={{ color: "rgb(255,77,77)" }}>lows</span><span style={{ color: "rgb(255,170,40)" }}>mids</span><span style={{ color: "rgb(61,220,132)" }}>highs</span></span></div>
-          <canvas ref={waveEl} className="block h-[92px] w-full" role="img" aria-label="Main's waveform, the last 8 seconds, colored by where its sound is" />
+              <span style={{ color: "rgb(255,64,40)" }}>lows</span><span style={{ color: "rgb(240,64,200)" }}>mids</span><span style={{ color: "rgb(56,196,255)" }}>highs</span></span></div>
+          <canvas ref={waveEl} className="block h-[132px] w-full" role="img" aria-label="Main's waveform, the last 8 seconds, colored by where its sound is" />
           <span className="cp-meta">last 8 s</span>
         </section>
       </div>}
