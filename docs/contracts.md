@@ -395,6 +395,10 @@ Pressing it again is the next try. It builds on the first because of how Aria's 
   - punch, thin bass or a messy synth: Aria's racks
 - Names: what Aria adds is "Aria <what it does>". The racks carry their Aria name inside the file. A stock device Aria adds is renamed "Aria <device>", or by its label (`track_device` `label`, e.g. "Aria Sidechain"). An EQ Eight is "Aria EQ".
 
+### Undo everything (Nov 1)
+
+`undo {}` undoes the last change, `undo {steps: n}` the last n (up to 50), and `undo {all: true}` everything Aria changed. The bridge calls live.js `undo` until it has done that many, or until there's nothing left. The reply carries `count`, and the chat crosses out that many changes.
+
 ### Faders to a level, and two things at once (Nov 1)
 
 - `track_volume {track, change_db}` moves a fader by an amount (±6 dB), or `{track, to_db}` sets it to a level the producer named ("down to -15"), from -70 to +6 dB. live.js `volume <track> <change> <to|none>`.

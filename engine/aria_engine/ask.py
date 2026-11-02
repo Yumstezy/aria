@@ -226,8 +226,11 @@ TOOLS = [
                       "description": "What to change in it, one move per step, in the plugin's own words."}},
             "required": ["what", "steps"]}}},
     {"type": "function", "function": {
-        "name": "undo", "description": "Undo the last change Aria made in Live.",
-        "parameters": {"type": "object", "properties": {}}}},
+        "name": "undo", "description": "Undo changes Aria made in Live, newest first: the last one, the last few (steps), or "
+                                       "everything Aria changed (all: \"undo everything\", \"undo all of it\", \"put it all back\").",
+        "parameters": {"type": "object", "properties": {
+            "steps": {"type": "integer", "minimum": 1, "maximum": 50, "description": "How many changes to undo. Leave out for the last one."},
+            "all": {"type": "boolean", "description": "Undo everything Aria changed."}}}}},
     {"type": "function", "function": {
         "name": "suggest", "description": "Offer a change the producer did NOT ask for. It is shown with Do it / Not now and only runs if they say yes.",
         "parameters": {"type": "object", "properties": {
@@ -711,7 +714,16 @@ def check_action(name, args, tracks=(), plugins=()):
             if shape in ("low_cut", "high_cut"):
                 out["steep"] = bool(args.get("steep", False))
             return out if ok else None
-        if name in ("check_mix", "undo", "check_again", "hear_song", "add_part_markers"):
+        if name == "undo":   # Nov 1: "undo everything" undid one change
+            if args.get("all") is True:
+                return {"all": True}
+            steps = args.get("steps")
+            if steps is None or steps == 1:
+                return {}
+            if isinstance(steps, bool) or not 1 <= int(steps) <= 50:
+                return None
+            return {"steps": int(steps)}
+        if name in ("check_mix", "check_again", "hear_song", "add_part_markers"):
             return {}
         if name == "vocal_sync":
             vocal = match_track(args.get("vocal_track"), tracks)

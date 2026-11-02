@@ -1234,8 +1234,16 @@ async function apply(action, tracks = []) {
     }
     case "eq_band":
       return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, -1, a.shape || "bell", a.steep ? 1 : 0, a.mode || "aria");
-    case "undo":
-      return await askLive("undo", "undo_done");
+    case "undo": {   // the last change, the last few, or everything (Nov 1: "undo everything" undid one)
+      const want = a.all ? 50 : Math.max(1, Math.min(50, a.steps || 1));
+      let n = 0, last = null;
+      while (n < want) {
+        const r = await askLive("undo", "undo_done");
+        if (!r.ok) { if (!n) return r; break; }
+        n++; last = r;
+      }
+      return n === 1 ? { ...last, count: 1 } : { ok: true, count: n, text: a.all ? `Undid all ${n} of Aria's changes.` : `Undid the last ${n} changes.` };
+    }
     case "check_mix":
       if (busy) return { ok: false, text: "A Mix check is already running." };
       serial(checkMix);   // queued: it starts once this answer's changes are done
@@ -1378,7 +1386,7 @@ async function runAsk(text, imageId = null) {
 function noteChanges(at, done) {
   done.forEach((d, k) => {
     if (!d.ok) return;
-    if (d.type === "undo") undoneTop();
+    if (d.type === "undo") for (let n = 0; n < (d.count || 1); n++) undoneTop();
     else if (UNDOABLE(d.type)) changeStack.push({ at, kind: "d", k });
   });
   sendUndoNext();

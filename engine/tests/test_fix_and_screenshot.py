@@ -186,3 +186,10 @@ def test_track_faders_are_applied_to_the_ear_recordings(tmp_path):
     mix = sum(sf.read(p, always_2d=True)[0] for p in paths.values())
     out = A.find_tracks(paths, rate, mix, {"tempo": 120.0, "start_beat": 0.0}, faders={"KICK": -3.0, "LEADS": 0.0})
     assert out["levels_lufs"]["LEADS"] - out["levels_lufs"]["KICK"] == 3.0
+
+
+def test_undo_everything_or_the_last_few():
+    for args, want in (({"all": True}, {"all": True}), ({"steps": 3}, {"steps": 3}), ({}, {}), ({"steps": 1}, {})):
+        out = ask.ask("undo", CONTEXT, client=client_for("Undoing.", call("undo", **args)))
+        assert out["actions"] == [{"type": "undo", "args": want}]
+    assert ask.ask("undo", CONTEXT, client=client_for("", call("undo", steps=99)))["actions"] == []
