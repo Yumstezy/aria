@@ -2,6 +2,8 @@
 
 All engine calls are HTTP JSON on `http://127.0.0.1:8765`. Times are in bars (1-based) unless the field name says `beat` or `sec`. Levels are dB, loudness is LUFS, timing is ms.
 
+Who may call (Nov 2): requests with no `Origin` (the bridge), or with `Origin` `null`, `file:...` or `http://localhost` / `http://127.0.0.1` (Aria's pages). Any other `Origin` gets 403 `{"detail": "Only Aria's own pages can call the engine."}` before the request runs.
+
 ## Sections
 
 `POST /sections` (as built Oct 29, build step 8b, Arrangement). The producer's song sends Live's tempo and where its recording started; a reference file sends only its path, and the engine estimates the tempo (95 to 190 BPM) and the first beat.

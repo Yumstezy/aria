@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import pyloudnorm as pyln
@@ -61,6 +61,29 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
 )
+
+
+# CORS only stops another site from reading the answer: a POST with no Content-Type still arrives, and FastAPI reads
+# its body as JSON (Nov 2: a page anywhere could run an Ask on the producer's Muse key). So a request that says it
+# comes from any other site is refused before it runs. The bridge sends no Origin; Aria's pages send null, file:// or
+# localhost.
+ORIGIN_OK = re.compile(r"^(null|file:.*|http://(localhost|127\.0\.0\.1)(:\d+)?)$")
+
+
+class OnlyAriaPages:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            origin = dict(scope["headers"]).get(b"origin")
+            if origin is not None and not ORIGIN_OK.match(origin.decode("latin-1")):
+                res = JSONResponse({"detail": "Only Aria's own pages can call the engine."}, status_code=403)
+                return await res(scope, receive, send)
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(OnlyAriaPages)
 
 
 @app.get("/health")
