@@ -4,6 +4,12 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 1, night: release v0.2.1 is the download.** It's built from 7c57e1c: the Ear fix, make-space advice, track loudness, sidechain-aware buried, faders to a level, two requests in one message, and no empty "Fixing…".
+- Test-installed into a scratch home: devices copied, 26 racks, current helper, and the engine answers /health.
+- The public link serves it (checked byte for byte).
+- Ian confirmed the racks load in Live.
+- From here on, only fixes, and the mix model if it gets good enough. No new features. Security (the per-install token) is next.
+
 **Nov 1, evening: the judges' site and README, cleaned up.**
 - Try it is one calm card in four steps (Listen, Check, Fix, Compare), after Ian found the Live-style version cluttered.
 - The team section is lanyard badges with photos and LinkedIn links. The buttons are M3 Expressive in Aria's colors.
