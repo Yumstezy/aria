@@ -237,9 +237,9 @@ export default function App() {
         </>}
       >
         {/* A real screenshot of Aria in Live (Ian, Nov 1: "we can prob just use a real image"), in place of the drawing */}
-        <img src="/img/live-hero.jpg" alt="Aria in Ableton Live: Mix check docked on the left, the Aria device on the Main track at the bottom right"
-             width={2400} height={1447} className="block h-auto w-full rounded-[14px] border border-white/10 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9)]" />
-        <p className="mt-5 text-center text-[13px] text-faint">Aria in Ableton Live, on one of Ian's sessions. Mix check is docked on the left, and the Aria device sits on the Main track.</p>
+        <img src="/img/live-hero.jpg" alt="Aria in Ableton Live: Mix check docked on the left, showing a buried vocal, with Aria Ear on the kick track below"
+             width={2400} height={1331} className="block h-auto w-full rounded-[14px] border border-white/10 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9)]" />
+        <p className="mt-5 text-center text-[13px] text-faint">Aria in Ableton Live, on one of Ian's sessions. Mix check is docked on the left, where it found the vocal buried under the backing. Aria Ear sits on the kick track below.</p>
       </Hero>
 
       {DEMO_VIDEO && (
