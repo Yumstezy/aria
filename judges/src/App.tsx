@@ -128,9 +128,11 @@ const NAV: LiquidNavItem[] = [
 const META: [string, string, Accent, ReactNode][] = [
   ["Muse Spark writes it", "Turns Aria's measurements into plain advice and a fix. It only ever sees measured numbers, and Aria checks its answer before anything happens.", "gold", I.spark()],
   ["Muse Spark does it", "24 tools in Live through tool calling: EQ, faders, stock devices, 26 custom racks, sidechain, vocal sync. Each is checked against a fixed menu and limits, and each has Undo.", "blue", I.check()],
-  ["Muse Spark asks", "When it can't tell which track you mean, it asks instead of guessing. It also names the parts of your song: Intro, Build, Drop.", "good", I.speech()],
+  ["Muse Spark asks", "When it can't tell which track you mean, it asks instead of guessing, so a change never lands on the wrong track.", "good", I.speech()],
   ["Muse Spark sees it", "Paste a screenshot into the chat, like a plugin you're stuck on, and Muse Spark looks at it along with what you asked.", "hot", I.image()],
+  ["Muse Spark names the parts", "Aria hears the whole song and Muse Spark names its parts, Intro, Build, Drop, so a check compares your drop with a reference's drop.", "blue", I.split()],
   ["Muse Voice Transcribe hears it", "Hold a key and say it. \"Cut the mud on the bass\" came back as text in 1.4 seconds and ran like a typed request.", "white", I.mic()],
+  ["Demucs splits it", "Meta's open model that pulls a mix apart into drums, bass, vocals and the rest, so Aria can say which part is causing a problem.", "good", I.knob()],
   ["Audiobox Aesthetics rates it", "Meta's open model that scores how good audio sounds. We're testing it in our mix model, which learns from 99 mixes people rated.", "gold", I.wave()],
 ];
 
@@ -221,14 +223,14 @@ export default function App() {
       <header className="fixed inset-x-0 top-0 z-50 bg-gradient-to-b from-black via-black/70 to-transparent pb-5">
         <div className="mx-auto flex max-w-[1160px] items-center gap-4 px-6 pt-4">
           <a href="#" className="flex items-center gap-2.5 text-[17px] font-semibold"><span className="mark size-[22px]" />Aria</a>
-          <div className="flex flex-1 justify-center"><LiquidNavbar tone="dark" items={NAV} active={navAt} onChange={(i) => setNavAt(i)} /></div>
-          <a href="/demo" className="hidden text-[14px] text-muted transition-colors hover:text-ink md:inline">Demos</a>
-          <Button href={DOWNLOAD} variant="filled" size="sm" className="hidden sm:inline-flex">{I.download(16)}Download</Button>
+          <div className="hidden flex-1 justify-center lg:flex"><LiquidNavbar tone="dark" items={NAV} active={navAt} onChange={(i) => setNavAt(i)} /></div>
+          <a href="/demo" className="ml-auto text-[14px] text-muted transition-colors hover:text-ink lg:ml-0">Demos</a>
+          <Button href={DOWNLOAD} variant="filled" size="sm">{I.download(16)}Download</Button>
         </div>
       </header>
 
       <Hero
-        title={<>Aria hears your mix,<br />and fixes it in Ableton.</>}
+        title={<>Aria hears your mix,<br className="hidden sm:block" /> and fixes it in Ableton.</>}
         sub={<>An AI co-producer that runs inside Live, on your Main track. It finds the sounds that clash or stick out, Meta's Muse Spark explains them and makes the fix, and Aria measures again to prove it worked.</>}
         cta={<>
           <Button href={DOWNLOAD} variant="filled" size="md">{I.download(18)}Download for Mac</Button>
@@ -267,8 +269,8 @@ export default function App() {
       </Section>
 
       <Section id="meta" label="Meta AI" title="Built on Meta's AI." dim="Not a chat box on the side."
-               sub="Three of Meta's models: Muse Spark, Muse Voice Transcribe and Audiobox Aesthetics. Muse never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it, with Undo.">
-        <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+               sub="Four of Meta's models: Muse Spark, Muse Voice Transcribe, Demucs and Audiobox Aesthetics. Muse never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it, with Undo.">
+        <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {META.map(([t, d, a, ic], i) => (
             <Rise key={t} delay={i * 0.06}><GlowCard accent={a} className="h-full">
               <IconChip>{ic}</IconChip><b className="mt-4 text-[16.5px] font-medium">{t}</b><p className="mt-2 text-[14px] leading-relaxed text-muted">{d}</p>
@@ -284,7 +286,7 @@ export default function App() {
         </Rise>
       </Section>
 
-      <Section id="tools" label="The tools" title="Seven tools in one device." dim="These four are new this week."
+      <Section id="tools" label="The tools" title="Eight tools in one device." dim="These four are new this week."
                sub="Alongside Mix check, the reference compare, Arrangement and the live analyzer.">
         <div className="mt-14 grid gap-20">
           {TOOLS.map((t, i) => (

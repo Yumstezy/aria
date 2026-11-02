@@ -10,7 +10,7 @@
   --color-hairline: rgba(255, 255, 255, 0.07);
   --color-ink: #ededef;
   --color-muted: #9ca3af;
-  --color-faint: #62626a;
+  --color-faint: #8a8a92;   /* 4.6:1 on black, for small gray text (was #62626a, 3.5:1) */
   --color-hot: #ff8a5b;
   --color-good: #4ade80;
   --color-gold: #f5c451;
@@ -50,7 +50,8 @@
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 
-html { scroll-behavior: smooth; background: var(--color-ground); }
+html { background: var(--color-ground); }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 body { margin: 0; background: var(--color-ground); color: var(--color-ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 ::selection { background: rgba(245, 196, 81, 0.3); }
 

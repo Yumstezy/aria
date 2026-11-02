@@ -2,6 +2,7 @@
 // Ableton once it's recorded. Same look as the main page, nothing else on it.
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { MotionConfig } from "motion/react";
 import "./index.css";
 import { TryIt } from "@/components/try-it";
 import { DemoVideo } from "@/components/demo-video";
@@ -46,4 +47,4 @@ function Demos() {
   );
 }
 
-createRoot(document.getElementById("root")!).render(<StrictMode><Demos /></StrictMode>);
+createRoot(document.getElementById("root")!).render(<StrictMode><MotionConfig reducedMotion="user"><Demos /></MotionConfig></StrictMode>);

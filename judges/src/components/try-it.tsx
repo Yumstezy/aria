@@ -189,6 +189,23 @@ const plainChange = (t: string) => {
   return t.replace(/\.+$/, "");
 };
 
+// One request's changes in plain words. Back-to-back volume moves on the same track read as one, with where the
+// fader ended ("Turned the vocal down 12 dB, to -12 dB", not "down 6 dB, then down 6 dB")
+const plainSteps = (done: { ok: boolean; text: string }[]) => {
+  const out: string[] = [];
+  let run: { track: string; dir: string; db: number; now: number } | null = null;
+  const flush = () => { if (run) out.push(`Turned the ${run.track.toLowerCase()} ${run.dir} ${Math.round(run.db)} dB, to ${Math.round(run.now)} dB`); run = null; };
+  for (const d of done.filter((x) => x.ok)) {
+    const m = d.text.match(/^"(\w+)" (down|up) ([\d.]+) dB, now (-?[\d.]+) dB/);
+    if (m && run && run.track === m[1] && run.dir === m[2]) { run.db += parseFloat(m[3]); run.now = parseFloat(m[4]); continue; }
+    flush();
+    if (m) run = { track: m[1], dir: m[2], db: parseFloat(m[3]), now: parseFloat(m[4]) };
+    else out.push(plainChange(d.text));
+  }
+  flush();
+  return out.map((t, k) => (k ? t.replace(/^\w/, (c) => c.toLowerCase()) : t)).join(", then ");
+};
+
 /* ---------- the demo ---------- */
 export function TryIt() {
   const mix = useMix();
@@ -229,7 +246,10 @@ export function TryIt() {
     const key = (e: KeyboardEvent) => {
       if (e.code !== "Space" || e.repeat) return;
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (!hover.current && !card.current?.contains(document.activeElement)) return;
+      if (!hover.current) {
+        if (!card.current?.contains(document.activeElement)) return;
+        if (e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement) return;   // keyboard users press the focused button
+      }
       e.preventDefault();
       toggleRef.current();
     };
@@ -268,7 +288,7 @@ export function TryIt() {
     0: "Ian's song, 16 bars, before any mixing. Tap a track's name to hear it alone.",
     1: busy ?? "The lead melody is buried. The rest of the song covers it most of the time, so you barely hear it.",
     2: busy ?? "Muse Spark made room for the leads instead of just turning them up:",
-    3: lowMids ? `Same 16 bars, same loudness. The boxy low mids are ${Math.abs(lowMids.diff_db)} dB cleaner.` : "Same 16 bars, same loudness.",
+    3: `After the fix and Ian's ${ASKS.length} requests. Same 16 bars, same loudness.` + (lowMids ? ` The boxy low mids are ${Math.abs(lowMids.diff_db)} dB cleaner.` : ""),
   };
   const action: Record<Stage, { label: string; run: () => void } | null> = {
     0: { label: "Check the mix", run: check },
@@ -283,9 +303,9 @@ export function TryIt() {
       {/* the four steps, in order */}
       <ol className="flex border-b border-hairline px-5 sm:px-7">
         {STAGES.map((name, i) => (
-          <li key={name} className={cn("relative py-4 pr-6 text-[14px] transition-colors duration-300 sm:pr-10", i === stage ? "text-ink" : i < stage ? "text-muted" : "text-faint")}>
+          <li key={name} className={cn("relative py-4 pr-4 text-[13px] transition-colors duration-300 sm:pr-10 sm:text-[14px]", i === stage ? "text-ink" : i < stage ? "text-muted" : "text-faint")}>
             <span className="mr-2 tabular-nums opacity-60">{i + 1}</span>{name}
-            {i === stage && <motion.span layoutId="stage-line" className="absolute inset-x-0 -bottom-px mr-6 h-[2px] bg-ink sm:mr-10" transition={{ type: "spring", stiffness: 400, damping: 34 }} />}
+            {i === stage && <motion.span layoutId="stage-line" className="absolute inset-x-0 -bottom-px mr-4 h-[2px] bg-ink sm:mr-10" transition={{ type: "spring", stiffness: 400, damping: 34 }} />}
           </li>
         ))}
       </ol>
@@ -310,11 +330,11 @@ export function TryIt() {
                       <WaveCanvas wave={t as unknown as Wave} />
                       {focus === true && <motion.div layoutId="focus" className="pointer-events-none absolute inset-0 rounded-[10px] ring-1 ring-[#ff8a5b]/60" />}
                     </div>
-                    <span className={cn("w-[56px] flex-none text-right text-[11.5px] text-good transition-opacity duration-500", fixed && fixedTracks.has(t.name) ? "opacity-100" : "opacity-0")}>EQ</span>
+                    <span className={cn("w-[28px] flex-none text-right text-[11.5px] text-good sm:w-[56px] transition-opacity duration-500", fixed && fixedTracks.has(t.name) ? "opacity-100" : "opacity-0")}>EQ</span>
                   </div>
                 );
               })}
-              <div className="pointer-events-none absolute inset-y-0 left-[74px] right-[72px] sm:left-[88px]">
+              <div className="pointer-events-none absolute inset-y-0 left-[74px] right-[44px] sm:left-[88px] sm:right-[72px]">
                 <div ref={playhead} className={cn("absolute inset-y-0 w-px bg-white/70 transition-opacity", playing ? "opacity-100" : "opacity-0")} style={{ left: 0 }} />
               </div>
             </motion.div>
@@ -357,7 +377,7 @@ export function TryIt() {
           <AnimatePresence mode="wait">
             <motion.p key={`${stage}-${busy ?? ""}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
                       className={cn("max-w-[560px] text-[16px] leading-relaxed", busy ? "text-muted" : "text-ink")}>
-              {say[stage]}
+              {mix.state === "error" ? "The audio didn't load in this browser. Reload the page to try again." : say[stage]}
             </motion.p>
           </AnimatePresence>
           {stage === 2 && busy === null && (
@@ -380,7 +400,7 @@ export function TryIt() {
                     {ASKS.map((a) => (
                       <li key={a.id} className="mt-3 max-w-[560px] text-[14px] leading-relaxed">
                         <span className="text-ink">"{a.ask}"</span>
-                        <span className="block text-muted">{a.done.filter((d) => d.ok).map((d, k) => (k ? plainChange(d.text).replace(/^\w/, (c) => c.toLowerCase()) : plainChange(d.text))).join(", then ")}.</span>
+                        <span className="block text-muted">{plainSteps(a.done)}.</span>
                       </li>
                     ))}
                   </motion.ul>

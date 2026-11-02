@@ -74,7 +74,7 @@ One problem, start to finish. Aria's loop is the same for every problem it finds
 
 ## Meta AI
 
-**Muse Spark does the work you see, not a chat box on the side.** It never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it, with Undo.
+**Four of Meta's models: Muse Spark, Muse Voice Transcribe, Demucs and Audiobox Aesthetics.** Muse Spark does the work you see, not a chat box on the side. It never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it, with Undo.
 
 | | |
 |---|---|
@@ -84,6 +84,8 @@ One problem, start to finish. Aria's loop is the same for every problem it finds
 | **Muse Spark asks** | When it can't tell which track you mean, it asks: *"Which vocal track do you mean, VOCAL TEST or Vox 2?"* It also names the parts of your song: Intro, Build, Drop. |
 | **Muse Spark looks at your screen** | Attach a screenshot of any plugin and it reads the settings. On EQ Eight it read *band 4, 3.62 kHz, -3.50 dB, Q 6.00* and tied it to the harsh spot Aria had measured. |
 | **Muse Voice Transcribe hears it** `muse-voice-transcribe-1.0` | Hold a key and say it. *"Cut the mud on the bass"* came back as text in 1.4 seconds and ran like a typed request. |
+| **Demucs splits it** `htdemucs` | Meta's open source separation model pulls the recording apart into drums, bass, vocals and the rest, so Aria can say which part is causing a problem. |
+| **Audiobox Aesthetics rates it** | Meta's open model that scores how good audio sounds. We're testing it in the mix model, which learns from 99 mixes people rated. |
 
 ---
 
@@ -291,3 +293,5 @@ docs/        build steps, contracts, the rubric, status
 
 - **No commercial music** anywhere in the repo or the video. The 99 rated mixes were given to us or released for free for us to use; only their measurements are in the repo, never the audio. The sample song is Ian's own.
 - **Fonts:** the system font on Mac, and Geist, bundled under the OFL.
+- **Demucs** (split mode): the code is MIT. Its author says the model weights' license is unclear, so Aria uses it for this prototype only and the weights are never in the repo. They download on first use.
+- **Audiobox Aesthetics:** CC-BY 4.0, used in the mix model experiments (`ml/`).
