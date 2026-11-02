@@ -7,7 +7,6 @@ import { motion } from "motion/react";
 import { Hero, ArrowRight } from "@/components/ui/saa-s-template";
 import { LiquidNavbar, type LiquidNavItem } from "@/components/ui/liquid-glass-navbar";
 import { GlowCard, type Accent } from "@/components/ui/glow-card";
-import { LiveMockup } from "@/components/ui/live-mockup";
 import { HowItWorks } from "@/components/how-it-works";
 import { Button } from "@/components/ui/button";
 import { TeamLanyardRail, type LanyardMember } from "@/components/ui/team-lanyard-rail";
@@ -237,8 +236,10 @@ export default function App() {
           <Button href="#try" variant="outlined" size="md">Try it right here<ArrowRight /></Button>
         </>}
       >
-        <LiveMockup />
-        <p className="mt-5 text-center text-[13px] text-faint">A drawing of Aria in Live. The clips are Ian's song, drawn from its stems, with the parts Muse Spark named on it. The Aria screens are real screenshots, the chat with real requests.</p>
+        {/* A real screenshot of Aria in Live (Ian, Nov 1: "we can prob just use a real image"), in place of the drawing */}
+        <img src="/img/live-hero.jpg" alt="Aria in Ableton Live: Mix check docked on the left, the Aria device on the Main track at the bottom right"
+             width={2400} height={1447} className="block h-auto w-full rounded-[14px] border border-white/10 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9)]" />
+        <p className="mt-5 text-center text-[13px] text-faint">Aria in Ableton Live, on one of Ian's sessions. Mix check is docked on the left, and the Aria device sits on the Main track.</p>
       </Hero>
 
       {DEMO_VIDEO && (
