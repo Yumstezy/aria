@@ -134,9 +134,13 @@ def analyze(path, song_tempo, tempo=None, beat_shift=0, kick=None, place=None):
     beat"): beat 1 then goes on the kick at the nearest bar line, not on Live's grid."""
     audio, rate = sf.read(str(path), always_2d=True, dtype="float64")
     mono = audio.mean(axis=1)
+    if not np.isfinite(mono).all():
+        raise ValueError("That clip has broken samples (NaN or inf).")
     if not np.any(mono):
         raise ValueError("That clip is silent.")
     seconds = len(mono) / rate
+    if seconds < 2:   # under a beat or two there's no tempo or key to read, only a guess
+        raise ValueError("That clip is too short to read a tempo and key (under 2 seconds).")
     named = tempo_from_name(Path(path).stem)
     flux, fps = _flux(mono, rate)
     hop_level = 20 * np.log10(np.sqrt(np.convolve(mono ** 2, np.ones(HOP * 4) / (HOP * 4), mode="same"))[::HOP][:len(flux)] + 1e-9)

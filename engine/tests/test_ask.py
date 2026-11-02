@@ -384,3 +384,28 @@ def test_timing_requests_get_the_timing_tools():
     for name in ("check_again", "hear_song", "add_part_markers"):
         assert ask.interpret(msg(None, call(name)), ctx, "x")["actions"] == [{"type": name, "args": {}}]
     assert "never sidechain" in ask.PROMPT
+
+
+def test_a_raise_past_the_ceiling_is_capped_and_says_so():
+    # Nov 2: "raise the vocal to +10" with the fader at +4: Live caps at +6, so Muse's "+10" reply mustn't show
+    context = {**CONTEXT, "tracks": [{"name": "VOCAL", "volume_db": 4.0}]}
+    out = ask.interpret(msg("Raising your vocal to +10.", call("track_volume", track="VOCAL", change_db=6)), context, "raise the vocal to +10")
+    assert out["actions"] == [{"type": "track_volume", "args": {"track": "VOCAL", "change_db": 2.0}}]
+    assert out["reply"] is None and "ceiling" in out["problems"][0]
+    at_top = {**CONTEXT, "tracks": [{"name": "VOCAL", "volume_db": 6.0}]}
+    out = ask.interpret(msg("Up.", call("track_volume", track="VOCAL", change_db=3)), at_top, "vocal up")
+    assert out["actions"] == [] and "already" in out["problems"][0]
+
+
+def test_infinite_numbers_from_muse_are_skipped_not_a_crash():
+    out = ask.interpret(SimpleNamespace(content="ok", tool_calls=[
+        SimpleNamespace(function=SimpleNamespace(name="undo", arguments='{"steps": 1e999}')),
+        SimpleNamespace(function=SimpleNamespace(name="jump_to", arguments='{"bar": Infinity}'))]), CONTEXT, "undo")
+    assert out["actions"] == [] and out["dropped"] == 2
+
+
+def test_a_level_past_the_ceiling_goes_to_the_ceiling():
+    context = {**CONTEXT, "tracks": [{"name": "VOCAL", "volume_db": 0.0}]}
+    out = ask.interpret(msg("Vocal to +10.", call("track_volume", track="VOCAL", to_db=10)), context, "raise the vocal to +10")
+    assert out["actions"] == [{"type": "track_volume", "args": {"track": "VOCAL", "to_db": 6.0}}]
+    assert out["reply"] is None and "not +10" in out["problems"][0]

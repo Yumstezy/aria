@@ -165,7 +165,7 @@ def validate(raw, measured, context, findings, has_reference=False):
         return has_reference or not COMPARISON.search(text)
 
     notes = []
-    for n in data.get("notes") or []:
+    for n in (data.get("notes") if isinstance(data.get("notes"), list) else []):
         if not isinstance(n, dict) or not isinstance(n.get("text"), str):
             continue
         i = n.get("finding")

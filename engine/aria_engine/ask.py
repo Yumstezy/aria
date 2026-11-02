@@ -5,6 +5,7 @@ its limits (docs/contracts.md), and the device applies them with Undo. Calls Mus
 on its own initiative come back as suggestions, which wait for the producer's yes.
 """
 import json
+import math
 import os
 import re
 
@@ -538,6 +539,8 @@ def _setting(st, device=None):
             return None
         raw = m.group(0)
     v = float(raw)
+    if not math.isfinite(v):
+        return None
     unit = _unit(device, param) if device else None
     percent = unit.startswith("%") if unit else bool(PERCENT_KNOB.search(param))
     top = 400 if unit and "400" in unit else 100
@@ -758,7 +761,7 @@ def check_action(name, args, tracks=(), plugins=()):
         if name == "set_tempo":
             bpm = float(args["bpm"])
             return {"bpm": round(bpm, 2)} if 20 <= bpm <= 999 else None
-    except (KeyError, TypeError, ValueError):
+    except (KeyError, TypeError, ValueError, OverflowError):
         return None
     return None
 
@@ -835,7 +838,13 @@ def _one_call(name, args, context, request, tracks, plugins, actions, suggestion
             dropped += 1
             problems.append("Aria needs a name and bars in order (first bar, then last) to make a section.")
         return dropped
+    # "Raise the vocal to +10": the fader goes to Aria's ceiling, and the producer is told, rather than nothing happening
+    capped_to = None
+    if name == "track_volume" and isinstance(args.get("to_db"), (int, float)) and not isinstance(args["to_db"], bool) and 6 < args["to_db"] <= 24:
+        capped_to, args = args["to_db"], {**args, "to_db": 6}
     cleaned = check_action(name, args, tracks, plugins)
+    if cleaned is not None and capped_to is not None:
+        problems.append(f'Capped at +6 dB, Aria\'s ceiling: "{cleaned["track"]}" goes to +6 dB, not {capped_to:+g}.')
     if cleaned is None:
         dropped += 1
         problems.append(why_dropped(name, args, tracks, plugins))
@@ -857,6 +866,15 @@ def _one_call(name, args, context, request, tracks, plugins, actions, suggestion
             if not keep and cleaned["mode"] == "add":
                 return dropped + 1
             cleaned = {**cleaned, "settings": keep}
+    if name == "track_volume" and "change_db" in cleaned and cleaned["change_db"] > 0:
+        now = next((t.get("volume_db") for t in context.get("tracks") or [] if isinstance(t, dict) and t.get("name") == cleaned["track"]), None)
+        if isinstance(now, (int, float)) and now + cleaned["change_db"] > 6:
+            room = round(6 - now, 1)
+            if room <= 0:
+                problems.append(f'"{cleaned["track"]}" is already at Aria\'s ceiling of +6 dB.')
+                return dropped + 1
+            cleaned = {**cleaned, "change_db": room}
+            problems.append(f'Capped at +6 dB, Aria\'s ceiling: "{cleaned["track"]}" goes up {room} dB.')
     actions.append({"type": name, "args": cleaned})
     return dropped
 
@@ -878,7 +896,7 @@ def interpret(message, context, request):
             continue
         try:
             dropped = _one_call(name, args, context, request, tracks, plugins, actions, suggestions, shown, problems, dropped, reads)
-        except (KeyError, TypeError, ValueError, AttributeError):
+        except (KeyError, TypeError, ValueError, AttributeError, OverflowError):
             dropped += 1
             problems.append(f"Muse sent {name.replace('_', ' ')} with values Aria can't use, so Aria skipped it.")
         continue

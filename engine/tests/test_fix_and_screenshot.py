@@ -170,8 +170,11 @@ def test_a_fader_can_be_set_to_a_level_the_producer_names():
         call("track_volume", track="VOCAL", to_db=-15), call("track_eq", track="LEADS", shape="high_shelf", freq_hz=10000, gain_db=2)))
     assert [a["type"] for a in out["actions"]] == ["track_volume", "track_eq"]
     assert out["actions"][0]["args"] == {"track": "VOCAL", "to_db": -15.0}
-    for bad in ({"to_db": 9}, {"change_db": 0}):
+    for bad in ({"to_db": 30}, {"change_db": 0}):
         assert ask.ask("louder", ctx, client=client_for("", call("track_volume", track="VOCAL", **bad)))["actions"] == []
+    # Over the ceiling but plausible (Nov 2): it goes to +6 and says so
+    capped = ask.ask("vocal to +9", ctx, client=client_for("", call("track_volume", track="VOCAL", to_db=9)))
+    assert capped["actions"][0]["args"] == {"track": "VOCAL", "to_db": 6.0} and "ceiling" in capped["problems"][0]
 
 
 def test_track_faders_are_applied_to_the_ear_recordings(tmp_path):

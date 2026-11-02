@@ -107,3 +107,37 @@ def test_without_a_reference_nothing_is_compared(tmp_path, monkeypatch):
     body = client.post("/mix/analyze", json={"mix_path": path}).json()
     assert body["reference"] is None and "typical" not in body
     assert all(f["kind"] != "reference" for f in body["clarity"]["findings"])
+
+
+def test_broken_recordings_get_a_plain_400_not_a_crash(tmp_path, monkeypatch):
+    # Nov 2 corner cases: Live can write a header with no audio; a float file can carry NaN; a slip can hand in a tiny file
+    monkeypatch.setenv("MODEL_API_KEY", "")
+    import soundfile as sf
+    empty, one, broken = tmp_path / "empty.wav", tmp_path / "one.wav", tmp_path / "nan.wav"
+    sf.write(empty, np.zeros((0, 2)), 48000)
+    sf.write(one, np.zeros((1, 2)), 48000)
+    x = np.column_stack([sine(440, 0.3), sine(440, 0.3)]).astype(np.float32)
+    x[100] = np.nan
+    sf.write(broken, x, 48000, subtype="FLOAT")
+    for path, words in ((empty, "is empty"), (one, "too short"), (broken, "broken samples")):
+        res = client.post("/mix/analyze", json={"mix_path": str(path), "tempo": 120.0})
+        assert res.status_code == 400 and words in res.json()["detail"]
+        assert path.name in res.json()["detail"]   # the file's own name, as spelled
+
+
+def test_an_empty_ear_names_its_track(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODEL_API_KEY", "")
+    import soundfile as sf
+    mix = write(tmp_path / "mix.wav", sine(440, 0.3), sine(440, 0.3))
+    sf.write(tmp_path / "ear.wav", np.zeros((0, 2)), 48000)
+    res = client.post("/mix/analyze", json={"mix_path": mix, "tempo": 120.0, "tracks": {"Vox": str(tmp_path / "ear.wav"), "Mix": mix}})
+    assert res.status_code == 400 and res.json()["detail"] == "The recording of Vox is empty. Is the song playing?"
+
+
+def test_a_noise_floor_has_no_clashes(tmp_path, monkeypatch):
+    # Masking is relative to the mix: on -80 dB of hiss it reported buried parts that weren't there
+    monkeypatch.setenv("MODEL_API_KEY", "")
+    noise = np.random.default_rng(0).standard_normal(48000 * 4) * 10 ** (-80 / 20)
+    path = write(tmp_path / "hiss.wav", noise, noise)
+    body = client.post("/mix/analyze", json={"mix_path": path, "tempo": 120.0}).json()
+    assert body["clarity"]["findings"] == [] and "under -50 dB" in body["clarity"]["quiet"]

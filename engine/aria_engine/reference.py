@@ -148,8 +148,10 @@ def compare(audio, rate, ref_audio, ref_rate):
 
 
 def read(path):
-    """The reference's audio, any format soundfile reads (wav, aiff, flac, mp3, ogg)."""
-    return sf.read(str(path), always_2d=True, dtype="float64")
+    """The reference's audio, any format soundfile reads (wav, aiff, flac, mp3, ogg). A few broken samples (NaN or
+    inf) become silence, so a song isn't called silent for them; past two channels, left and right are kept."""
+    x, rate = sf.read(str(path), always_2d=True, dtype="float64")
+    return np.nan_to_num(x[:, :2], nan=0.0, posinf=0.0, neginf=0.0), rate
 
 
 def keep(data, name):

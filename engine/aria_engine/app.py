@@ -132,6 +132,27 @@ def _audio_file(path_str):
 
 
 SPLIT_TOP_N = 4
+MIN_SEC, MAX_SEC = 0.5, 600   # a Check mix records a few bars; anything over 10 minutes is a wrong file, and slow
+
+
+def read_recording(path, what):
+    """A recording as float64 frames x channels, or a plain 400: empty, too short, too long, broken samples.
+    More than two channels keeps the first two (left and right)."""
+    try:
+        x, rate = sf.read(str(path), always_2d=True, dtype="float64")
+    except (RuntimeError, sf.LibsndfileError) as e:
+        raise HTTPException(400, f"Can't read {what} as audio: {e}")
+    what = what[:1].upper() + what[1:] if what.startswith("the ") else what   # a file name keeps its own spelling
+    if len(x) == 0:
+        raise HTTPException(400, f"{what} is empty. Is the song playing?")
+    if len(x) < rate * MIN_SEC:
+        raise HTTPException(400, f"{what} is too short to measure (under {MIN_SEC} s).")
+    if len(x) > rate * MAX_SEC:
+        raise HTTPException(400, f"{what} is over {MAX_SEC // 60} minutes. Check a few bars at a time.")
+    if not np.isfinite(x).all():
+        raise HTTPException(400, f"{what} has broken samples (NaN or inf), so Aria can't measure it.")
+    return x[:, :2], rate
+
 
 
 def find_clarity(audio, rate, tempo, start_beat, beats_per_bar):
@@ -180,10 +201,7 @@ def find_tracks(paths, rate, audio, timing, playing=None, faders=None):
     then a track covered by another, then what the master shows."""
     sounds = {}
     for name, p in paths.items():
-        try:
-            x, r = sf.read(str(_audio_file(p)), always_2d=True, dtype="float64")
-        except (RuntimeError, sf.LibsndfileError) as e:
-            raise HTTPException(400, f"Can't read the recording of {name}: {e}")
+        x, r = read_recording(_audio_file(p), f"the recording of {name}")
         if r != rate:
             raise HTTPException(400, f"{name} was recorded at {r} Hz, Main at {rate} Hz.")
         # The Ear hears the track before its fader; the listener hears it after. -70 dB is a fader at -inf.
@@ -252,13 +270,17 @@ def compare_with(ref_path, audio, rate, bars, name=None, window=None, part=None)
 def mix_analyze(req: MixRequest):
     path = _audio_file(req.mix_path)
 
-    try:
-        audio, rate = sf.read(str(path), always_2d=True, dtype="float64")
-    except (RuntimeError, sf.LibsndfileError) as e:
-        raise HTTPException(400, f"Can't read {path.name} as audio: {e}")
+    audio, rate = read_recording(path, path.name)
     measured = analysis.measure_array(audio, rate)
     timing = dict(tempo=req.tempo, start_beat=req.start_beat, beats_per_bar=req.beats_per_bar or 4.0)
-    if req.tracks and len(req.tracks) >= 2:
+    # Nothing playing (silence, or only a noise floor): no clashes to find. Masking is relative to the mix, so on
+    # -80 dB of hiss it would report buried parts that aren't there.
+    peak_db = 20 * np.log10(float(np.max(np.abs(audio))) + 1e-12)
+    if "all" in measured["unmeasured"] or peak_db < -50:
+        found = clarity.analyze(audio, rate, **timing)
+        found.update(findings=[], mode="master", spectra=stems.spectra({"mix": audio}, rate),
+                     quiet=measured["unmeasured"].get("all") or "Nothing loud enough to check: the loudest moment is under -50 dB.")
+    elif req.tracks and len(req.tracks) >= 2:
         found = find_tracks(req.tracks, rate, audio, timing, req.tracks_playing, req.track_faders_db)
     else:
         found = find_clarity(audio, rate, req.tempo, req.start_beat, req.beats_per_bar or 4.0)
@@ -344,10 +366,7 @@ def before_after(req: BeforeAfterRequest):
     problem's range changed. Negative change_db: less of it than before."""
     takes = []
     for t in (req.before, req.after):
-        try:
-            x, r = sf.read(str(_audio_file(t.path)), always_2d=True, dtype="float64")
-        except (RuntimeError, sf.LibsndfileError) as e:
-            raise HTTPException(400, f"Can't read {Path(t.path).name}: {e}")
+        x, r = read_recording(_audio_file(t.path), Path(t.path).name)
         takes.append((x, r, t.start_beat))
     (bx, br, bb), (ax, ar, ab) = takes
     if br != ar:
