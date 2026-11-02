@@ -1,63 +1,245 @@
 {
- "recorded": "Mix check: Aria's engine and Muse Spark on Nov 1, 2026, 3:44 PM, on the files in test-pack/sample (the same check Live runs). The steps after it are filled in from Ian's run in Live.",
- "reference": "Finished mix (reference).wav: Ian's own finished mix of the same 16 bars",
+ "recorded": "Ian's run in Live on Nov 1, 2026, 5:00 to 5:07 PM, with every reply and change exactly as Aria logged it. Track 12 (\"take me in your arms\", inside the vocal group) is shown as VOCAL, and a few follow-up messages are merged into the request they answer. The Mix check is Ian's 5:00 recording from Live, run through Aria's engine and Muse Spark again.",
+ "after_note": "After plays Ian's export from Live at the end of the run (all steps), turned down 6.8 dB to the same loudness as Before, so you hear the mix, not the volume. Before is the sample's rough mix: the five unmixed parts in test-pack/sample.",
+ "reference": null,
  "steps": [
   {
    "id": "check",
    "kind": "check",
    "label": "Mix check",
    "ask": null,
-   "reply": "Your low mids sit fuller than the reference in these bars.",
+   "reply": "The leads get lost under everything else in the low mids and mids.",
    "note": {
-    "short": "Low mids sound boxy and crowded",
-    "text": "Your low mids are fuller than Finished mix (reference).wav. That is +4.7 dB from 220 to 350 Hz around 310 Hz, so that area feels boxy."
+    "short": "Leads get lost under the mix",
+    "text": "The LEADS sit 5.5 dB under everything else in the 400 to 1000 Hz range for 60 percent of the time they play. That clouds the presence of the leads. Make room by cutting everything else in that range, cleaning up the LEADS with EQ, or sidechaining the cover to the LEADS."
    },
    "finding": {
-    "kind": "reference",
-    "hz": 310,
+    "kind": "masking",
+    "hz": null,
     "hz_range": [
-     220,
-     350
+     150,
+     1000
     ],
-    "diff_db": 4.7,
+    "diff_db": null,
     "bars": [
-     1,
+     2,
      16
-    ]
+    ],
+    "masked": "LEADS"
    },
-   "bands": [
-    {
-     "name": "Sub",
-     "diff_db": -0.9
-    },
-    {
-     "name": "Bass",
-     "diff_db": -0.9
-    },
-    {
-     "name": "Low mids",
-     "diff_db": 0.9
-    },
-    {
-     "name": "Mids",
-     "diff_db": 0.5
-    },
-    {
-     "name": "Upper mids",
-     "diff_db": -0.2
-    },
-    {
-     "name": "Highs",
-     "diff_db": 1.4
-    },
-    {
-     "name": "Air",
-     "diff_db": 1.7
-    }
-   ],
    "done": [],
    "devices": [],
    "audio": null
+  },
+  {
+   "id": "fix",
+   "kind": "fix",
+   "label": "Fix it",
+   "button": "Fix it",
+   "ask": null,
+   "reply": "I'll carve out space for those buried leads instead of just pushing them louder.",
+   "done": [
+    {
+     "text": "Added an EQ Eight on \"BASS\". band 5 Bell -3.01 dB at 274 Hz, Q 1.",
+     "ok": true
+    },
+    {
+     "text": "Added an EQ Eight on \"LEADS\". band 5 Bell 1.99 dB at 699 Hz, Q 1.",
+     "ok": true
+    },
+    {
+     "text": "\"KICK\" down 3 dB, now -8.801 dB.",
+     "ok": true
+    }
+   ],
+   "devices": [
+    {
+     "track": "BASS",
+     "name": "EQ Eight"
+    },
+    {
+     "track": "LEADS",
+     "name": "EQ Eight"
+    }
+   ],
+   "audio": "/demo/01 after.m4a",
+   "measured": null
+  },
+  {
+   "id": "vocal12",
+   "kind": "ask",
+   "label": "Lower the vocal",
+   "ask": "lower the take me in your arms track to like -11",
+   "reply": "Turning that vocal down toward -12.",
+   "done": [
+    {
+     "text": "\"VOCAL\" down 6 dB, now -6.001 dB.",
+     "ok": true
+    },
+    {
+     "text": "\"VOCAL\" down 6 dB, now -12.001 dB.",
+     "ok": true
+    }
+   ],
+   "devices": [],
+   "audio": null,
+   "keywords": [
+    "vocal",
+    "lower",
+    "down",
+    "quieter",
+    "track"
+   ]
+  },
+  {
+   "id": "leads",
+   "kind": "ask",
+   "label": "Leads too loud",
+   "ask": "i think the leads are way to loud and over power the rest of the song",
+   "reply": "Turning the leads down a touch.",
+   "done": [
+    {
+     "text": "\"LEADS\" down 2 dB, now 1.998 dB.",
+     "ok": true
+    },
+    {
+     "text": "\"LEADS\" down 3 dB, now -1.002 dB.",
+     "ok": true
+    }
+   ],
+   "devices": [],
+   "audio": null,
+   "keywords": [
+    "leads",
+    "lead",
+    "loud",
+    "overpower",
+    "quieter",
+    "down"
+   ]
+  },
+  {
+   "id": "basscut",
+   "kind": "ask",
+   "label": "Cut the bass highs",
+   "ask": "turn the bass high frequencys cut",
+   "reply": "Cutting the bass top end now.",
+   "done": [
+    {
+     "text": "On \"BASS\": band 8 Low Pass 12dB at 1000 Hz.",
+     "ok": true
+    }
+   ],
+   "devices": [],
+   "audio": null,
+   "keywords": [
+    "bass",
+    "high",
+    "highs",
+    "cut",
+    "frequencies",
+    "frequencys",
+    "top"
+   ]
+  },
+  {
+   "id": "vocals",
+   "kind": "ask",
+   "label": "Lower the vocal group",
+   "ask": "can u lower the vocal track",
+   "reply": "I'll lower the vocals group by the standard 2 dB.",
+   "done": [
+    {
+     "text": "\"VOCAL\" down 2 dB, now 0.0 dB.",
+     "ok": true
+    }
+   ],
+   "devices": [],
+   "audio": null,
+   "keywords": [
+    "vocal",
+    "vocals",
+    "lower"
+   ]
+  },
+  {
+   "id": "air",
+   "kind": "ask",
+   "label": "Air on the leads",
+   "ask": "turn down track 12 to -15 and the leads need some airy ness",
+   "reply": "Turning that track down toward your target.",
+   "done": [
+    {
+     "text": "On \"LEADS\": band 8 High Shelf 1.99 dB at 9.99 kHz, Q 1.",
+     "ok": true
+    },
+    {
+     "text": "\"VOCAL\" down 6 dB, now -18.001 dB.",
+     "ok": true
+    }
+   ],
+   "devices": [],
+   "audio": null,
+   "keywords": [
+    "air",
+    "airy",
+    "airiness",
+    "bright",
+    "leads",
+    "sparkle"
+   ]
+  },
+  {
+   "id": "reverb",
+   "kind": "ask",
+   "label": "Reverb on the vocal",
+   "ask": "add reverb to my vocals",
+   "reply": "Adding space to your vocals.",
+   "done": [
+    {
+     "text": "Added a Reverb on \"VOCAL\": Decay Time 2.49 s, Predelay 20.0 ms, Dry/Wet 19 %.",
+     "ok": true
+    }
+   ],
+   "devices": [
+    {
+     "track": "VOCAL",
+     "name": "Reverb"
+    }
+   ],
+   "audio": null,
+   "keywords": [
+    "reverb",
+    "space",
+    "verb",
+    "vocals"
+   ]
+  },
+  {
+   "id": "delay",
+   "kind": "ask",
+   "label": "Delay on the vocal",
+   "ask": "and some easy deley",
+   "reply": "Adding a touch of delay to your vocals.",
+   "done": [
+    {
+     "text": "Added a Delay on \"VOCAL\": L 16th 3, R 16th 4, Feedback 29 %, Dry/Wet 15 %.",
+     "ok": true
+    }
+   ],
+   "devices": [
+    {
+     "track": "VOCAL",
+     "name": "Delay"
+    }
+   ],
+   "audio": null,
+   "keywords": [
+    "delay",
+    "deley",
+    "echo",
+    "easy"
+   ]
   }
  ]
 }

@@ -18,7 +18,7 @@ type Step = {
   id: string; kind: "check" | "fix" | "ask"; label: string; ask: string | null; reply: string | null;
   note?: { short: string; text: string }; finding?: { kind: string; hz: number; hz_range: number[]; diff_db: number; bars: number[] };
   bands?: { name: string; diff_db: number }[]; done: Done[]; devices: { track: string; name: string }[]; audio: string | null;
-  measured?: string | null; keywords?: string[];
+  measured?: string | null; keywords?: string[]; button?: string;
 };
 const STEPS = run.steps as Step[];
 const CHECK = STEPS.find((s) => s.kind === "check")!;
@@ -27,12 +27,15 @@ const ASKS = STEPS.filter((s) => s.kind === "ask");
 
 // What each step means for someone who has never mixed a song. Written for the page; the numbers come from the run.
 const PLAIN: Record<string, (s: Step) => string> = {
-  check: (s) => s.finding
-    ? `Aria compared these 16 bars with Ian's own finished mix. The rough version has ${s.finding.diff_db} dB too much around ${s.finding.hz} Hz: the boxy, cardboard sound in the low middle, where bass, synths and voice pile up.`
-    : "Aria listened to these 16 bars and looked for sounds that clash or stick out.",
-  fix: () => "Muse Spark picked a change for each problem, Aria made it in Live, then played the same bars again and measured whether the problem really went away.",
-  sidechain: () => "The kick and the bass hit the same low notes at once, so they blur. A sidechain makes the bass duck for a split second every time the kick hits.",
-  punch: () => "Aria loaded one of its racks, Aria Punch Through, on the kick: parallel saturation and compression that help the kick cut through.",
+  check: () => "Aria listened to each track on its own. The lead synth is there, but the rest of the song covers it most of the time, so you barely hear the melody.",
+  fix: () => "Instead of just turning the leads up (louder, closer to distortion), Muse made room: it cut the bass where it sits on top of the leads, gave the leads a little lift where they carry, and turned down the kick, which was by far the loudest thing.",
+  vocal12: () => "The vocal sample was too loud. Aria turned its fader down until it sat with the music instead of on top of it.",
+  leads: () => "Now the leads came through, a bit too much. Aria pulled them back so they don't overpower the song.",
+  basscut: () => "The bass had high, buzzy overtones it doesn't need, right where the leads and vocal live. A low pass on the bass removes everything above 1000 Hz, which leaves the bass's weight and clears space for the rest.",
+  vocals: () => "The whole vocal group came down 2 dB so the voice blends in.",
+  air: () => "A high shelf adds a touch of 'air': the shimmer above 10 kHz that makes a synth sound open and expensive.",
+  reverb: () => "Reverb puts the vocal in a room, so it sounds like part of the track instead of pasted on top.",
+  delay: () => "A soft delay repeats the vocal quietly in time with the song, which fills the space between phrases.",
 };
 
 const COLORS = ["#ff5a4f", "#ffa529", "#10a4ee", "#5cffe8", "#ff94a6"];
@@ -281,7 +284,7 @@ export function TryIt() {
     if (busy) return;
     setPhase("checking");
     if (!playing) mix.play(gains(), 0);
-    await walk(["Listening to bars 1 to 16", "Splitting the mix into its parts", "Comparing with the reference", "Muse Spark is reading the measurements"], 1100);
+    await walk(["Listening to bars 1 to 16", "Hearing each track on its own", "Finding what covers what", "Muse Spark is reading the measurements"], 1100);
     if (CHECK.reply) say({ kind: "muse", text: CHECK.reply });
     if (CHECK.note) say({ kind: "card", title: CHECK.note.short, text: CHECK.note.text });
     say({ kind: "plain", text: PLAIN.check(CHECK) });
@@ -291,17 +294,17 @@ export function TryIt() {
   const apply = async (s: Step, asked?: string) => {
     setPhase("busy");
     if (s.kind === "ask") say({ kind: "user", text: s.ask ?? s.label, note: asked && asked.trim().toLowerCase() !== (s.ask ?? "").toLowerCase() ? "the recorded request closest to what you typed" : undefined });
-    else say({ kind: "step", text: "Fixing the strongest problems" });
+    else say({ kind: "step", text: s.button === "Fix it" && CHECK.note ? `Fix it: ${CHECK.note.short}` : "Fixing the strongest problems" });
     setTyping(true);
     await sleep(1400);
     setTyping(false);
     if (s.reply) say({ kind: "muse", text: s.reply });
     for (const d of s.done) { await sleep(450); say({ kind: "done", d }); }
     setApplied((a) => [...a, s.id]);
-    if (s.kind === "fix") {
+    if (s.kind === "fix" && s.measured) {
       await walk(["Playing bars 1 to 16 again", "Comparing before and after at the same loudness"], 1100);
       say({ kind: "step", text: "How it went" });
-      if (s.measured) say({ kind: "muse", text: s.measured });
+      say({ kind: "muse", text: s.measured });
     }
     if (PLAIN[s.id]) say({ kind: "plain", text: PLAIN[s.id](s) });
     if (s.audio) {
@@ -421,11 +424,11 @@ export function TryIt() {
               })}
               <span className="pointer-events-none absolute bottom-0 top-5 w-px bg-white" style={{ left: `calc(var(--lane-left) + (100% - var(--lane-left)) * ${(pos / DUR).toFixed(4)})` }} />
             </div>
-            <p className="mt-2 text-[12px] text-[#8a8a8a]">{showAfter ? "Playing what Live played after Aria's changes. Mute and solo work on the original tracks." : "Mute or solo a track to hear what each one plays."}</p>
+            <p className="mt-2 text-[12px] text-[#8a8a8a]">{showAfter ? "Playing Ian's export from Live after the whole run, at the same loudness as Before. Mute and solo work on the original tracks." : "Mute or solo a track to hear what each one plays."}</p>
             <div className="mt-3">
               <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 text-[12px] text-[#9a9a9a]">
                 <span>The whole mix, measured as it plays</span>
-                {range && <span className="text-[#ffb532]">{range[0]} to {range[1]} Hz: where Aria heard the problem</span>}
+                {range && <span className="text-[#ffb532]">{range[0]} to {range[1]} Hz: where the leads get covered</span>}
               </div>
               <Spectrum analyser={mix.analyser} playing={playing} range={range} />
             </div>
@@ -447,7 +450,7 @@ export function TryIt() {
                     <button type="button" onClick={fixAll} disabled={phase === "idle" || busy || applied.includes(FIX.id)}
                             className={cn("rounded-full px-4 py-1.5 text-[13px] font-medium transition",
                               phase !== "idle" && !applied.includes(FIX.id) ? "bg-[#6ea8ff] text-black hover:brightness-110" : "bg-white/10 text-[#6a6a6a]")}>
-                      {applied.includes(FIX.id) ? "Fixed" : "Fix all"}
+                      {applied.includes(FIX.id) ? "Fixed" : FIX.button ?? "Fix all"}
                     </button>
                   </Hint>
                 )}
@@ -494,7 +497,7 @@ export function TryIt() {
                       <div className="flex flex-wrap gap-1.5">
                         {m.steps.map((id) => { const s = STEPS.find((x) => x.id === id)!; return (
                           <button key={id} type="button" onClick={() => (s.kind === "fix" ? fixAll() : apply(s))} disabled={busy || applied.includes(id)}
-                                  className="rounded-full border border-white/15 px-3 py-1 text-[12.5px] text-[#d0d0d4] hover:bg-white/10 disabled:opacity-40">{s.kind === "fix" ? "Fix all" : s.ask}</button>
+                                  className="rounded-full border border-white/15 px-3 py-1 text-[12.5px] text-[#d0d0d4] hover:bg-white/10 disabled:opacity-40">{s.kind === "fix" ? (s.button ?? "Fix all") : s.label}</button>
                         ); })}
                       </div>
                     )}
@@ -511,7 +514,7 @@ export function TryIt() {
                   {pending.map((s) => (
                     <Hint key={s.id} on={next === "chat" && s === pending[0]}>
                       <button type="button" onClick={() => apply(s)} disabled={busy}
-                              className="rounded-full border border-white/15 px-3 py-1 text-[12.5px] text-[#d0d0d4] transition hover:bg-white/10 disabled:opacity-40">{s.ask}</button>
+                              className="rounded-full border border-white/15 px-3 py-1 text-[12.5px] text-[#d0d0d4] transition hover:bg-white/10 disabled:opacity-40">{s.label}</button>
                     </Hint>
                   ))}
                 </div>
@@ -529,7 +532,7 @@ export function TryIt() {
           </div>
         </div>
         <p className="border-t border-black/70 bg-[#161616] px-4 py-2.5 text-[11.5px] leading-relaxed text-[#7a7a7a]">
-          Recorded, not simulated: this replays a real run, faster than real time. {run.recorded} Reference: {run.reference}. The audio is in the repo's test-pack/sample, so anyone with Live can run it for real.
+          Recorded, not simulated: this replays a real run, faster than real time. {run.recorded} {run.after_note} The five tracks are in the repo's test-pack/sample, so anyone with Live can run it for real.
         </p>
       </div>
     </div>
