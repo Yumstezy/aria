@@ -215,16 +215,27 @@ export function TryIt() {
     tick();
     return () => cancelAnimationFrame(raf);
   }, [mix]);
-  useEffect(() => {
-    if (stage !== 3) return;
-    const key = (e: KeyboardEvent) => { if (e.code === "Space" && !(e.target instanceof HTMLButtonElement)) { e.preventDefault(); setVersion((v) => (v === "before" ? "after" : "before")); } };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [stage]);
-
   const playing = mix.state === "playing";
   const ensurePlaying = (g: Gains = gains()) => { if (mix.state !== "playing") mix.play(g, 0); };
   const toggle = () => (playing ? mix.stop() : mix.play(gains()));
+
+  // Space plays and pauses while the pointer is over the demo or focus is in it, instead of scrolling the page
+  // (Ian, Nov 1: "alow for pressing pause (space bar to pause) instead of it scrolling u down")
+  const card = useRef<HTMLDivElement>(null);
+  const hover = useRef(false);
+  const toggleRef = useRef(toggle);
+  toggleRef.current = () => { if (mix.state !== "loading") toggle(); };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.repeat) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (!hover.current && !card.current?.contains(document.activeElement)) return;
+      e.preventDefault();
+      toggleRef.current();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
 
   const check = async () => {
     setSolo(null);
@@ -267,7 +278,8 @@ export function TryIt() {
   };
 
   return (
-    <div className="mt-12 overflow-hidden rounded-[22px] border border-edge bg-card">
+    <div ref={card} onPointerEnter={() => (hover.current = true)} onPointerLeave={() => (hover.current = false)}
+         className="mt-12 overflow-hidden rounded-[22px] border border-edge bg-card">
       {/* the four steps, in order */}
       <ol className="flex border-b border-hairline px-5 sm:px-7">
         {STAGES.map((name, i) => (

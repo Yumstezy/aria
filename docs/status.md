@@ -4,6 +4,14 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 1, 10 PM: judges' site fixes from Ian's read-through.**
+- The Meta AI section now lists every Meta model Aria uses: Muse Spark (advice, 24 tools, questions, screenshots), Muse Voice Transcribe, and Audiobox Aesthetics, which is still being tested for the mix model.
+- "What broke, and how we fixed it" is rewritten in plain words for people who don't make music.
+- The mix model line is out of "What didn't work" (and the README says it's still being tested): Ian expects to decide on the model Nov 2.
+- Try it: space plays and pauses while the pointer is over the demo, instead of scrolling the page.
+- Still to do: the hero picture becomes a real screenshot of Aria in Live. It's waiting on Ian saving one as a file.
+- Not in a release yet: the undo-everything fix (f0e8956). Publish v0.2.2 with it.
+
 **Nov 1, night: release v0.2.1 is the download.** It's built from 7c57e1c: the Ear fix, make-space advice, track loudness, sidechain-aware buried, faders to a level, two requests in one message, and no empty "Fixing…".
 - Test-installed into a scratch home: devices copied, 26 racks, current helper, and the engine answers /health.
 - The public link serves it (checked byte for byte).

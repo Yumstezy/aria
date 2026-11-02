@@ -197,7 +197,7 @@ Found by using Aria on real songs inside Live, every day of the build.
 
 ### What didn't work
 
-- **The mix model didn't ship.** Trained on 99 mixes people rated good, mid or bad: 0.49 balanced accuracy against 0.45 for loudness alone, and it failed the shuffle test. With Meta's Audiobox Aesthetics scores added: 0.51, better than chance, but not reliably better than loudness. Next: the spectrum's shape alone, good against bad ([`ml/HANDOFF-shape-model.md`](ml/HANDOFF-shape-model.md)).
+- **The mix model is still being tested.** It learns from 99 mixes people rated good, mid or bad, with Meta's Audiobox Aesthetics scores as one input. It goes into Aria only if it beats simple baselines ([`ml/HANDOFF-shape-model.md`](ml/HANDOFF-shape-model.md)).
 - **One vocal still reads the wrong tempo** (Ian's 148 BPM stem reads 192), so every reading comes with the next likely ones, and the song's own tempo is one tap.
 - **Without a reference, a broad low-mid boost is hard to hear:** the rules found 1 of 3 planted problems. That's why the reference compare exists.
 

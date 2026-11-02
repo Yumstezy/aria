@@ -33,6 +33,7 @@ const I = {
   knob: (s?: number) => svg(<><circle cx="12" cy="12" r="7" /><path d="M12 12 15.5 8.5" /></>, s),
   split: (s?: number) => svg(<path d="M4 6h6l4 6-4 6H4M20 6h-4M20 18h-4M14 12h6" />, s),
   user: (s?: number) => svg(<><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>, s),
+  image: (s?: number) => svg(<><rect x="4" y="5" width="16" height="14" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="m4 17 5-4 4 3 3-2 4 3" /></>, s),
   download: (s?: number) => svg(<path d="M12 4v11M7 10l5 5 5-5M5 20h14" />, s),
   github: (s?: number) => svg(<path d="M9 19c-4 1.5-4-2-6-2.5m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.8 2.7 5.8 3 5.8 3a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4.4 9.4c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21" />, s),
 };
@@ -122,11 +123,15 @@ const NAV: LiquidNavItem[] = [
   { label: "Team", href: "#team", icon: I.user(), fx: "pop" },
 ];
 
+// Every Meta model Aria uses (Ian, Nov 1: "talk about all the tools we used from meta like the thing for the model
+// the voice spark etc."). Audiobox is still being tested for the mix model, so it says so.
 const META: [string, string, Accent, ReactNode][] = [
   ["Muse Spark writes it", "Turns Aria's measurements into plain advice and a fix. It only ever sees measured numbers, and Aria checks its answer before anything happens.", "gold", I.spark()],
   ["Muse Spark does it", "24 tools in Live through tool calling: EQ, faders, stock devices, 26 custom racks, sidechain, vocal sync. Each is checked against a fixed menu and limits, and each has Undo.", "blue", I.check()],
   ["Muse Spark asks", "When it can't tell which track you mean, it asks instead of guessing. It also names the parts of your song: Intro, Build, Drop.", "good", I.speech()],
+  ["Muse Spark sees it", "Paste a screenshot into the chat, like a plugin you're stuck on, and Muse Spark looks at it along with what you asked.", "hot", I.image()],
   ["Muse Voice Transcribe hears it", "Hold a key and say it. \"Cut the mud on the bass\" came back as text in 1.4 seconds and ran like a typed request.", "white", I.mic()],
+  ["Audiobox Aesthetics rates it", "Meta's open model that scores how good audio sounds. We're testing it in our mix model, which learns from 99 mixes people rated.", "gold", I.wave()],
 ];
 
 const TOOLS: { crop: number; skip?: number; title: string; line: string; src: string; alt: string }[] = [
@@ -143,19 +148,20 @@ const BUILD: [string, string][] = [
   ["The screens", "React, inside Live's own web view: the strip on the device, and the window docked over Live."],
 ];
 
+// In plain words for someone who doesn't make music (Ian, Nov 1: "if i didnt know anything about music i would have
+// zero clue")
 const BROKE: [string, string][] = [
-  ["The device came up blank.", "Live's audio was off, which stalls Max's message queue. The device now carries its own page that says so."],
-  ["A result was too big to show.", "Max passes its web view about 32 KB; a groove result was 50 KB. Results are packed now, and anything too long gets a plain error."],
-  ["Live dropped warp markers without a word.", "Aria now sets them in rounds, reads them back, and only says Synced when they're there."],
-  ["Kicks read 30 ms late.", "A kick's low end builds slowly. Hits are timed by their full sound now."],
-  ["A vocal read 190 for 126.", "Three beats at 190 last as long as two at 126. Counting repeats over whole bars fixed it."],
-  ["\"On time\" became a sidechain.", "Muse got timing tools, a rule that timing never means ducking, and a question when the track isn't clear."],
+  ["Aria showed a blank screen.", "It happened when Live's sound was switched off, which freezes the part of Live that Aria runs on. Now Aria tells you to turn the sound on."],
+  ["Some results were too big to show.", "Live's screens can only take so much at once, and one result was too big. Aria packs its results smaller now, and says so plainly if one still won't fit."],
+  ["Live quietly ignored some changes.", "When Aria lined a vocal up with the beat, Live sometimes dropped the timing marks without saying so. Now Aria checks they stuck before it says it's done."],
+  ["Aria heard kick drums a little late.", "A kick's deep thump takes a moment to build, so every hit read a split second late. Now Aria times each hit by its whole sound."],
+  ["A slow vocal read as a fast one.", "A vocal at 126 beats a minute read as 190, because three fast beats take as long as two slow ones. Counting over longer stretches fixed it."],
+  ["\"Put it on beat\" got the wrong fix.", "Asked to line a vocal up with the beat, Muse made it duck under the kick instead, which is a different thing. Now it has tools for timing, and it asks when it isn't sure which track you mean."],
 ];
 
 const MISSES = [
-  "The mix model didn't ship. Trained on 99 mixes people rated, it scored 0.49 against 0.45 for loudness alone and failed our shuffle test. With Meta's Audiobox scores: 0.51, better than chance, but not reliably better than loudness. Next we try the spectrum's shape alone, good against bad.",
-  "One vocal still reads the wrong tempo (Ian's 148 BPM stem reads 192), so every reading comes with the next likely ones, and the song's own tempo is one tap.",
-  "Without a reference, a broad low-mid boost is hard to hear: the rules found 1 of 3 planted problems. That's why the reference compare exists.",
+  "One vocal still reads at the wrong speed: Ian's vocal at 148 beats a minute reads as 192. So Aria shows its best guesses, and you can pick your song's own speed with one tap.",
+  "Without a song to compare with, a mix that's a little muddy is hard to catch. In our test, Aria found 1 of the 3 problems we planted. That's why you can add a reference song to compare against.",
 ];
 
 
@@ -260,9 +266,9 @@ export default function App() {
         </Rise>
       </Section>
 
-      <Section id="meta" label="Meta AI" title="Muse Spark does the work you see." dim="Not a chat box on the side."
-               sub="Muse never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it, with Undo.">
-        <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <Section id="meta" label="Meta AI" title="Built on Meta's AI." dim="Not a chat box on the side."
+               sub="Three of Meta's models: Muse Spark, Muse Voice Transcribe and Audiobox Aesthetics. Muse never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it, with Undo.">
+        <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {META.map(([t, d, a, ic], i) => (
             <Rise key={t} delay={i * 0.06}><GlowCard accent={a} className="h-full">
               <IconChip>{ic}</IconChip><b className="mt-4 text-[16.5px] font-medium">{t}</b><p className="mt-2 text-[14px] leading-relaxed text-muted">{d}</p>
