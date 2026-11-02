@@ -108,7 +108,7 @@ Fix it asks Muse Spark for the change and it happens in Live. Check again plays 
 
 ### Ask, and it happens.
 
-Type or say it: *"Make the drums crispier." "Sync my vocal to the kick."* Each change has Undo. Aria comes with 26 custom racks built from Live's stock devices, and everything it adds is named for what it does, like Aria Sidechain.
+Type or say it: *"Make the drums crispier." "Sync my vocal to the kick."* You can undo each change. Aria comes with 26 custom racks built from Live's stock devices, and everything it adds is named for what it does, like Aria Sidechain.
 
 </td>
 </tr>
@@ -239,7 +239,7 @@ cd aria
 
 - **Your audio stays on your Mac.** The engine listens only on `127.0.0.1`. Recordings and reference songs never leave the computer. Muse Spark gets measured numbers and your requests.
 - **Your key stays yours.** It lives in `engine/.env`, read from the environment and never committed.
-- **The AI can't run anything.** Muse Spark picks from a fixed menu of actions; each is checked against limits before it's applied, and every change has Undo.
+- **The AI can't run anything.** Muse Spark picks from a fixed menu of actions; each is checked against limits before it's applied, and every change can be undone.
 - **Only Aria's pages can talk to the engine,** and every Python library is pinned to an exact version.
 - **Next:** a per-install token so nothing but Aria can call the engine, and a signed, notarized installer.
 
@@ -287,7 +287,7 @@ docs/        build steps, contracts, the rubric, status
 
 - **No invented data.** The engine reports only what it measured; the screens never show example numbers; Muse gets only measured numbers and its answer is checked. If Muse is down, Aria shows the measurements and says advice is unavailable.
 - **Plain words.** "Your choruses are too bright" first, then "+3.8 dB at 2 to 5 kHz" as the detail.
-- **The producer stays in charge.** Every change has Undo. What you ask for happens; what Muse suggests waits for a yes. Third-party plugins are never changed, only shown.
+- **The producer stays in charge.** Every change can be undone. What you ask for happens; what Muse suggests waits for a yes. Third-party plugins are never changed, only shown.
 
 ## Licenses and credits
 

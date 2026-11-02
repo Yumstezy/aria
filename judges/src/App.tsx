@@ -126,7 +126,7 @@ const NAV: LiquidNavItem[] = [
 // the voice spark etc."). Audiobox is still being tested for the mix model, so it says so.
 const META: [string, string, Accent, ReactNode][] = [
   ["Muse Spark writes it", "Turns Aria's measurements into plain advice and a fix. It only ever sees measured numbers, and Aria checks its answer before anything happens.", "gold", I.spark()],
-  ["Muse Spark does it", "24 tools in Live through tool calling: EQ, faders, stock devices, 26 custom racks, sidechain, vocal sync. Each is checked against a fixed menu and limits, and each has Undo.", "blue", I.check()],
+  ["Muse Spark does it", "24 tools in Live through tool calling: EQ, faders, stock devices, 26 custom racks, sidechain, vocal sync. Each is checked against a fixed menu and limits, and each can be undone.", "blue", I.check()],
   ["Muse Spark asks", "When it can't tell which track you mean, it asks instead of guessing, so a change never lands on the wrong track.", "good", I.speech()],
   ["Muse Spark sees it", "Paste a screenshot into the chat, like a plugin you're stuck on, and Muse Spark looks at it along with what you asked.", "hot", I.image()],
   ["Muse Spark names the parts", "Aria hears the whole song and Muse Spark names its parts, Intro, Build, Drop, so a check compares your drop with a reference's drop.", "blue", I.split()],
@@ -139,7 +139,7 @@ const TOOLS: { crop: number; skip?: number; title: string; line: string; src: st
   { crop: 560, skip: 150, title: "Fix it, then prove it.", line: "Fix it asks Muse Spark for the change and it happens in Live. Check again plays the same bars at the same loudness: 3 dB or more lower is Fixed, and it moves out of the way. Less, and it comes back with Fix it again.", src: "/img/fixed.png", alt: "A problem confirmed fixed by Before and after" },
   { crop: 420, skip: 450, title: "Two loops, one groove.", line: "Aria finds every hit to the millisecond and moves each one onto the grid or onto another loop's feel, in a new clip under the original. A perc loop 14.9 ms behind its kick came back at 0, all 32 hits. Nothing is stretched.", src: "/img/groove.png", alt: "Groove match: in time" },
   { crop: 560, skip: 410, title: "A vocal on your kick.", line: "Drop in an acapella. Aria reads its tempo and key, puts its first beat on your kick, not just the grid (Ian's kick sits 22 to 25 ms late), and warps it with Live's own markers, reading them back to be sure they stuck.", src: "/img/vocal.png", alt: "Vocal sync on the kick" },
-  { crop: 560, skip: 40, title: "Ask, and it happens.", line: "Real requests from testing, typos and all. 5 of 5 got the right tool, or a question when the track wasn't clear. Each change has Undo.", src: "/img/chat.png", alt: "Ask Muse making changes in Live" },
+  { crop: 560, skip: 40, title: "Ask, and it happens.", line: "Real requests from testing, typos and all. 5 of 5 got the right tool, or a question when the track wasn't clear. You can undo each change.", src: "/img/chat.png", alt: "Ask Muse making changes in Live" },
 ];
 
 const BUILD: [string, string][] = [
