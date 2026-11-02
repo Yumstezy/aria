@@ -126,7 +126,7 @@ const NAV: LiquidNavItem[] = [
 
 const META: [string, string, Accent, ReactNode][] = [
   ["Muse Spark writes it", "Turns Aria's measurements into plain advice and a fix. It only ever sees measured numbers, and Aria checks its answer before anything happens.", "gold", I.spark()],
-  ["Muse Spark does it", "21 actions in Live through tool calling, from an EQ cut to syncing a vocal. Each is checked against a fixed menu and limits, and each has Undo.", "blue", I.check()],
+  ["Muse Spark does it", "24 tools in Live through tool calling: EQ, faders, stock devices, 26 custom racks, sidechain, vocal sync. Each is checked against a fixed menu and limits, and each has Undo.", "blue", I.check()],
   ["Muse Spark asks", "When it can't tell which track you mean, it asks instead of guessing. It also names the parts of your song: Intro, Build, Drop.", "good", I.speech()],
   ["Muse Voice Transcribe hears it", "Hold a key and say it. \"Cut the mud on the bass\" came back as text in 1.4 seconds and ran like a typed request.", "white", I.mic()],
 ];

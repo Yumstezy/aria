@@ -5,56 +5,208 @@
   </picture>
 </p>
 
-<h1 align="center">Aria hears your mix and fixes it, inside Ableton.</h1>
+<h1 align="center">Aria hears your mix, and fixes it in Ableton.</h1>
 
 <p align="center">
-  An AI co-producer on your Main track. It finds the sounds that clash or stick out,<br>
-  <b>Meta's Muse Spark</b> explains them in plain words and makes the fix in Live,<br>
-  and Aria measures again to prove it worked.
+  An AI co-producer that runs inside Live, on your Main track. It finds the sounds that clash or stick out,<br>
+  Meta's <b>Muse Spark</b> explains them and makes the fix, and Aria measures again to prove it worked.
 </p>
 
 <p align="center">
-  <a href="https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip"><b>Download for Mac</b></a> ·
-  <a href="https://aria-judges.vercel.app">Website</a> ·
-  <a href="#install">Install</a> ·
-  <a href="#meta-ai">Meta AI</a> ·
-  <a href="#results">Results</a> ·
-  <a href="#team">Team</a>
+  <a href="https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip"><b>Download for Mac</b></a> &nbsp;·&nbsp;
+  <a href="https://aria-judges.vercel.app/#try"><b>Try it in your browser</b></a> &nbsp;·&nbsp;
+  <a href="https://aria-judges.vercel.app">Website</a> &nbsp;·&nbsp;
+  <a href="#get-aria">Install</a>
 </p>
 
-<p align="center"><sub>Meta Global AI Developer Hackathon · Indie track · built Oct 26 to Nov 4, 2026 · 153 engine tests</sub></p>
+<p align="center"><sub>Meta Global AI Developer Hackathon, Indie track. Built Oct 26 to Nov 4, 2026.</sub></p>
 
 <br>
 
-<img src="judges/public/img/home.png" alt="Aria's Home in the full window, on a real song">
+<img src="judges/public/img/home.png" alt="Aria's window on a real song">
 
-<p align="center"><sub>Aria's window on Ian's own song: what to fix, the reference, the song's parts and the live analyzer. Every screenshot here is the real app with real results.</sub></p>
-
----
-
-## Why Aria
-
-**Finishing a song stops at the mix.** Most producers learn to make a drop long before they learn why it sounds muddy next to the songs they love. The usual answers are an engineer, a course, or guessing with plugins. Aria works where they already are: in Ableton, on their own song.
-
-| It finds the problem | It says it plainly | It fixes it, and proves it |
-|---|---|---|
-| Not a score out of 100. The sound, the range and the bars: *"SYNTH buried, 1 to 4 kHz, bars 33 to 48."* | Muse Spark writes it the way a producer would say it, from measured numbers only. Never canned text. | One tap makes the change in Live, with Undo. **Check again** measures the same bars at the same loudness and marks it **Fixed**. |
-
-**Who it's for:** bedroom and indie producers in Ableton Live, starting with EDM, who can make the parts but can't yet hear why the whole doesn't hold up.
-
-**What it never does:** invent a number, judge your taste, or change a third-party plugin. It changes Live's own devices; for a plugin, it draws how it should look and you set it.
+<p align="center"><sub>Aria's window on Ian's own song. Every screenshot here is the real app with real results.</sub></p>
 
 ---
 
-## Install
+## Try it
 
-You need a Mac, **Ableton Live 12 Suite** and **Python 3.11** ([free from python.org](https://www.python.org/downloads/macos/)).
+**[Hear Aria fix a real mix](https://aria-judges.vercel.app/#try), no Ableton needed.** A house demo Ian made, before mixing, in four steps:
 
-1. **Download** [Aria-mac.zip](https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip) and unzip it. Move the Aria folder somewhere it can stay, like Documents.
-2. **Double-click Install Aria.** The first time, your Mac may block it: right-click it and choose Open. When it's done, paste your Meta Model API key into the file it opens and save.
-3. **In Live:** User Library > Presets > Audio Effects > Max Audio Effect > Aria. Drag **Aria** onto your Main track, last, and press **Check**.
+1. **Listen.** Five tracks: kick, drums, bass, leads, vocal. Tap one to hear it alone.
+2. **Check.** Aria hears each track on its own: *the lead melody is buried, covered by the rest of the song most of the time.*
+3. **Fix.** Muse Spark makes room instead of turning the leads up: cut the bass 3 dB at 274 Hz, lifted the leads 2 dB at 699 Hz, turned the kick down 3 dB. Then seven more requests, like *"turn the bass high frequencys cut"* and *"add reverb to my vocals"*.
+4. **Compare.** Before and after, at the same loudness. The boxy low mids are 2.1 dB cleaner.
 
-The zip has the same steps, plus fixes for common problems, in **Read me first.txt**. Without a key, Aria still shows what it measured, just no advice.
+It replays Ian's real run in Live, step by step: every reply and change exactly as Aria logged it, and the After is Live's own export. The five tracks are in [`test-pack/sample`](test-pack/sample), with how to run the same thing in Live, or through the engine without Live.
+
+---
+
+## How it works
+
+One problem, start to finish. Aria's loop is the same for every problem it finds.
+
+| | |
+|---|---|
+| **Aria hears it.** | Mix check records 16 bars of your Main track and finds the sounds that clash or stick out, and exactly where. In Ian's drop: sharp bursts around 3620 Hz, 2.7 times a bar, bars 34 to 80. |
+| **Muse Spark says it plainly.** | It gets only the measured numbers and writes what's wrong the way a producer would say it. Then it picks the fix, as an action from a fixed menu. |
+| **The fix happens in Live.** | Aria checks the action against its limits, sets Live's own devices, and keeps an Undo. Ask for a change and it happens right away; a suggestion waits for your yes. |
+| **Then Aria proves it worked.** | Check again plays the same bars and compares them at the same loudness. 3 dB or more lower is Fixed. On our test mix with a planted harsh boost, that range came back 6.9 dB lower. |
+
+---
+
+## Why it matters
+
+**Finishing a song stops at the mix.** Most producers learn to make a drop long before they learn why it sounds muddy next to the songs they love. The usual answers are an engineer, a course, or guessing with plugins. Aria works where they already are, in Ableton, on their own song.
+
+<img src="judges/public/img/mixcheck.png" alt="Mix check: what to fix, where, against a reference">
+
+- **Where, not a score.** The sound, the range and the bars: *"Upper mids fuller than your reference, 2.8 to 3.6 kHz, bars 33 to 81."*
+- **Plain words.** Muse Spark writes it the way a producer would say it, from measured numbers only.
+- **Never made up.** If Aria can't measure something, it says so. No example numbers, no canned advice.
+
+---
+
+## Meta AI
+
+**Muse Spark does the work you see, not a chat box on the side.** It never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it, with Undo.
+
+| | |
+|---|---|
+| **Muse Spark writes it** `muse-spark-1.3` | Turns Aria's measurements into plain advice and a fix. It only ever sees measured numbers, and Aria checks its answer before anything happens. |
+| **Muse Spark does it** | 24 tools in Live through tool calling: EQ, faders, 20 stock devices and 26 custom racks, sidechain, markers, groove match, vocal sync, Check again, Undo. It picks the tool a mix engineer would: drums fighting the bass get a sidechain, mud gets low cuts, a buried sound gets space made for it, never a louder fader. |
+| **Muse Spark fixes the whole mix** | "Fix my whole mix": it fixes the strongest problems, Aria plays the same bars again and measures each one, and Muse reports what's fixed from the measurements alone. |
+| **Muse Spark asks** | When it can't tell which track you mean, it asks: *"Which vocal track do you mean, VOCAL TEST or Vox 2?"* It also names the parts of your song: Intro, Build, Drop. |
+| **Muse Spark looks at your screen** | Attach a screenshot of any plugin and it reads the settings. On EQ Eight it read *band 4, 3.62 kHz, -3.50 dB, Q 6.00* and tied it to the harsh spot Aria had measured. |
+| **Muse Voice Transcribe hears it** `muse-voice-transcribe-1.0` | Hold a key and say it. *"Cut the mud on the bass"* came back as text in 1.4 seconds and ran like a typed request. |
+
+---
+
+## The tools
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### Fix it, then prove it.
+
+Fix it asks Muse Spark for the change and it happens in Live. Check again plays the same bars at the same loudness: 3 dB or more lower is Fixed. Less, and it comes back with Fix it again.
+
+</td>
+<td width="50%"><img src="judges/public/img/fixed.png" alt="A problem confirmed fixed"></td>
+</tr>
+<tr>
+<td width="50%"><img src="judges/public/img/chat.png" alt="Ask Muse making changes in Live"></td>
+<td width="50%" valign="top">
+
+### Ask, and it happens.
+
+Type or say it: *"Make the drums crispier." "Sync my vocal to the kick."* Each change has Undo. Aria comes with 26 custom racks built from Live's stock devices, and everything it adds is named for what it does, like Aria Sidechain.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### Two loops, one groove.
+
+Aria finds every hit to the millisecond and moves each one onto the grid or onto another loop's feel, in a new clip under the original. A perc loop 14.9 ms behind its kick came back at 0, all 32 hits. Nothing is stretched.
+
+</td>
+<td width="50%"><img src="judges/public/img/groove.png" alt="Groove match"></td>
+</tr>
+<tr>
+<td width="50%"><img src="judges/public/img/vocal.png" alt="Vocal sync on the kick"></td>
+<td width="50%" valign="top">
+
+### A vocal on your kick.
+
+Drop in an acapella. Aria reads its tempo and key, puts its first beat on your kick, not just the grid (Ian's kick sits 22 to 25 ms late), and warps it with Live's own markers, reading them back to be sure they stuck.
+
+</td>
+</tr>
+<tr>
+<td width="50%"><img src="judges/public/img/arrangement.png" alt="Arrangement: the parts of two songs, named by Muse Spark"></td>
+<td width="50%"><img src="judges/public/img/analyzer.png" alt="Live analyzer"></td>
+</tr>
+<tr>
+<td valign="top"><b>Arrangement.</b> Aria hears the whole song and Muse Spark names its parts, so a check compares your drop with their drop.</td>
+<td valign="top"><b>Live analyzer.</b> The spectrum against your reference, loudness, where the sound sits in stereo, and a waveform colored by its lows and highs.</td>
+</tr>
+</table>
+
+---
+
+## How it's built
+
+**Four parts, one rule: report only what was measured.** If the engine can't measure something, it says so and returns nothing. Muse gets only those numbers, and its JSON is checked before anything happens.
+
+```mermaid
+flowchart LR
+  subgraph Live["Ableton Live"]
+    D["Aria on Main<br/>records, Live API,<br/>live analyzer"]
+    W["Aria's window<br/>React in Live's web view"]
+  end
+  B["Bridge<br/>Node for Max<br/>Undo stack"]
+  E["Engine<br/>Python, on this Mac"]
+  M["Muse Spark<br/>Muse Voice Transcribe"]
+  D <--> B
+  W <--> B
+  B <--> E
+  E <--> M
+```
+
+| | |
+|---|---|
+| **The device** (`device/`) | Sits last on the Main track. Records bars for a check, reads and sets things through the Live API, and runs the live analyzer 20 times a second. Aria Ear, on any track, lets Aria hear that track by name. |
+| **The bridge** (`device/bridge.js`) | Node for Max. Carries messages between Live, the screens and the engine, and keeps every change on an Undo stack. |
+| **The engine** (`engine/`) | Python and FastAPI, on this Mac. Measures the audio and talks to Muse Spark. It returns numbers; the words come from Muse. 170 tests. |
+| **The screens** (`ui/`) | React, inside Live's own web view: the strip on the device, and the window docked over Live. |
+
+<details>
+<summary>How it measures</summary>
+
+- **Clarity rules:** buried sounds, mud, harsh bursts, ringing notes, bass clicks and clashing tracks, from the split parts or from each track by name, with its bars and range. A sound that ducks under the kick (a sidechain) isn't called buried during its ducks, and every finding carries each track's loudness.
+- **Always at the same loudness:** reference compares and before and after are loudness matched (BS.1770, pyloudnorm).
+- **Hits to the millisecond:** onsets pinned to the start of the attack, moved by slicing just before each hit, then found again in the new file by cross-correlation.
+- **Vocals and kicks:** tempo from how the vocal repeats over whole bars, key from the notes it uses, kicks timed by their full sound.
+- **Song parts:** a 4-bar grid, parts of 8 to 32 bars, repeats share a label, Muse Spark names them.
+
+</details>
+
+<details>
+<summary>What broke, and how we fixed it</summary>
+
+Found by using Aria on real songs inside Live, every day of the build.
+
+| What broke | How we fixed it |
+|---|---|
+| **The device came up blank.** | Live's audio was off, which stalls Max's message queue. The device now carries its own page that says so. |
+| **A result was too big to show.** Max passes its web view about 32 KB; a groove result was 50 KB. | Results are packed now, and anything too long gets a plain error. |
+| **Live drops warp markers without a word.** | Markers are set in rounds and read back from Live. Aria only says Synced when they're there. |
+| **Aria's checks couldn't hear Aria's own fixes.** Aria Ear sat before the fader, and Aria's EQs went in after the Ear. | Aria's devices now go in before the Ear, and the engine applies each track's fader. |
+| **Muse kept turning buried sounds up.** On an unleveled mix it raised the leads three times. | Muse sees every track's loudness and makes space instead: it cuts what covers the sound, and turns down whatever is too loud. |
+| **Live's browser doesn't see links.** "Name my tracks" couldn't find Aria Ear. | The installer copies the devices. |
+
+</details>
+
+### What didn't work
+
+- **The mix model didn't ship.** Trained on 99 mixes people rated good, mid or bad: 0.49 balanced accuracy against 0.45 for loudness alone, and it failed the shuffle test. With Meta's Audiobox Aesthetics scores added: 0.51, better than chance, but not reliably better than loudness. Next: the spectrum's shape alone, good against bad ([`ml/HANDOFF-shape-model.md`](ml/HANDOFF-shape-model.md)).
+- **One vocal still reads the wrong tempo** (Ian's 148 BPM stem reads 192), so every reading comes with the next likely ones, and the song's own tempo is one tap.
+- **Without a reference, a broad low-mid boost is hard to hear:** the rules found 1 of 3 planted problems. That's why the reference compare exists.
+
+---
+
+## Get Aria
+
+**Download, double-click, drag.** You need a Mac, Ableton Live 12 Suite, Python 3.11 ([free from python.org](https://www.python.org/downloads/macos/)) and a Meta Model API key.
+
+1. **Download** [Aria-mac.zip](https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip) and unzip it. Move the Aria folder where it will stay, like Documents.
+2. **Double-click Install Aria.** It sets up the engine and puts Aria in Live's browser. The first time, macOS may ask: right-click it and choose Open. Paste your key into the file it opens and save.
+3. **Drag Aria onto Main.** In Live: User Library, Presets, Audio Effects, Max Audio Effect, Aria. Drop it last on your Main track and press Check.
+
+The zip has the same steps, and fixes for common problems, in **Read me first.txt**. Without a key, Aria still shows what it measured, just no advice.
 
 <details>
 <summary>From the code, and for developers</summary>
@@ -65,232 +217,72 @@ cd aria
 ./install.sh
 ```
 
-`install.sh` sets up the engine (a Python environment and `engine/.env`), links Aria and Aria Ear into Live's browser (links, so `git pull` updates them), and copies the Remote Script for "Name my tracks" (in Live, once: Settings > Link, Tempo & MIDI > Control Surface: **Aria**).
+`install.sh` sets up the engine (a Python environment and `engine/.env`), copies Aria, Aria Ear and the 26 racks into Live's User Library (the scripts the devices run are linked, so `git pull` updates them), and copies the Remote Script for "Name my tracks" (in Live, once: Settings > Link, Tempo & MIDI > Control Surface: Aria).
 
-- Engine tests: `cd engine && .venv/bin/pytest` (153 passing)
+- Engine tests: `cd engine && .venv/bin/pytest` (170 passing)
 - Screens: `cd ui && npm install && npm run build` (the built pages in `ui/dist/` are committed, so running Aria never needs Node)
-- Websites: `cd judges && npm run build` (aria-judges.vercel.app) and `cd site && npm run build` (the product page)
+- Website: `cd judges && npm run build` (aria-judges.vercel.app); the demo's data comes from `judges/scripts/make_demo_data.py`
 - The release zip: `scripts/release.sh`
 - The JSON between device, bridge, engine and screens: [`docs/contracts.md`](docs/contracts.md)
 - Where things stand, day by day: [`docs/status.md`](docs/status.md)
 
 </details>
 
----
+### Security and privacy
 
-## Meta AI
-
-Meta's models do the work you see, in every screen. Not a chat box on the side.
-
-| Model | What it does in Aria |
-|---|---|
-| **Muse Spark** `muse-spark-1.3` | Turns the engine's measurements into plain advice and a concrete fix, as JSON that Aria validates. It only ever sees measured numbers. |
-| | **Drives Live through tool calling: 24 tools.** EQ, volume, 20 stock devices, 26 custom racks, sidechain, markers and sections, tempo, mute, solo, plugin guides, groove match, vocal sync, Check again, hearing the song, Undo. |
-| | **Picks the right tool, like a mix engineer.** Drums fighting the bass get a sidechain, mud gets low cuts, harsh hits that come and go get Multiband Dynamics, a weak kick gets a punch rack. It knows each stock device's knobs and what every macro on Aria's racks moves. |
-| | **Asks instead of guessing.** A real reply from testing: *"Which vocal track do you mean, VOCAL TEST or Vox 2?"* |
-| | **Names the parts of a song** (Intro, Build, Drop, Break, Outro) from their measured loudness and shape. |
-| | **Fixes the whole mix, then checks its own work.** "Fix my whole mix": Muse fixes the strongest problems with whatever each one needs, Aria plays the same bars again and measures each one, then Muse reports what's Fixed, from the measurements only. Press it again and it builds on its own changes instead of stacking new ones. |
-| | **Looks at your screen.** Attach a screenshot of any plugin and Muse reads its settings and says exactly what to change. On a test shot of EQ Eight it read *band 4, 3.62 kHz, -3.50 dB, Q 6.00* and tied it to the harsh spot Aria had measured. |
-| **Muse Voice Transcribe** `muse-voice-transcribe-1.0` | Hold the mapped key and say it. *"Cut the mud on the bass"* came back as text in 1.4 s, then ran like a typed request. |
-| **Audiobox Aesthetics** | Scored all 99 rated mixes as a feature for the mix model. A side experiment, [reported honestly](#what-didnt-work): it didn't beat loudness, so it didn't ship. |
-
-> **The guardrail.** Muse Spark never touches Live directly. It answers with actions from a fixed menu. Aria checks each one (the track exists, the gain stays within ±6 dB, the knob's unit fits) and only then applies it, with Undo. If Muse is down, Aria shows the measurements and says advice is unavailable.
-
----
-
-## What it does
-
-### Mix check
-
-Records 16 bars of your Main track, splits it into its parts, and finds what clashes or sticks out: buried sounds, mud, harsh hits, ringing notes, bass clicks, tracks that fight. Each problem is marked on the spectrum by its kind (icon) and its range (color, lows red to highs violet). Add a reference song to compare part for part: *"Against their Drop."*
-
-<img src="judges/public/img/mixcheck.png" alt="Mix check against a reference song">
-
-<table>
-<tr>
-<td width="50%" valign="top">
-
-### Fix it, then prove it
-
-**Fix it** asks Muse Spark for the change, and it happens in Live with Undo. **Check again** plays the same bars and measures them at the same loudness: 3 dB or more lower is **Fixed**, otherwise it comes back with **Fix it again**.
-
-*Here: a planted harsh boost, 6.9 dB less after the fix.*
-
-</td>
-<td width="50%"><img src="judges/public/img/fixed.png" alt="Before and after, a problem confirmed fixed"></td>
-</tr>
-<tr>
-<td width="50%"><img src="judges/public/img/chat.png" alt="Ask Muse making changes in Live"></td>
-<td width="50%" valign="top">
-
-### Ask Muse
-
-Type or say what you want. *"Make the drums crispier." "Sync my vocal to the kick." "Tighten the bongo to the kick at 70%."* It happens right away, each change with Undo. Anything Muse suggests on its own waits for a yes.
-
-Aria comes with 26 custom racks built from Live's stock devices, for kicks, bass, synths, space and transitions. *"My kick doesn't punch through"* loads Aria Punch Through. Everything Aria adds is named for what it does, like Aria Sidechain, so you can tell it apart from your own devices.
-
-*Real requests from testing, typos and all, with what Aria did in green.*
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-### Groove match
-
-Two loops flamming? Aria finds every hit to the millisecond, moves each one onto the grid or onto another loop's feel, and writes a new clip under the original (kept, muted). Nothing is stretched. Warped loops are timed the way you hear them, through Live's warp markers.
-
-*A perc loop following a kick loop: worst hit 15.5 ms off, now 0.*
-
-</td>
-<td width="50%"><img src="judges/public/img/groove.png" alt="Groove match result"></td>
-</tr>
-<tr>
-<td width="50%"><img src="judges/public/img/vocal.png" alt="Vocal sync with the kick"></td>
-<td width="50%" valign="top">
-
-### Vocal sync
-
-Drop in an acapella. Aria reads its tempo and key, puts its first beat on your kick, and warps it to your song with Live's own warp markers, which it reads back to be sure they stuck. Undo puts it back.
-
-*Ian's vocal: A minor, beat 1 on the kick at bar 10, which sits 25.3 ms after Live's grid.*
-
-</td>
-</tr>
-</table>
-
-### Arrangement
-
-Aria hears the whole song once, finds its parts on a 4-bar grid, and Muse Spark names them. Rename or move them, then add them to Live as markers. Every Mix check then knows which part it heard.
-
-<img src="judges/public/img/arrangement.png" alt="The parts of two songs, named by Muse Spark">
-
-### Live analyzer
-
-Your Main track as it plays: a sixth-octave spectrum against your reference, loudness to the BS.1770 standard, a stereo view with a phase meter, and a waveform colored by where the sound is.
-
-<img src="judges/public/img/analyzer.png" alt="Live analyzer">
-
----
-
-## How it's built
-
-**One rule:** the engine reports only what it measured. If it can't measure something, it says so and returns nothing. Muse gets only those numbers, and its JSON is checked before anything happens.
-
-```mermaid
-flowchart LR
-  subgraph Live["Ableton Live"]
-    D["Aria.amxd on Main<br/>records, Live API,<br/>live analyzer"]
-    W["Aria window<br/>React in Live's web view"]
-  end
-  B["Bridge<br/>Node for Max<br/>Undo stack"]
-  E["Engine<br/>Python, FastAPI<br/>127.0.0.1:8765"]
-  M["Muse Spark<br/>Muse Voice Transcribe"]
-  D <--> B
-  W <--> B
-  B <--> E
-  E <--> M
-```
-
-| Part | What it does |
-|---|---|
-| **The device** (`device/Aria.amxd`) | Sits last on the Main track. Records bars for a check, reads tempo, clips and warp markers, sets EQ, devices, markers and warp markers through the Live API, and runs the live analyzer: 55 bands, loudness and a stereo buffer, 20 times a second. |
-| **The bridge** (`device/bridge.js`) | Node for Max. Carries messages between Live, the screens and the engine, keeps every change on an Undo stack, and starts the engine when it's needed. |
-| **The engine** (`engine/`) | Python and FastAPI. Measures the audio and talks to Muse Spark. Returns numbers; the words come from Muse. |
-| **The screens** (`ui/`) | React, TypeScript and Tailwind, built into single HTML files that Live's own web view loads: the strip on the device and the window docked over Live. |
-
-**How it measures**
-
-- **Clarity rules:** buried sounds, mud, harsh bursts, ringing notes, bass clicks and clashing tracks, from the split parts or from the producer's own tracks (Aria Ear), each with its bars and range.
-- **Always at the same loudness:** reference compares and before and after are loudness matched (pyloudnorm).
-- **Hits to the millisecond:** onsets pinned to the start of the attack, moved by slicing just before each hit (no stretching), then found again in the new file by cross-correlation.
-- **Vocals and kicks:** tempo from how the vocal repeats over whole bars, key from the notes it uses, kicks timed by their full sound.
-- **Song parts:** tempo and a 4-bar grid, parts of 8 to 32 bars, repeats share a label, Muse Spark names them.
-
----
-
-## Security and privacy
-
-| | |
-|---|---|
-| **Your audio stays on your Mac** | The engine runs locally and listens only on `127.0.0.1`. Recordings, stems and reference songs never leave the computer. Muse Spark gets measured numbers and your typed requests; a held-key voice request goes to Muse Voice Transcribe as a short clip. |
-| **Your key stays yours** | The Meta Model API key lives in `engine/.env`, read from the environment and never committed (`.env.example` is the template). |
-| **The AI can't run anything** | Muse Spark can only pick from a fixed menu of actions. Each one is checked against limits before it's applied, and every change has Undo. Muse's JSON is validated; anything off-menu is dropped. |
-| **Only Aria's pages can talk to the engine** | The engine accepts browser requests only from Aria's own pages and localhost, and only `GET` and `POST`. |
-| **Pinned dependencies** | Every Python library is pinned to an exact version. |
-
-**Next (Ian, in progress):** a per-install token so nothing but Aria itself can call the engine, and a signed, notarized installer so macOS doesn't warn on first open.
-
----
-
-## Results
-
-Every number came from real audio this week, and the code that produced it is in this repo.
-
-| Result | How it was measured |
-|---|---|
-| **14.9 ms → 0 ms** average lateness of a perc loop following a kick loop | Ian's loops at 165 BPM; all 32 hits found again by cross-correlation |
-| **5.5 ms** worst, for a 140 BPM loop warped into a 165 song (before warp-aware timing, 21 hits moved up to 39 ms the wrong way) | Same loop, same kick, timed through Live's warp markers |
-| **6.9 dB less** for a planted harsh boost after the fix, so **Fixed** | Test mix B against the clean control, loudness matched |
-| **126.6 BPM** read from a 126 BPM acapella (190 before the fix); key **G# minor**, right | The vocal alone, no beat underneath |
-| **22 to 25 ms**: how far Ian's kick sits after Live's grid, so a vocal lands on the kick, not the grid | His drum and vocal stems |
-| **-9.2 LUFS** in the Live analyzer on Ian's drop, the same as the engine measured | BS.1770 in the device against pyloudnorm in the engine |
-| **5 of 5** real requests to Muse Spark got the right tool or a clarifying question | Sync, groove at 70%, a sidechain, an unclear vocal, "did that work" |
-| **Same part names three runs in a row** for a reference song | `POST /sections`, Muse Spark naming |
-
-### What didn't work
-
-- **The mix model didn't ship.** Trained on 99 mixes people rated good, mid or bad (71 producer groups): best **0.49** balanced accuracy against **0.45** for loudness alone (0.33 is a coin toss), and it failed the shuffle test (p = 0.70). With Meta's Audiobox scores added: **0.51**, better than chance (p = 0.01), but it beat loudness in only 52% of test rounds against a bar of 80%. Raters preferred louder mixes. Next: spectral shape only, good against bad ([`ml/HANDOFF-shape-model.md`](ml/HANDOFF-shape-model.md)).
-- **One vocal still reads the wrong tempo:** Ian's own 148 BPM stem reads 192. So every reading comes with the next likely ones, and the song's own tempo is one tap.
-- **Broad boosts are hard to hear without a reference:** on three test mixes with one planted problem each, the clarity rules found the spikes but missed a broad low-mid boost (1 of 3). That's why the reference compare exists.
-
-### What broke, and how we fixed it
-
-Found by using Aria on real songs inside Live, every day of the build.
-
-| What broke | How we fixed it |
-|---|---|
-| **A blank device.** The strip came up empty in Live. | Live's audio wasn't running, which stalls Max's message queue. The device now carries a page of its own that says so. |
-| **Max's message limit.** A groove result was 50 KB; Max passes its web view about 32 KB, so the screen hung. | Results are packed (7 KB), and the bridge refuses anything too long with a plain error. |
-| **Live drops warp markers without a word.** Vocal sync set two markers, Live kept one, and the vocal played half time. | Markers set in rounds and read back from Live. Aria only says Synced when they're there. |
-| **Kicks read 30 ms late.** Filtered to the low end, a kick's body builds slowly. | Each hit is timed by its full sound; the low band only decides whether it's a kick. |
-| **Vocals in three against two.** A 126 BPM acapella read 190. | Counting how the vocal repeats over whole bars, not single beats. |
-| **"On time" became a sidechain.** Muse read "set my vocal on time with my kick" as ducking. | Timing tools, a rule that timing never means sidechain, and a question when the track isn't clear. |
-| **A comparison nobody understood.** "Against good mixes" confused our own producer, and 30 mixes aren't a standard. | Taken out the same day. Without a reference, Aria finds clashes and problem spots only. |
+- **Your audio stays on your Mac.** The engine listens only on `127.0.0.1`. Recordings and reference songs never leave the computer. Muse Spark gets measured numbers and your requests.
+- **Your key stays yours.** It lives in `engine/.env`, read from the environment and never committed.
+- **The AI can't run anything.** Muse Spark picks from a fixed menu of actions; each is checked against limits before it's applied, and every change has Undo.
+- **Only Aria's pages can talk to the engine,** and every Python library is pinned to an exact version.
+- **Next:** a per-install token so nothing but Aria can call the engine, and a signed, notarized installer.
 
 ---
 
 ## Team
 
-| | What they did | |
-|---|---|---|
-| **Ian Barrie** | Built Aria end to end: the Python engine and its Muse Spark integration, the screens inside Live and the websites, and the Max for Live devices and bridge. Designed the product, tested it in Live every day on his own songs, and now leads security. | [@Yumstezy](https://github.com/Yumstezy) |
-| **Raghav Agarwal** | Built the mix model: the three tiers of rated mixes, their measurements, and the ordinal model with its ship rule. Ran the Audiobox side experiment and reported what it showed. | [@RaghavAgarwal18](https://github.com/RaghavAgarwal18) |
-| **Dylan Haman** | Product manager: organized the team, ran planning and check-ins, and kept the build on schedule. Set priorities and coordinated the hand-offs between the product, the model and the submission. | [@Hamqnn](https://github.com/Hamqnn) |
+**Three people, nine days.**
+
+<table>
+<tr>
+<td align="center" width="33%"><img src="judges/public/img/team/ian.jpg" width="120" alt="Ian Barrie"><br><b>Ian Barrie</b><br><sub>Builder</sub></td>
+<td align="center" width="33%"><img src="judges/public/img/team/dylan.jpg" width="120" alt="Dylan Haman"><br><b>Dylan Haman</b><br><sub>Product manager</sub></td>
+<td align="center" width="33%"><img src="judges/public/img/team/raghav.jpg" width="120" alt="Raghav Agarwal"><br><b>Raghav Agarwal</b><br><sub>Machine learning</sub></td>
+</tr>
+<tr>
+<td valign="top">Built Aria end to end: the engine and its Muse Spark integration, the screens inside Live and the websites, and the Max for Live devices. Designed the product, tested it in Live every day, and now leads security.</td>
+<td valign="top">Organized the team, ran planning and check-ins, and kept the build on schedule. Set priorities and coordinated the hand-offs to the submission.</td>
+<td valign="top">Built the mix model: the rated mixes, their measurements, and the ordinal model with its ship rule. Ran the Audiobox side experiment and reported what it showed.</td>
+</tr>
+<tr>
+<td align="center"><a href="https://www.linkedin.com/in/ianabarrie/">LinkedIn</a> · <a href="https://github.com/Yumstezy">GitHub</a></td>
+<td align="center"><a href="https://www.linkedin.com/in/dylan-haman-735116266/">LinkedIn</a> · <a href="https://github.com/Hamqnn">GitHub</a></td>
+<td align="center"><a href="https://www.linkedin.com/in/raghav-agarwal-csu/">LinkedIn</a> · <a href="https://github.com/RaghavAgarwal18">GitHub</a></td>
+</tr>
+</table>
 
 ---
 
 ## The repo
 
 ```
-device/    Aria.amxd and Aria Ear.amxd, the bridge (bridge.js), Live API helpers (live.js), the stereo scope (scope.js)
-engine/    the FastAPI engine: clarity, reference, sections, groove, vocal, Muse Spark, voice, with tests
-ui/        the screens (React), built to ui/dist for Live's web view
-ml/        the rated-mix model: data manifest, measurements, training, results, and the next experiment
-judges/    the website (aria-judges.vercel.app)
-site/      the product page
-scripts/   the release zip and its install guide
-design/    the design system and screen references
-docs/      build steps, contracts, the rubric, status
+device/      Aria and Aria Ear, the bridge (bridge.js), Live API helpers (live.js), Aria's 26 racks, the Remote Script
+engine/      the engine: clarity, reference, sections, groove, vocal, Muse Spark, voice, with tests
+ui/          the screens (React), built to ui/dist for Live's web view
+test-pack/   the sample song for judges and testers
+ml/          the rated-mix model: data, measurements, training, results, and the next experiment
+judges/      the website (aria-judges.vercel.app), with the Try it demo
+site/        the product page
+scripts/     the release zip and its install guide
+docs/        build steps, contracts, the rubric, status
 ```
 
 ## Rules we built by
 
-- **No invented data.** The engine reports only what it measured; the screens never show example numbers; Muse gets only measured numbers and its JSON is validated. If the model fails, the screen says advice is unavailable and why.
+- **No invented data.** The engine reports only what it measured; the screens never show example numbers; Muse gets only measured numbers and its answer is checked. If Muse is down, Aria shows the measurements and says advice is unavailable.
 - **Plain words.** "Your choruses are too bright" first, then "+3.8 dB at 2 to 5 kHz" as the detail.
 - **The producer stays in charge.** Every change has Undo. What you ask for happens; what Muse suggests waits for a yes. Third-party plugins are never changed, only shown.
 
 ## Licenses and credits
 
-- **No commercial music** anywhere in the repo or the video. The 99 rated mixes were given to us or released for free for us to use; only their measurements are in the repo, never the audio.
-- **Fonts:** the system font on Mac, Geist bundled under the OFL.
+- **No commercial music** anywhere in the repo or the video. The 99 rated mixes were given to us or released for free for us to use; only their measurements are in the repo, never the audio. The sample song is Ian's own.
+- **Fonts:** the system font on Mac, and Geist, bundled under the OFL.
