@@ -161,18 +161,18 @@ const MISSES = [
 ];
 
 
-// The same three people as badges on a lanyard rail (Ian, Nov 1). Photos and LinkedIn links come from Ian; until then
-// each badge shows the silhouette and links to the person's GitHub.
+// The same three people as badges on a lanyard rail (Ian, Nov 1), with the photos and LinkedIn links Ian sent
+// (public/img/team, cropped square around the face).
 const BADGES: LanyardMember[] = [
-  { id: "ian", name: "Ian Barrie", role: "Builder", team: "Aria · Build", tone: 1, image: "",
-    bio: "Built Aria end to end: the engine and Muse Spark, the screens in Live, the devices and the websites.",
-    tags: ["Engine", "Max for Live", "Security"], links: [{ label: "GitHub", href: "https://github.com/Yumstezy" }] },
-  { id: "dylan", name: "Dylan Haman", role: "Product manager", team: "Aria · Product", tone: 2, image: "",
-    bio: "Organized the team, ran planning and check-ins, and kept the build on schedule.",
-    tags: ["Planning", "Hand-offs"], links: [{ label: "GitHub", href: "https://github.com/Hamqnn" }] },
-  { id: "raghav", name: "Raghav Agarwal", role: "Machine learning", team: "Aria · Mix model", tone: 3, image: "",
-    bio: "Built the mix model: the rated mixes, their measurements, and the ordinal model with its ship rule.",
-    tags: ["Mix model", "Audiobox"], links: [{ label: "GitHub", href: "https://github.com/RaghavAgarwal18" }] },
+  { id: "ian", name: "Ian Barrie", role: "Builder", team: "Aria · Build", tone: 1, image: "/img/team/ian.jpg",
+    bio: "Built Aria end to end: the engine, Muse Spark, the devices in Live and the sites.",
+    tags: ["Engine", "Max for Live", "Security"], links: [{ label: "LinkedIn", href: "https://www.linkedin.com/in/ianabarrie/" }, { label: "GitHub", href: "https://github.com/Yumstezy" }] },
+  { id: "dylan", name: "Dylan Haman", role: "Product manager", team: "Aria · Product", tone: 2, image: "/img/team/dylan.jpg",
+    bio: "Organized the team, ran planning and check-ins, kept the schedule.",
+    tags: ["Planning", "Hand-offs"], links: [{ label: "LinkedIn", href: "https://www.linkedin.com/in/dylan-haman-735116266/" }, { label: "GitHub", href: "https://github.com/Hamqnn" }] },
+  { id: "raghav", name: "Raghav Agarwal", role: "Machine learning", team: "Aria · Mix model", tone: 3, image: "/img/team/raghav.jpg",
+    bio: "Built the mix model: rated mixes, their measurements, the ordinal model.",
+    tags: ["Mix model", "Audiobox"], links: [{ label: "LinkedIn", href: "https://www.linkedin.com/in/raghav-agarwal-csu/" }, { label: "GitHub", href: "https://github.com/RaghavAgarwal18" }] },
 ];
 
 // Getting Aria into Live: what's in Aria-mac.zip and what "Install Aria" does (install.sh)
