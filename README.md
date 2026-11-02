@@ -293,5 +293,4 @@ docs/        build steps, contracts, the rubric, status
 
 - **No commercial music** anywhere in the repo or the video. The 99 rated mixes were given to us or released for free for us to use; only their measurements are in the repo, never the audio. The sample song is Ian's own.
 - **Fonts:** the system font on Mac, and Geist, bundled under the OFL.
-- **Demucs** (split mode): the code is MIT. Its author says the model weights' license is unclear, so Aria uses it for this prototype only and the weights are never in the repo. They download on first use.
 - **Audiobox Aesthetics:** CC-BY 4.0, used in the mix model experiments (`ml/`).
