@@ -8,4 +8,6 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": resolve(import.meta.dirname, "src") } },
   server: { port: 5182 },
+  // Two pages: the main page, and the demos page at /demo (vercel.json cleanUrls serves demo.html there)
+  build: { rollupOptions: { input: { main: resolve(import.meta.dirname, "index.html"), demo: resolve(import.meta.dirname, "demo.html") } } },
 });

@@ -13,14 +13,12 @@ import { Button } from "@/components/ui/button";
 import { TeamLanyardRail, type LanyardMember } from "@/components/ui/team-lanyard-rail";
 import { TryIt } from "@/components/try-it";
 import { cn } from "@/lib/utils";
+import { DEMO_VIDEO, DOWNLOAD, GITHUB } from "@/links";
+import { DemoVideo } from "@/components/demo-video";
 
-const GITHUB = "https://github.com/Yumstezy/aria";
+
 const PRODUCT = "https://aria-sigma-gilt.vercel.app";
-// The newest release's zip on GitHub: the devices, the engine and a double-click installer (scripts/release.sh makes it)
-const DOWNLOAD = "https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip";
 const RELEASES = "https://github.com/Yumstezy/aria/releases/latest";
-// The demo video, when Ian has recorded it: a file in public/ (like "/demo.mp4"). The section shows only once it's set.
-const DEMO_VIDEO: string | null = null;
 
 /* ---------- icons: the app's own line icons ---------- */
 const svg = (d: ReactNode, size = 18) => (
@@ -218,6 +216,7 @@ export default function App() {
         <div className="mx-auto flex max-w-[1160px] items-center gap-4 px-6 pt-4">
           <a href="#" className="flex items-center gap-2.5 text-[17px] font-semibold"><span className="mark size-[22px]" />Aria</a>
           <div className="flex flex-1 justify-center"><LiquidNavbar tone="dark" items={NAV} active={navAt} onChange={(i) => setNavAt(i)} /></div>
+          <a href="/demo" className="hidden text-[14px] text-muted transition-colors hover:text-ink md:inline">Demos</a>
           <Button href={DOWNLOAD} variant="filled" size="sm" className="hidden sm:inline-flex">{I.download(16)}Download</Button>
         </div>
       </header>
@@ -236,15 +235,14 @@ export default function App() {
 
       {DEMO_VIDEO && (
         <Section id="demo" label="Watch it run" title="Three minutes in Ableton." dim="Nothing faked.">
-          <Rise className="mt-12 overflow-hidden rounded-[22px] border border-edge bg-card">
-            <video src={DEMO_VIDEO} controls playsInline preload="metadata" className="block aspect-video w-full" />
-          </Rise>
+          <Rise className="mt-12"><DemoVideo /></Rise>
         </Section>
       )}
 
       <Section id="try" label="Try it" title="Hear Aria fix a real mix." dim="No Ableton needed."
                sub="A house demo Ian made, before mixing. Four steps: listen, let Aria check it, fix it, then compare.">
         <TryIt />
+        <p className="mt-4 text-[14px] text-faint">Also on its own page, with the video of Aria in Ableton: <a href="/demo" className="text-muted underline underline-offset-4 hover:text-ink">aria-judges.vercel.app/demo</a></p>
       </Section>
 
       <Section id="how" label="How it works" title="One problem, start to finish." dim="Heard, explained, fixed, proved."
