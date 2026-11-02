@@ -270,7 +270,7 @@ export default function App() {
       </Section>
 
       <Section id="meta" label="Meta AI" title="Built on Meta's AI." dim="Not a chat box on the side."
-               sub="Four of Meta's models: Muse Spark, Muse Voice Transcribe, Demucs and Audiobox Aesthetics. Muse never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it, with Undo.">
+               sub="Four of Meta's models: Muse Spark, Muse Voice Transcribe, Demucs and Audiobox Aesthetics. Muse never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it. You can undo any change it makes.">
         <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {META.map(([t, d, a, ic], i) => (
             <Rise key={t} delay={i * 0.06}><GlowCard accent={a} className="h-full">

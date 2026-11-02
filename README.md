@@ -74,7 +74,7 @@ One problem, start to finish. Aria's loop is the same for every problem it finds
 
 ## Meta AI
 
-**Four of Meta's models: Muse Spark, Muse Voice Transcribe, Demucs and Audiobox Aesthetics.** Muse Spark does the work you see, not a chat box on the side. It never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it, with Undo.
+**Four of Meta's models: Muse Spark, Muse Voice Transcribe, Demucs and Audiobox Aesthetics.** Muse Spark does the work you see, not a chat box on the side. It never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it. You can undo any change it makes.
 
 | | |
 |---|---|
