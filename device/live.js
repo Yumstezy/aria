@@ -498,6 +498,13 @@ const BAND_ORDER = {
   bell: ["4", "5", "3", "6", "2", "7", "1", "8"], notch: ["4", "5", "3", "6", "2", "7", "1", "8"]
 };
 
+// Where a device Aria adds goes on a track: at the end, but before an Aria Ear, so the Ear hears it (Nov 1: the Ears
+// recorded the track without Aria's own EQs, so a fixed problem still showed up in the next check)
+function insertAt(track, devs) {
+  for (let i = 0; i < devs.length; i++) if (String(one(new LiveAPI("id " + devs[i]), "name")) === "Aria Ear") return i;
+  return devs.length;
+}
+
 function eq(freq, gain, q, trackIndex, shape, steep, mode) {
   const index = trackIndex === undefined ? -1 : trackIndex;
   const opts = { shape: SHAPES[shape] ? shape : "bell", steep: steep === 1 || steep === "1" || steep === true };
@@ -505,8 +512,8 @@ function eq(freq, gain, q, trackIndex, shape, steep, mode) {
   let device = findEq(track, mode ? String(mode) : "aria");
   if (device) { applyEq(device, false, freq, gain, q, index, opts); return; }
   const devs = ids(track.get("devices"));
-  // On Main, add it just before Aria so Aria still hears the result; elsewhere at the end
-  const at = index < 0 ? Math.max(0, devs.indexOf(Number(new LiveAPI("this_device").id))) : devs.length;
+  // On Main, add it just before Aria so Aria still hears the result; elsewhere at the end, before an Aria Ear
+  const at = index < 0 ? Math.max(0, devs.indexOf(Number(new LiveAPI("this_device").id))) : insertAt(track, devs);
   pendingEq = { freq: freq, gain: gain, q: q, index: index, opts: opts, before: devs };
   try { track.call("insert_device", "EQ Eight", at); } catch (e) { post("insert_device failed: " + e + "\n"); }
   outlet(0, "defer", "eq_continue");
@@ -718,8 +725,8 @@ function device(trackIndex, nameText, settingsText, addedFlag, mode, labelText) 
 function insertNext() {
   const p = pendingDevice, track = trackAt(p.index);
   const devs = ids(track.get("devices"));
-  // On Main, just before Aria so Aria still hears the result; elsewhere at the end
-  const at = p.index < 0 ? Math.max(0, devs.indexOf(Number(new LiveAPI("this_device").id))) : devs.length;
+  // On Main, just before Aria so Aria still hears the result; elsewhere at the end, before an Aria Ear
+  const at = p.index < 0 ? Math.max(0, devs.indexOf(Number(new LiveAPI("this_device").id))) : insertAt(track, devs);
   const as = p.tries.shift();
   try { track.call("insert_device", as, at); } catch (e) { post("insert_device " + as + " failed: " + e + "\n"); }
   outlet(0, "defer", "device_continue");

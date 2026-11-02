@@ -93,6 +93,8 @@ class MixRequest(BaseModel):
     tracks: Optional[Dict[str, str]] = None
     # Which of those tracks Live says had clips playing in these bars (null: Live couldn't say, a group say)
     tracks_playing: Optional[Dict[str, Optional[bool]]] = None
+    # Each of those tracks' fader in dB (Nov 1): the Ear records before the fader, so the engine applies it
+    track_faders_db: Optional[Dict[str, float]] = None
 
 
 def _audio_file(path_str):
@@ -150,7 +152,7 @@ def track_loudness(x, rate):
     return round(float(v), 1) if np.isfinite(v) else None
 
 
-def find_tracks(paths, rate, audio, timing, playing=None):
+def find_tracks(paths, rate, audio, timing, playing=None, faders=None):
     """Key tracks mode: the producer's own tracks, by name. Clashes first (neither track stands clear),
     then a track covered by another, then what the master shows."""
     sounds = {}
@@ -161,7 +163,9 @@ def find_tracks(paths, rate, audio, timing, playing=None):
             raise HTTPException(400, f"Can't read the recording of {name}: {e}")
         if r != rate:
             raise HTTPException(400, f"{name} was recorded at {r} Hz, Main at {rate} Hz.")
-        sounds[name] = x
+        # The Ear hears the track before its fader; the listener hears it after. -70 dB is a fader at -inf.
+        db = (faders or {}).get(name)
+        sounds[name] = x * 10 ** (max(-70.0, min(6.0, float(db))) / 20) if db is not None else x
     n = min(len(x) for x in sounds.values())
     sounds = {k: v[:n] for k, v in sounds.items()}
     master = clarity.analyze(audio, rate, **timing)
@@ -232,7 +236,7 @@ def mix_analyze(req: MixRequest):
     measured = analysis.measure_array(audio, rate)
     timing = dict(tempo=req.tempo, start_beat=req.start_beat, beats_per_bar=req.beats_per_bar or 4.0)
     if req.tracks and len(req.tracks) >= 2:
-        found = find_tracks(req.tracks, rate, audio, timing, req.tracks_playing)
+        found = find_tracks(req.tracks, rate, audio, timing, req.tracks_playing, req.track_faders_db)
     else:
         found = find_clarity(audio, rate, req.tempo, req.start_beat, req.beats_per_bar or 4.0)
 

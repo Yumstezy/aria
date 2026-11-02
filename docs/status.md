@@ -10,7 +10,10 @@ Updated at the end of each session: what passed, what's next, any blocker.
 - After plays his export from Live (`after.wav`), lined up (10.6 ms) and turned down 6.8 dB to the rough mix's loudness. The footer says all of this.
 
 Found while building it:
-- **Aria Ear sits before the fader, and Aria adds its devices after the Ear.** So the per-track findings can't change after a fix: Ian's 5:12 check still showed KICK at -7.4 LUFS after Aria turned it down 3 dB. To fix next: put Aria's devices before the Ear, and add each fader's level to the Ear recordings in the engine.
+- **Aria Ear sits before the fader, and Aria adds its devices after the Ear.** So the per-track findings can't change after a fix: Ian's 5:12 check still showed KICK at -7.4 LUFS after Aria turned it down 3 dB. Fixed the same evening: Aria's devices go in before the Ear (EQ, stock devices, and racks via the helper), and Check mix sends each Ear track's fader, which the engine applies. Manual check for Ian:
+  1. Restart Live (for the helper) and re-add Aria.
+  2. Turn Name my tracks off and on, so each Ear lands after the devices already there.
+  3. Check mix, then Fix it, then Check mix again. The track that was turned down should measure lower, and a fixed problem should be able to go away.
 - The check's advice prompt (muse.py) also said "bring the covered sound up". It now says make room.
 
 **Nov 1, 5 PM: release v0.2.0 is the download.** Ian had run "Install Aria" from an old download (~/Downloads/Aria 2, v0.1.0) at 4:19. That pointed Aria, its engine and the Live helper back at the old code, so his 4:31 tests ran without the day's fixes. Fixed:

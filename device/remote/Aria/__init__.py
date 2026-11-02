@@ -298,8 +298,16 @@ class Aria(ControlSurface):
         for i, d in enumerate(devices):
             if d.class_name in ("PluginDevice", "AuPluginDevice") and key(w["name"]) in key(d.name):
                 new = i
+        names = [d.name for d in devices]
+        # On a track, before an Aria Ear, so the Ear hears it (Nov 1)
+        if w["index"] >= 0 and "Aria Ear" in names and names.index("Aria Ear") < new:
+            try:
+                at = names.index("Aria Ear")
+                self.song().move_device(devices[new], w["track"], at)
+                new = at
+            except Exception as e:
+                self.log_message("Aria: couldn't move it before the Ear: %s" % e)
         if w["index"] < 0:
-            names = [d.name for d in devices]
             if "Aria" in names and names.index("Aria") < new:
                 try:
                     at = names.index("Aria")

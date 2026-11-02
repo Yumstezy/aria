@@ -172,3 +172,17 @@ def test_a_fader_can_be_set_to_a_level_the_producer_names():
     assert out["actions"][0]["args"] == {"track": "VOCAL", "to_db": -15.0}
     for bad in ({"to_db": 9}, {"change_db": 0}):
         assert ask.ask("louder", ctx, client=client_for("", call("track_volume", track="VOCAL", **bad)))["actions"] == []
+
+
+def test_track_faders_are_applied_to_the_ear_recordings(tmp_path):
+    import numpy as np, soundfile as sf
+    from aria_engine import app as A
+    rate, t = 44100, np.arange(44100 * 4) / 44100
+    paths = {}
+    for name in ("KICK", "LEADS"):   # test tones at the same level; the kick's fader is 3 dB down
+        p = tmp_path / f"{name}.wav"
+        sf.write(p, np.stack([0.3 * np.sin(2 * np.pi * 300 * t)] * 2, 1), rate)
+        paths[name] = str(p)
+    mix = sum(sf.read(p, always_2d=True)[0] for p in paths.values())
+    out = A.find_tracks(paths, rate, mix, {"tempo": 120.0, "start_beat": 0.0}, faders={"KICK": -3.0, "LEADS": 0.0})
+    assert out["levels_lufs"]["LEADS"] - out["levels_lufs"]["KICK"] == 3.0

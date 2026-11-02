@@ -479,6 +479,13 @@ async function checkMix() {
         for (const [shown, orig] of Object.entries(earNameOf)) tracksPlaying[shown] = byName[orig] === undefined ? null : byName[orig];
       } catch (e) { tracksPlaying = null; }   // Live didn't answer: the engine goes by the audio
     }
+    // Each Ear track's fader, which the Ear can't hear (track devices all come before the fader). Nov 1: Aria turned
+    // the kick down 3 dB and the next check still heard it at the old level.
+    const faders = {};
+    for (const [shown, orig] of Object.entries(earNameOf)) {
+      const t = (live.tracks || []).find((x) => x.name === orig);
+      if (t && typeof t.volume_db === "number") faders[shown] = t.volume_db;
+    }
 
     toUI("progress", { step: "analyze", text: keyTracks ? `Comparing ${Object.keys(tracks).length} tracks and asking Muse Spark`
       : referenceNow() ? `Comparing with ${referenceNow().name} and asking Muse Spark` : "Splitting your mix and asking Muse Spark" });
@@ -488,7 +495,7 @@ async function checkMix() {
     const refPart = ref && parts.theirs ? { reference_window: [parts.theirs.start_sec, parts.theirs.end_sec], reference_part: parts.theirs.name } : {};
     const res = await request("POST", "/mix/analyze",
       { mix_path: file, start_beat: live.song_beat, tempo: live.tempo, bars: BARS, beats_per_bar: live.beats_per_bar,
-        ...(keyTracks ? { tracks, ...(tracksPlaying ? { tracks_playing: tracksPlaying } : {}) } : {}),
+        ...(keyTracks ? { tracks, track_faders_db: faders, ...(tracksPlaying ? { tracks_playing: tracksPlaying } : {}) } : {}),
         ...(ref ? { reference_path: ref.path, reference_name: ref.name, ...refPart } : {}) }, ANALYZE_TIMEOUT_MS);
     if (res.status !== 200) {
       throw new UserError((res.json && res.json.detail) || `The engine couldn't analyze the recording (HTTP ${res.status}).`);
