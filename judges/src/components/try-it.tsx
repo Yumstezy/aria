@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import song from "@/demo-tracks.json";
 import run from "@/demo-run.json";
 import reveal from "@/demo-reveal.json";
@@ -471,11 +472,9 @@ export function TryIt() {
         <div className="flex flex-wrap items-center gap-2 border-b border-black/70 bg-[#262626] px-3 py-2 sm:gap-3">
           <span ref={(el) => { targets.current.play = el; }} className="relative inline-flex">
             <Ring on={tour === "play"} />
-            <button type="button" onClick={play} disabled={mix.state === "loading"}
-                    className={cn("flex h-8 items-center gap-2 rounded-[8px] px-3.5 text-[13px] font-medium transition", playing ? "bg-[#7cd38a] text-black" : "bg-white text-black hover:bg-white/90")}
-                    aria-label={playing ? "Stop" : "Play"}>
+            <Button onClick={play} disabled={mix.state === "loading"} variant={playing ? "go" : "filled"} size="xs" aria-label={playing ? "Stop" : "Play"}>
               {mix.state === "loading" ? "Loading…" : playing ? <><span className="size-[9px] rounded-[1px] bg-black" />Stop</> : <><span className="h-0 w-0 border-y-[5px] border-l-[9px] border-y-transparent border-l-black" />Play</>}
-            </button>
+            </Button>
           </span>
           <span className="hidden font-mono text-[12px] text-[#9a9a9a] sm:inline">{song.tempo} BPM · bars 1 to 16, looping</span>
           <div className="ml-auto flex items-center gap-2">
@@ -495,10 +494,10 @@ export function TryIt() {
               </span>
             )}
             {latestAfter && !showReveal && (
-              <button type="button" onClick={openReveal} ref={(el) => { targets.current.reveal = el; }}
-                      className="relative rounded-full bg-white/10 px-3.5 py-1.5 text-[12.5px] font-semibold text-white ring-1 ring-[#4ade80]/50 transition hover:bg-white/20">
-                <Ring on={tour === "reveal"} />The reveal
-              </button>
+              <span ref={(el) => { targets.current.reveal = el; }} className="relative inline-flex">
+                <Ring on={tour === "reveal"} />
+                <Button onClick={openReveal} variant="tonal" size="xs" className="ring-1 ring-[#4ade80]/50">The reveal</Button>
+              </span>
             )}
           </div>
         </div>
@@ -569,19 +568,16 @@ export function TryIt() {
               <div className="ml-auto flex gap-2">
                 <span ref={(el) => { targets.current.check = el; }} className="relative inline-flex">
                   <Ring on={tour === "check"} />
-                  <button type="button" onClick={checkMix} disabled={busy || phase !== "idle"}
-                          className={cn("rounded-full px-4 py-1.5 text-[13px] font-medium transition", phase === "idle" ? "bg-white text-black hover:bg-white/90" : "bg-white/10 text-[#8a8a8a]")}>
+                  <Button onClick={checkMix} disabled={busy || phase !== "idle"} variant="filled" size="xs">
                     {phase === "checking" ? "Checking…" : phase === "idle" ? "Check mix" : "Checked"}
-                  </button>
+                  </Button>
                 </span>
                 {FIX && (
                   <span ref={(el) => { targets.current.fix = el; }} className="relative inline-flex">
                     <Ring on={tour === "fix"} />
-                    <button type="button" onClick={() => FIX && !applied.includes(FIX.id) && apply(FIX)} disabled={phase === "idle" || busy || applied.includes(FIX.id)}
-                            className={cn("rounded-full px-4 py-1.5 text-[13px] font-medium transition",
-                              phase !== "idle" && !applied.includes(FIX.id) ? "bg-[#6ea8ff] text-black hover:brightness-110" : "bg-white/10 text-[#6a6a6a]")}>
+                    <Button onClick={() => FIX && !applied.includes(FIX.id) && apply(FIX)} disabled={phase === "idle" || busy || applied.includes(FIX.id)} variant="tertiary" size="xs">
                       {applied.includes(FIX.id) ? "Fixed" : FIX.button ?? "Fix all"}
-                    </button>
+                    </Button>
                   </span>
                 )}
               </div>
@@ -646,8 +642,8 @@ export function TryIt() {
               {phase !== "idle" && pending.length > 0 && (
                 <div ref={(el) => { targets.current.ask = el; }} className="mb-2 flex flex-wrap gap-1.5">
                   {pending.map((s) => (
-                    <button key={s.id} type="button" onClick={() => apply(s)} disabled={busy}
-                            className={cn("rounded-full border px-3 py-1 text-[12.5px] transition disabled:opacity-40", tour === "ask" ? "border-[#6ea8ff]/60 text-white hover:bg-[#6ea8ff]/15" : "border-white/15 text-[#d0d0d4] hover:bg-white/10")}>{s.label}</button>
+                    <Button key={s.id} onClick={() => apply(s)} disabled={busy} variant="outlined" size="xs"
+                            className={cn("h-7 px-3 text-[12.5px]", tour === "ask" && "border-[#6ea8ff]/60 text-white")}>{s.label}</Button>
                   ))}
                 </div>
               )}
@@ -656,9 +652,9 @@ export function TryIt() {
                 <input value={text} onChange={(e) => setText(e.target.value)} disabled={busy}
                        placeholder={phase === "idle" ? "Run Check mix first, or type \"check my mix\"" : "Ask, or tell Muse what to change"}
                        className="min-w-0 flex-1 bg-transparent py-1.5 text-[14px] text-white placeholder:text-[#6a6a6a] focus:outline-none" aria-label="Ask Muse" />
-                <button type="submit" disabled={busy || !text.trim()} className="grid size-8 flex-none place-items-center rounded-[10px] bg-white/10 text-white transition hover:bg-white/20 disabled:opacity-40" aria-label="Send">
+                <Button type="submit" disabled={busy || !text.trim()} variant="tonal" size="icon-xs" shape="square" aria-label="Send">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
-                </button>
+                </Button>
               </form>
             </div>
           </div>
@@ -689,7 +685,7 @@ export function TryIt() {
               <div className="relative mx-auto max-w-[900px] px-5 py-8 sm:py-10">
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] font-medium text-[#4ade80]">The reveal</span>
-                  <button type="button" onClick={() => setShowReveal(false)} className="rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] text-[#d0d0d4] hover:bg-white/20">Back to the demo</button>
+                  <Button onClick={() => setShowReveal(false)} variant="tonal" size="xs">Back to the demo</Button>
                 </div>
                 <h3 className="mt-3 text-center text-[clamp(30px,4.4vw,52px)] font-medium leading-[1.05] tracking-[-0.035em]">
                   {version === "after" ? "After Aria." : "Before Aria."}

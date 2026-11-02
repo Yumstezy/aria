@@ -4,11 +4,12 @@
 // loops and vocal (CLAUDE.md, "No invented data").
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { Hero, ButtonLink, ArrowRight } from "@/components/ui/saa-s-template";
+import { Hero, ArrowRight } from "@/components/ui/saa-s-template";
 import { LiquidNavbar, type LiquidNavItem } from "@/components/ui/liquid-glass-navbar";
 import { GlowCard, type Accent } from "@/components/ui/glow-card";
 import { LiveMockup } from "@/components/ui/live-mockup";
 import { HowItWorks } from "@/components/how-it-works";
+import { Button } from "@/components/ui/button";
 import { TryIt } from "@/components/try-it";
 import { cn } from "@/lib/utils";
 
@@ -207,7 +208,7 @@ export default function App() {
         <div className="mx-auto flex max-w-[1160px] items-center gap-4 px-6 pt-4">
           <a href="#" className="flex items-center gap-2.5 text-[17px] font-semibold"><span className="mark size-[22px]" />Aria</a>
           <div className="flex flex-1 justify-center"><LiquidNavbar tone="dark" items={NAV} active={navAt} onChange={(i) => setNavAt(i)} /></div>
-          <a href={DOWNLOAD} className="hidden h-10 items-center gap-2 rounded-[10px] bg-white px-4 text-[14px] font-medium text-black sm:inline-flex">{I.download(16)}Download</a>
+          <Button href={DOWNLOAD} variant="filled" size="sm" className="hidden sm:inline-flex">{I.download(16)}Download</Button>
         </div>
       </header>
 
@@ -215,8 +216,8 @@ export default function App() {
         title={<>Aria hears your mix,<br />and fixes it in Ableton.</>}
         sub={<>An AI co-producer that runs inside Live, on your Main track. It finds the sounds that clash or stick out, Meta's Muse Spark explains them and makes the fix, and Aria measures again to prove it worked.</>}
         cta={<>
-          <ButtonLink variant="gradient" size="lg" className="rounded-lg" href={DOWNLOAD}>{I.download(17)}Download for Mac</ButtonLink>
-          <ButtonLink variant="ghost" size="lg" className="rounded-lg" href="#how">See how it works<ArrowRight /></ButtonLink>
+          <Button href={DOWNLOAD} variant="filled" size="md">{I.download(18)}Download for Mac</Button>
+          <Button href="#try" variant="outlined" size="md">Try it right here<ArrowRight /></Button>
         </>}
       >
         <LiveMockup />
@@ -328,7 +329,7 @@ export default function App() {
           ))}
         </div>
         <Rise className="mt-8 flex flex-wrap items-center gap-3">
-          <ButtonLink variant="gradient" size="lg" className="rounded-lg" href={DOWNLOAD}>{I.download(17)}Download for Mac</ButtonLink>
+          <Button href={DOWNLOAD} variant="filled" size="md">{I.download(18)}Download for Mac</Button>
           <a href={RELEASES} className="text-[14px] text-muted underline-offset-4 hover:text-white hover:underline">Release notes on GitHub</a>
         </Rise>
       </Section>
@@ -351,9 +352,9 @@ export default function App() {
             ))}
           </div>
           <Rise className="mt-12 flex flex-wrap gap-3">
-            <ButtonLink variant="gradient" size="lg" className="rounded-lg" href={DOWNLOAD}>{I.download(17)}Download for Mac</ButtonLink>
-            <ButtonLink variant="ghost" size="lg" className="rounded-lg" href={GITHUB}>{I.github(17)}Code on GitHub</ButtonLink>
-            <ButtonLink variant="ghost" size="lg" className="rounded-lg" href={PRODUCT}>The product page<ArrowRight /></ButtonLink>
+            <Button href={DOWNLOAD} variant="filled" size="md">{I.download(18)}Download for Mac</Button>
+            <Button href={GITHUB} variant="tonal" size="md">{I.github(18)}Code on GitHub</Button>
+            <Button href={PRODUCT} variant="outlined" size="md">The product page<ArrowRight /></Button>
           </Rise>
         </div>
       </section>

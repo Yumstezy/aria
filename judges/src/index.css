@@ -16,6 +16,23 @@
   --color-gold: #f5c451;
   --color-blue: #6ea8ff;
   --color-violet: #a78bfa;
+  /* The M3 Expressive button's roles (components/ui/button.tsx), in Aria's colors (Nov 1) */
+  --color-primary: #ffffff;
+  --color-on-primary: #0a0a0b;
+  --color-secondary-container: rgba(255, 255, 255, 0.1);
+  --color-on-secondary-container: #ffffff;
+  --color-tertiary-container: #6ea8ff;
+  --color-on-tertiary-container: #0a0a0b;
+  --color-go: #4ade80;
+  --color-on-go: #0a0a0b;
+  --color-surface-container-low: #161618;
+  --color-on-surface: #ededef;
+  --color-on-surface-variant: #d0d0d4;
+  --color-outline-variant: rgba(255, 255, 255, 0.2);
+  --color-error: #f2b8b5;
+  --color-on-error: #601410;
+  --shadow-elevation-1: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 1px 3px 1px rgb(0 0 0 / 0.15);
+  --shadow-elevation-2: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 2px 6px 2px rgb(0 0 0 / 0.15);
   --font-sans: "Poppins", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
@@ -34,3 +51,25 @@ body { margin: 0; background: var(--color-ground); color: var(--color-ink); font
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes playhead { from { left: 0%; } to { left: 100%; } }
+
+/* The M3 Expressive button: a state layer for hover and press, a focus ring, the corner morph, its type sizes */
+@utility state-layer {
+  &::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: currentColor; opacity: 0;
+    transition: opacity 150ms cubic-bezier(0.2, 0, 0, 1); pointer-events: none; z-index: 0; }
+  &:hover::after { opacity: 0.08; }
+  &:focus-visible::after { opacity: 0.1; }
+  &[data-press]::after { opacity: 0.12; }
+}
+@utility state-layer-transparent { &::after { display: none; } }
+@utility focus-ring { &:focus-visible { outline: 2px solid #6ea8ff; outline-offset: 2px; } }
+@utility transition-shape {
+  transition: border-radius 220ms cubic-bezier(0.2, 0, 0, 1), box-shadow 200ms cubic-bezier(0.2, 0, 0, 1),
+    background-color 200ms, color 200ms, transform 200ms cubic-bezier(0.2, 0, 0, 1);
+}
+@utility type-label-large { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: 0.1px; }
+@utility type-title-medium { font-size: 16px; line-height: 24px; font-weight: 500; letter-spacing: 0.15px; }
+@utility type-headline-small { font-size: 24px; line-height: 32px; font-weight: 500; }
+.ripple-wave { opacity: 0.16; transform: scale(0); animation: ripple-grow 450ms cubic-bezier(0.2, 0, 0, 1) forwards; transition: opacity 400ms; }
+.ripple-wave[data-out] { opacity: 0; }
+@keyframes ripple-grow { to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .ripple-wave { animation-duration: 1ms; } }
