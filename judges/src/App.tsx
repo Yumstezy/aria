@@ -10,6 +10,7 @@ import { GlowCard, type Accent } from "@/components/ui/glow-card";
 import { LiveMockup } from "@/components/ui/live-mockup";
 import { HowItWorks } from "@/components/how-it-works";
 import { Button } from "@/components/ui/button";
+import { TeamLanyardRail, type LanyardMember } from "@/components/ui/team-lanyard-rail";
 import { TryIt } from "@/components/try-it";
 import { cn } from "@/lib/utils";
 
@@ -159,10 +160,19 @@ const MISSES = [
   "Without a reference, a broad low-mid boost is hard to hear: the rules found 1 of 3 planted problems. That's why the reference compare exists.",
 ];
 
-const TEAM: [string, string, string][] = [
-  ["Ian Barrie", "Built Aria end to end: the engine and its Muse Spark integration, the screens inside Live and the websites, and the Max for Live devices. Designed the product, tested it in Live every day, and now leads security.", "https://github.com/Yumstezy"],
-  ["Dylan Haman", "Product manager: organized the team, ran planning and check-ins, and kept the build on schedule. Set priorities and coordinated the hand-offs to the submission.", "https://github.com/Hamqnn"],
-  ["Raghav Agarwal", "Built the mix model: the rated mixes, their measurements, and the ordinal model with its ship rule. Ran the Audiobox side experiment and reported what it showed.", "https://github.com/RaghavAgarwal18"],
+
+// The same three people as badges on a lanyard rail (Ian, Nov 1). Photos and LinkedIn links come from Ian; until then
+// each badge shows the silhouette and links to the person's GitHub.
+const BADGES: LanyardMember[] = [
+  { id: "ian", name: "Ian Barrie", role: "Builder", team: "Aria · Build", tone: 1, image: "",
+    bio: "Built Aria end to end: the engine and Muse Spark, the screens in Live, the devices and the websites.",
+    tags: ["Engine", "Max for Live", "Security"], links: [{ label: "GitHub", href: "https://github.com/Yumstezy" }] },
+  { id: "dylan", name: "Dylan Haman", role: "Product manager", team: "Aria · Product", tone: 2, image: "",
+    bio: "Organized the team, ran planning and check-ins, and kept the build on schedule.",
+    tags: ["Planning", "Hand-offs"], links: [{ label: "GitHub", href: "https://github.com/Hamqnn" }] },
+  { id: "raghav", name: "Raghav Agarwal", role: "Machine learning", team: "Aria · Mix model", tone: 3, image: "",
+    bio: "Built the mix model: the rated mixes, their measurements, and the ordinal model with its ship rule.",
+    tags: ["Mix model", "Audiobox"], links: [{ label: "GitHub", href: "https://github.com/RaghavAgarwal18" }] },
 ];
 
 // Getting Aria into Live: what's in Aria-mac.zip and what "Install Aria" does (install.sh)
@@ -340,17 +350,9 @@ export default function App() {
             <span className="text-[13px] font-medium text-faint">Who built it</span>
             <h2 className="fade-text mt-2.5 text-[clamp(30px,4vw,46px)] font-medium leading-[1.1] tracking-[-0.04em]">Three people, nine days.</h2>
           </Rise>
-          <div className="mt-10 grid gap-3 md:grid-cols-3">
-            {TEAM.map(([name, role, gh], i) => (
-              <Rise key={name} delay={i * 0.06}>
-                <a href={gh} className="flex h-full flex-col gap-2 rounded-[18px] border border-edge bg-card p-5 transition-colors hover:bg-card-2">
-                  <b className="text-[16.5px] font-medium">{name}</b>
-                  <span className="text-[14px] leading-relaxed text-muted">{role}</span>
-                  <span className="mt-auto flex items-center gap-1.5 pt-2 text-[13px] text-faint">{I.github(14)}{gh.replace("https://github.com/", "")}</span>
-                </a>
-              </Rise>
-            ))}
-          </div>
+          <Rise className="mt-6">
+            <TeamLanyardRail items={BADGES} autoplay caption="Hover a badge to meet someone, click to flip it, or pull it down." />
+          </Rise>
           <Rise className="mt-12 flex flex-wrap gap-3">
             <Button href={DOWNLOAD} variant="filled" size="md">{I.download(18)}Download for Mac</Button>
             <Button href={GITHUB} variant="tonal" size="md">{I.github(18)}Code on GitHub</Button>

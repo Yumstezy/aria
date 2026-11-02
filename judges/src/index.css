@@ -16,6 +16,19 @@
   --color-gold: #f5c451;
   --color-blue: #6ea8ff;
   --color-violet: #a78bfa;
+  /* shadcn's names, for the team lanyard rail (components/ui/team-lanyard-rail.tsx), in Aria's palette (Nov 1).
+     The ribbons use Aria's accents: gold, blue, green, violet, orange. */
+  --color-background: #000000;
+  --color-foreground: #ededef;
+  --color-muted-foreground: #9ca3af;
+  --color-card-foreground: #ededef;
+  --color-border: rgba(255, 255, 255, 0.12);
+  --color-ring: #6ea8ff;
+  --color-chart-1: #f5c451;
+  --color-chart-2: #6ea8ff;
+  --color-chart-3: #4ade80;
+  --color-chart-4: #a78bfa;
+  --color-chart-5: #ff8a5b;
   /* The M3 Expressive button's roles (components/ui/button.tsx), in Aria's colors (Nov 1) */
   --color-primary: #ffffff;
   --color-on-primary: #0a0a0b;
