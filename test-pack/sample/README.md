@@ -1,6 +1,6 @@
 # Sample song
 
-16 bars of Ian's own house demo (Ian Barrie, BRILL), 128 BPM, 44.1 kHz, shared for judges and testers. The judges' page plays the same files in its "Try it" section.
+16 bars of a house demo Ian made, 128 BPM, 44.1 kHz, shared for judges and testers. The judges' page plays the same files in its "Try it" section.
 
 | File | What it is |
 |---|---|

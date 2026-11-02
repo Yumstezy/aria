@@ -42,6 +42,14 @@ const PLAIN: Record<string, (s: Step) => string> = {
   delay: () => "A soft delay repeats the vocal quietly in time with the song, which fills the space between phrases.",
 };
 
+// What Aria did, in three plain groups for the reveal; each change line is copied from the run (demo-run.json)
+const doneOf = (...ids: string[]) => STEPS.filter((s) => ids.includes(s.id)).flatMap((s) => s.done.filter((d) => d.ok).map((d) => d.text));
+const REVEAL_CARDS = [
+  { title: "Made room for the leads", plain: "Cut the bass where it sat on the melody, instead of just turning the leads up.", changes: doneOf("fix").filter((t) => /EQ Eight/.test(t)) },
+  { title: "Turned down what was too loud", plain: "The kick, the vocal and the leads came down until everything fit.", changes: [...doneOf("fix").filter((t) => /KICK/.test(t)), ...["vocal12", "leads", "vocals"].map((id) => doneOf(id).slice(-1)[0]).filter(Boolean)] },
+  { title: "Cleaned it up and finished it", plain: "Took the buzz off the bass, added air to the leads, put the vocal in a room.", changes: doneOf("basscut", "air", "reverb", "delay").filter((t) => !/"VOCAL" down/.test(t)) },
+];
+
 const COLORS = ["#ff5a4f", "#ffa529", "#10a4ee", "#5cffe8", "#ff94a6"];
 const DUR = (song.bars * 4 * 60) / song.tempo;   // 16 bars at 128 BPM: 30 s
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -263,14 +271,15 @@ type Msg =
 const words = (t: string) => t.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 2);
 
 // The guided tour: one short sentence per step, pointing at what to press (Ian, Nov 1)
-type Tour = "play" | "solo" | "check" | "fix" | "ask" | "reveal" | "done";
+type Tour = "play" | "solo" | "check" | "fix" | "hear" | "ask" | "reveal" | "done";
 const TOUR: Record<Exclude<Tour, "done">, { n: number; text: string; skip?: string }> = {
   play: { n: 1, text: "This is Ian's song in a small Live, before any mixing. Press play." },
   solo: { n: 2, text: "Solo the leads. That melody is what gets lost in the full mix.", skip: "Next" },
   check: { n: 3, text: "Now let Aria listen. It hears every track on its own." },
   fix: { n: 4, text: "Aria found the problem. Let Muse Spark fix it." },
-  ask: { n: 5, text: "Ask for more, the way Ian did. Tap a request or type one.", skip: "Next" },
-  reveal: { n: 6, text: "That's the whole run. Time for the big reveal." },
+  hear: { n: 5, text: "You're hearing After now: where Ian's run with Aria ended up. Flip to Before, then back.", skip: "Next" },
+  ask: { n: 6, text: "That took a few more requests. Tap them to see what Ian asked for.", skip: "Next" },
+  reveal: { n: 7, text: "That's the whole run. Time for the big reveal." },
 };
 
 /* ---------- the demo ---------- */
@@ -287,6 +296,8 @@ export function TryIt() {
   const [text, setText] = useState("");
   const [tour, setTour] = useState<Tour>("play");
   const [showReveal, setShowReveal] = useState(false);
+  const [showNumbers, setShowNumbers] = useState(false);
+  const revealHead = useRef<HTMLDivElement>(null);
   const thread = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const targets = useRef<Partial<Record<Tour, HTMLElement | null>>>({});
@@ -310,6 +321,7 @@ export function TryIt() {
       const p = mix.position() / DUR;
       if (playhead.current) playhead.current.style.left = `${(p * 100).toFixed(3)}%`;
       if (played.current) played.current.style.width = `${(p * 100).toFixed(3)}%`;
+      if (revealHead.current) revealHead.current.style.left = `${(p * 100).toFixed(3)}%`;
       raf = requestAnimationFrame(tick);
     };
     tick();
@@ -388,7 +400,11 @@ export function TryIt() {
     }
     if (PLAIN[s.id]) say({ kind: "plain", text: PLAIN[s.id](s) });
     setPhase("checked");
-    if (s.kind === "fix") setTour("ask");
+    if (s.audio) {   // the payoff right away: switch to After while it plays (Ian, Nov 1: "there's no reveal" at the fix)
+      setVersion("after");
+      if (mix.state !== "playing") mix.play({ ...gains(), before: 0, after: { [s.id]: 1 } });
+    }
+    if (s.kind === "fix") setTour("hear");
     else if (tour === "ask" && pending.filter((x) => x.id !== s.id).length <= ASKS.length - 3) setTour("reveal");
   };
 
@@ -435,6 +451,7 @@ export function TryIt() {
   }, [showReveal]);
 
   const tipNow = tour !== "done" && !showReveal ? TOUR[tour] : null;
+  const lowMids = reveal.bands.find((b) => b.name === "Low mids" && b.diff_db < 0);
   const changes = STEPS.reduce((n, s) => n + s.done.length, 0);
 
   return (
@@ -444,7 +461,7 @@ export function TryIt() {
         {/* window title bar */}
         <div className="flex h-[34px] items-center gap-[7px] border-b border-black/70 bg-[#141414] px-3">
           <span className="size-[11px] flex-none rounded-full bg-[#ff5f57]" /><span className="size-[11px] flex-none rounded-full bg-[#febc2e]" /><span className="size-[11px] flex-none rounded-full bg-[#28c840]" />
-          <span className="ml-3 truncate text-[12px] text-[#9a9a9a]">BRILL house demo · Aria on Main</span>
+          <span className="ml-3 truncate text-[12px] text-[#9a9a9a]">House demo by Ian · Aria on Main</span>
           <span className="ml-auto flex flex-none items-center gap-1.5 rounded-full bg-[#4ade80]/12 px-2.5 py-[3px] text-[11.5px] font-medium text-[#4ade80]">
             <span className="size-[6px] animate-pulse rounded-full bg-[#4ade80]" />Interactive demo
           </span>
@@ -464,9 +481,23 @@ export function TryIt() {
           <div className="ml-auto flex items-center gap-2">
             {tour !== "done" && !showReveal && <button type="button" onClick={() => setTour("done")} className="text-[12px] text-[#8a8a8a] hover:text-white">Skip tour</button>}
             {latestAfter && !showReveal && (
+              <span ref={(el) => { targets.current.hear = el; }} className="relative inline-flex">
+                <Ring on={tour === "hear"} />
+                <div className="flex rounded-full bg-[#141414] p-1" role="group" aria-label="Which version plays">
+                  {(["before", "after"] as const).map((v) => (
+                    <button key={v} type="button" onClick={() => { flip(v); if (tour === "hear" && v === "before") setTimeout(() => setTour((t) => (t === "hear" ? "ask" : t)), 3500); }}
+                            className={cn("relative rounded-full px-3.5 py-1 text-[12.5px] font-semibold transition", version === v ? "text-black" : "text-[#9a9a9a] hover:text-white")}>
+                      {version === v && <motion.span layoutId="transport-pill" className={cn("absolute inset-0 rounded-full", v === "after" ? "bg-[#4ade80]" : "bg-white")} transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
+                      <span className="relative">{v === "before" ? "Before" : "After"}</span>
+                    </button>
+                  ))}
+                </div>
+              </span>
+            )}
+            {latestAfter && !showReveal && (
               <button type="button" onClick={openReveal} ref={(el) => { targets.current.reveal = el; }}
-                      className="relative rounded-full bg-[#4ade80] px-3.5 py-1.5 text-[12.5px] font-semibold text-black transition hover:brightness-110">
-                <Ring on={tour === "reveal"} />Before vs After
+                      className="relative rounded-full bg-white/10 px-3.5 py-1.5 text-[12.5px] font-semibold text-white ring-1 ring-[#4ade80]/50 transition hover:bg-white/20">
+                <Ring on={tour === "reveal"} />The reveal
               </button>
             )}
           </div>
@@ -521,7 +552,7 @@ export function TryIt() {
                 <div ref={playhead} className="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" style={{ left: 0 }} />
               </div>
             </div>
-            <p className="mt-2 text-[12px] text-[#8a8a8a]">{showAfter ? "Playing Ian's export from Live after the run, at the same loudness as Before." : "Colors show where each sound lives: red lows, orange mids, green highs."}</p>
+            <p className="mt-2 text-[12px] text-[#8a8a8a]">{showAfter ? "After: Ian's export from Live at the end of the run, at the same loudness as Before." : "Colors show where each sound lives: red lows, orange mids, green highs."}</p>
             <div className="mt-3">
               <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 text-[12px] text-[#9a9a9a]">
                 <span>The whole mix, measured as it plays</span>
@@ -640,80 +671,101 @@ export function TryIt() {
              <motion.div initial={{ opacity: 0, y: tip.below ? -6 : 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
                          className="pointer-events-auto relative rounded-[12px] bg-[#6ea8ff] px-3.5 py-2.5 text-[13px] font-medium leading-snug text-[#0a0a0b] shadow-[0_12px_40px_-8px_rgba(110,168,255,0.7)]">
                 <span className={cn("absolute size-3 -translate-x-1/2 rotate-45 bg-[#6ea8ff]", tip.below ? "-top-1.5" : "-bottom-1.5")} style={{ left: `calc(50% + ${tip.arrow}px)` }} />
-                <div className="mb-0.5 text-[11px] font-semibold opacity-60">Step {tipNow.n} of 6</div>
+                <div className="mb-0.5 text-[11px] font-semibold opacity-60">Step {tipNow.n} of 7</div>
                 {tipNow.text}
-                {tipNow.skip && <button type="button" onClick={() => setTour(tour === "solo" ? "check" : "reveal")} className="ml-2 underline underline-offset-2 opacity-70 hover:opacity-100">{tipNow.skip}</button>}
+                {tipNow.skip && <button type="button" onClick={() => setTour(tour === "solo" ? "check" : tour === "hear" ? "ask" : "reveal")} className="ml-2 underline underline-offset-2 opacity-70 hover:opacity-100">{tipNow.skip}</button>}
              </motion.div>
             </div>
           )}
         </AnimatePresence>
 
-        {/* the big reveal: the same 16 bars, before and after, at the same loudness */}
+        {/* the big reveal (Ian, Nov 1: the first one read like a lab report): one big waveform that changes in place,
+            a big switch, and what Aria did in plain words, each with its real changes; the measurements on request */}
         <AnimatePresence>
           {showReveal && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}
-                        className="absolute inset-0 z-30 overflow-y-auto bg-[#0b0b0c]/[0.97] backdrop-blur-sm">
-              <div className="mx-auto max-w-[880px] px-5 py-8 sm:py-10">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-[12px] font-medium text-[#4ade80]">The reveal</div>
-                    <h3 className="mt-1 text-[clamp(26px,3.4vw,38px)] font-medium leading-[1.1] tracking-[-0.03em]">Before and after Aria.</h3>
-                    <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-[#a8a8ad]">The same 16 bars at the same loudness, so you hear the mix, not the volume. {STEPS.length - 1} steps in Live, {changes} changes, every one with Undo. Flip between them while it plays (or press space).</p>
-                  </div>
-                  <button type="button" onClick={() => setShowReveal(false)} className="flex-none rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] text-[#d0d0d4] hover:bg-white/20">Back to the demo</button>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.45 }}
+                        className="absolute inset-0 z-30 overflow-y-auto bg-[#09090a]">
+              <div className="pointer-events-none absolute inset-0 transition-colors duration-700" style={{ background: version === "after" ? "radial-gradient(70% 50% at 50% 30%, rgba(74,222,128,0.16), transparent 70%)" : "radial-gradient(70% 50% at 50% 30%, rgba(255,255,255,0.06), transparent 70%)" }} />
+              <div className="relative mx-auto max-w-[900px] px-5 py-8 sm:py-10">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] font-medium text-[#4ade80]">The reveal</span>
+                  <button type="button" onClick={() => setShowReveal(false)} className="rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] text-[#d0d0d4] hover:bg-white/20">Back to the demo</button>
                 </div>
+                <h3 className="mt-3 text-center text-[clamp(30px,4.4vw,52px)] font-medium leading-[1.05] tracking-[-0.035em]">
+                  {version === "after" ? "After Aria." : "Before Aria."}
+                </h3>
+                <p className="mx-auto mt-2 max-w-[520px] text-center text-[14px] text-[#a8a8ad]">Same 16 bars, same loudness. Flip it while it plays (or press space).</p>
 
                 <div className="mt-6 flex justify-center">
                   <div className="flex rounded-full bg-[#1b1b1c] p-1.5 ring-1 ring-white/10">
                     {(["before", "after"] as const).map((v) => (
                       <button key={v} type="button" onClick={() => flip(v)}
-                              className={cn("relative rounded-full px-8 py-2.5 text-[16px] font-semibold transition sm:px-12",
-                                version === v ? (v === "after" ? "text-black" : "text-black") : "text-[#9a9a9a] hover:text-white")}>
-                        {version === v && <motion.span layoutId="reveal-pill" className={cn("absolute inset-0 rounded-full", v === "after" ? "bg-[#4ade80]" : "bg-white")} transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
+                              className={cn("relative rounded-full px-10 py-3 text-[17px] font-semibold transition sm:px-14", version === v ? "text-black" : "text-[#9a9a9a] hover:text-white")}>
+                        {version === v && <motion.span layoutId="reveal-pill" className={cn("absolute inset-0 rounded-full shadow-[0_0_40px_-6px]", v === "after" ? "bg-[#4ade80] shadow-[#4ade80]" : "bg-white shadow-white/40")} transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
                         <span className="relative">{v === "before" ? "Before" : "After"}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="mt-6 space-y-2">
+                {/* one waveform of the whole mix; flipping fades one version into the other in place */}
+                <div className="relative mt-7 h-[150px] overflow-hidden rounded-[16px] bg-[#121213] ring-1 ring-white/10 sm:h-[180px]">
                   {(["before", "after"] as const).map((v) => (
-                    <div key={v} className={cn("relative h-[86px] overflow-hidden rounded-[12px] bg-[#151515] ring-1 transition duration-500", version === v ? "ring-white/25" : "opacity-40 ring-transparent")}>
-                      <span className={cn("absolute left-2 top-2 z-10 rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-semibold", v === "after" ? "text-[#4ade80]" : "text-[#cfcfcf]")}>{v === "before" ? "Before: the rough mix" : "After: Ian's run with Aria"}</span>
-                      <div className="absolute inset-x-0 inset-y-[10px]"><WaveCanvas wave={reveal[v] as unknown as Wave} dim={version !== v} /></div>
+                    <div key={v} className="absolute inset-x-0 inset-y-[14px] transition-opacity duration-500" style={{ opacity: version === v ? 1 : 0 }}>
+                      <WaveCanvas wave={reveal[v] as unknown as Wave} />
                     </div>
+                  ))}
+                  <div className="pointer-events-none absolute inset-0">
+                    <div ref={revealHead} className="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)]" style={{ left: 0 }} />
+                  </div>
+                </div>
+
+                <div className="mt-7 grid gap-3 sm:grid-cols-3">
+                  {REVEAL_CARDS.map((c, i) => (
+                    <motion.div key={c.title} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.12, duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
+                                className="rounded-[16px] bg-[#141416] p-4 ring-1 ring-white/[0.06]">
+                      <div className="text-[16px] font-medium">{c.title}</div>
+                      <p className="mt-1 text-[13px] leading-relaxed text-[#a8a8ad]">{c.plain}</p>
+                      <ul className="mt-3 space-y-1">
+                        {c.changes.map((t) => <li key={t} className="text-[12px] leading-snug text-[#4ade80]">{t}</li>)}
+                      </ul>
+                    </motion.div>
                   ))}
                 </div>
 
-                <div className="mt-6 grid gap-5 md:grid-cols-[minmax(0,1fr)_240px]">
-                  <div className="rounded-[12px] bg-[#151515] p-3">
-                    <div className="mb-1 flex items-center gap-3 text-[12px] text-[#9a9a9a]">
-                      <span>Where the sound sits, averaged over the 16 bars</span>
-                      <span className="ml-auto flex items-center gap-1.5"><span className="h-[2px] w-4 bg-[#8a8a8a]" />Before</span>
-                      <span className="flex items-center gap-1.5"><span className="h-[2px] w-4 bg-[#4ade80]" />After</span>
-                    </div>
-                    <RevealSpectrum range={CHECK.finding?.hz_range} />
-                    <div className="flex justify-between font-mono text-[10px] text-[#6a6a6a]"><span>30 Hz</span><span>Low</span><span>Middle</span><span>High</span><span>16 kHz</span></div>
-                  </div>
-                  <div className="rounded-[12px] bg-[#151515] p-3">
-                    <div className="text-[12px] text-[#9a9a9a]">After, compared with Before</div>
-                    <div className="mt-2 space-y-1.5">
-                      {reveal.bands.map((b) => (
-                        <div key={b.name} className="flex items-center gap-2 text-[12.5px]">
-                          <span className="w-[78px] flex-none text-[#cfcfcf]">{b.name}</span>
-                          <div className="relative h-[6px] flex-1 rounded-full bg-white/[0.06]">
-                            <span className={cn("absolute top-0 h-full rounded-full", b.diff_db < 0 ? "bg-[#6ea8ff]" : "bg-[#4ade80]")}
-                                  style={{ left: b.diff_db < 0 ? `${50 + Math.max(-50, b.diff_db * 12)}%` : "50%", width: `${Math.min(50, Math.abs(b.diff_db) * 12)}%` }} />
-                            <span className="absolute left-1/2 top-[-2px] h-[10px] w-px bg-white/30" />
-                          </div>
-                          <span className="w-[46px] flex-none text-right font-mono text-[11.5px] text-[#d8d8d8]">{b.diff_db > 0 ? "+" : ""}{b.diff_db}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-3 text-[11.5px] leading-relaxed text-[#8a8a8a]">dB, at the same loudness. Blue is less, green is more.</p>
-                  </div>
+                {lowMids && (
+                  <p className="mt-6 text-center text-[15px] text-[#d0d0d4]">
+                    Measured at the same loudness: the boxy low mids are <span className="font-semibold text-white">{Math.abs(lowMids.diff_db)} dB cleaner</span>.
+                  </p>
+                )}
+                <div className="mt-3 text-center">
+                  <button type="button" onClick={() => setShowNumbers((x) => !x)} className="text-[12.5px] text-[#8a8a8a] underline underline-offset-4 hover:text-white">{showNumbers ? "Hide the measurements" : "Show the measurements"}</button>
                 </div>
-                <p className="mt-5 text-[11.5px] leading-relaxed text-[#6a6a6a]">{reveal.source} Measured by judges/scripts/make_demo_data.py.</p>
+                <AnimatePresence>
+                  {showNumbers && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
+                        <div className="rounded-[12px] bg-[#141416] p-3">
+                          <div className="mb-1 flex items-center gap-3 text-[12px] text-[#9a9a9a]">
+                            <span>Average spectrum</span>
+                            <span className="ml-auto flex items-center gap-1.5"><span className="h-[2px] w-4 bg-[#8a8a8a]" />Before</span>
+                            <span className="flex items-center gap-1.5"><span className="h-[2px] w-4 bg-[#4ade80]" />After</span>
+                          </div>
+                          <RevealSpectrum range={CHECK.finding?.hz_range} />
+                        </div>
+                        <div className="rounded-[12px] bg-[#141416] p-3 text-[12.5px]">
+                          <div className="text-[12px] text-[#9a9a9a]">After vs Before, dB</div>
+                          <div className="mt-2 space-y-1">
+                            {reveal.bands.map((b) => (
+                              <div key={b.name} className="flex justify-between"><span className="text-[#cfcfcf]">{b.name}</span><span className="font-mono text-[#d8d8d8]">{b.diff_db > 0 ? "+" : ""}{b.diff_db}</span></div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <p className="mt-3 text-[11.5px] leading-relaxed text-[#6a6a6a]">{reveal.source} Measured by judges/scripts/make_demo_data.py.</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </motion.div>
           )}
