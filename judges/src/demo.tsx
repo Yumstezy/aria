@@ -22,7 +22,7 @@ function Demos() {
         <h1 className="max-w-[760px] text-[clamp(32px,4.6vw,52px)] font-medium leading-[1.08] tracking-[-0.04em]">
           <span className="fade-text">Hear Aria fix a real mix.</span> <span className="text-faint">No Ableton needed.</span>
         </h1>
-        <p className="mt-4 max-w-[600px] text-[16px] leading-relaxed text-muted">A house demo Ian made, before mixing. Four steps: listen, let Aria check it, fix it, then compare.</p>
+        <p className="mt-4 max-w-[600px] text-[16px] leading-relaxed text-muted">A house demo we made, before mixing. Four steps: listen, let Aria check it, fix it, then compare.</p>
         <TryIt />
       </section>
 
@@ -31,7 +31,7 @@ function Demos() {
           <h2 className="max-w-[760px] text-[clamp(28px,3.8vw,44px)] font-medium leading-[1.1] tracking-[-0.04em]">
             <span className="fade-text">Watch it in Ableton.</span> <span className="text-faint">The real thing, in Live.</span>
           </h2>
-          <p className="mt-4 max-w-[600px] text-[16px] leading-relaxed text-muted">Ian using Aria inside Ableton Live on his own song: the check, the fixes and the proof.</p>
+          <p className="mt-4 max-w-[600px] text-[16px] leading-relaxed text-muted">Aria inside Ableton Live on our own song: the check, the fixes and the proof.</p>
           <div className="mt-10"><DemoVideo /></div>
         </section>
       )}
@@ -41,6 +41,7 @@ function Demos() {
           <span className="flex items-center gap-2 text-ink"><span className="mark size-4" />Aria</span>
           <a href="/" className="hover:text-ink">The full page</a>
           <a href={GITHUB} className="hover:text-ink">Code on GitHub</a>
+          <span className="w-full text-[12px]">Credits: the sample song, its stems and the screenshots from Live are by Ian Barrie.</span>
         </div>
       </footer>
     </main>

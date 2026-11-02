@@ -138,7 +138,7 @@ const META: [string, string, Accent, ReactNode][] = [
 const TOOLS: { crop: number; skip?: number; title: string; line: string; src: string; alt: string }[] = [
   { crop: 560, skip: 150, title: "Fix it, then prove it.", line: "Fix it asks Muse Spark for the change and it happens in Live. Check again plays the same bars at the same loudness: 3 dB or more lower is Fixed, and it moves out of the way. Less, and it comes back with Fix it again.", src: "/img/fixed.png", alt: "A problem confirmed fixed by Before and after" },
   { crop: 420, skip: 450, title: "Two loops, one groove.", line: "Aria finds every hit to the millisecond and moves each one onto the grid or onto another loop's feel, in a new clip under the original. A perc loop 14.9 ms behind its kick came back at 0, all 32 hits. Nothing is stretched.", src: "/img/groove.png", alt: "Groove match: in time" },
-  { crop: 560, skip: 410, title: "A vocal on your kick.", line: "Drop in an acapella. Aria reads its tempo and key, puts its first beat on your kick, not just the grid (Ian's kick sits 22 to 25 ms late), and warps it with Live's own markers, reading them back to be sure they stuck.", src: "/img/vocal.png", alt: "Vocal sync on the kick" },
+  { crop: 560, skip: 410, title: "A vocal on your kick.", line: "Drop in an acapella. Aria reads its tempo and key, puts its first beat on your kick, not just the grid (our test kick sits 22 to 25 ms late), and warps it with Live's own markers, reading them back to be sure they stuck.", src: "/img/vocal.png", alt: "Vocal sync on the kick" },
   { crop: 560, skip: 40, title: "Ask, and it happens.", line: "Real requests from testing, typos and all. 5 of 5 got the right tool, or a question when the track wasn't clear. You can undo each change.", src: "/img/chat.png", alt: "Ask Muse making changes in Live" },
 ];
 
@@ -161,7 +161,7 @@ const BROKE: [string, string][] = [
 ];
 
 const MISSES = [
-  "One vocal still reads at the wrong speed: Ian's vocal at 148 beats a minute reads as 192. So Aria shows its best guesses, and you can pick your song's own speed with one tap.",
+  "One vocal still reads at the wrong speed: one of ours, at 148 beats a minute, reads as 192. So Aria shows its best guesses, and you can pick your song's own speed with one tap.",
   "Without a song to compare with, a mix that's a little muddy is hard to catch. In our test, Aria found 1 of the 3 problems we planted. That's why you can add a reference song to compare against.",
 ];
 
@@ -237,9 +237,14 @@ export default function App() {
         </>}
       >
         {/* A real screenshot of Aria in Live (Ian, Nov 1: "we can prob just use a real image"), in place of the drawing */}
-        <img src="/img/live-hero.jpg" alt="Aria in Ableton Live: Mix check docked on the left, showing a buried vocal, with Aria Ear on the kick track below"
-             width={2400} height={1331} className="block h-auto w-full rounded-[14px] border border-white/10 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.9)]" />
-        <p className="mt-5 text-center text-[13px] text-faint">Aria in Ableton Live, on one of Ian's sessions. Mix check is docked on the left, where it found the vocal buried under the backing. Aria Ear sits on the kick track below.</p>
+        {/* Edited like the tool shots (Ian, Nov 2): the top and bottom fade into the page, so the half-scrolled card at the
+            top and Live's device panel at the bottom fall away, and Aria and the arrangement stay sharp */}
+        <div className="overflow-hidden rounded-[18px] border border-edge bg-card shadow-[0_40px_120px_-40px_rgba(0,0,0,0.8)]"
+             style={{ maskImage: "linear-gradient(to bottom, transparent 0%, #000 12%, #000 86%, transparent 100%)", WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 12%, #000 86%, transparent 100%)" }}>
+          <img src="/img/live-hero.jpg" alt="Aria in Ableton Live: Mix check docked on the left, showing a buried vocal, with Aria Ear on the kick track below"
+               width={2400} height={1331} className="block h-auto w-full" />
+        </div>
+        <p className="mt-5 text-center text-[13px] text-faint">Aria in Ableton Live, on one of our sessions. Mix check is docked on the left, where it found the vocal buried under the backing. Aria Ear sits on the kick track below.</p>
       </Hero>
 
       {DEMO_VIDEO && (
@@ -249,13 +254,13 @@ export default function App() {
       )}
 
       <Section id="try" label="Try it" title="Hear Aria fix a real mix." dim="No Ableton needed."
-               sub="A house demo Ian made, before mixing. Four steps: listen, let Aria check it, fix it, then compare.">
+               sub="A house demo we made, before mixing. Four steps: listen, let Aria check it, fix it, then compare.">
         <TryIt />
         <p className="mt-4 text-[14px] text-faint">Also on its own page, with the video of Aria in Ableton: <a href="/demo" className="text-muted underline underline-offset-4 hover:text-ink">aria-judges.vercel.app/demo</a></p>
       </Section>
 
       <Section id="how" label="How it works" title="One problem, start to finish." dim="Heard, explained, fixed, proved."
-               sub="This is a real one, from Ian's own song. Aria's loop is the same for every problem it finds.">
+               sub="This is a real one, from our own song. Aria's loop is the same for every problem it finds.">
         <HowItWorks />
       </Section>
 
@@ -372,6 +377,7 @@ export default function App() {
         <div className="mx-auto flex max-w-[1160px] flex-wrap items-center gap-4 px-6 text-[13px] text-faint">
           <span className="flex items-center gap-2 text-ink"><span className="mark size-4" />Aria</span>
           <span>Built Oct 26 to Nov 4, 2026, for the Meta Global AI Developer Hackathon.</span>
+          <span className="w-full text-[12px]">Credits: the sample song, its stems and the screenshots from Live are by Ian Barrie.</span>
         </div>
       </footer>
     </main>

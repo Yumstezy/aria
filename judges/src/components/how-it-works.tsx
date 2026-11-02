@@ -135,7 +135,7 @@ function Prove() {
 
 const STEPS: { key: string; title: string; text: ReactNode; view: () => ReactNode }[] = [
   { key: "Hear", title: "Aria hears it.", view: Hear,
-    text: <>Mix check records bars of your Main track and finds the sounds that clash or stick out, and exactly where. In Ian's drop: sharp bursts around {real.hear.harsh.hz} Hz, {real.hear.harsh.bursts_per_bar} times a bar, bars {real.hear.harsh.bars[0]} to {real.hear.harsh.bars[1]}.</> },
+    text: <>Mix check records bars of your Main track and finds the sounds that clash or stick out, and exactly where. In our drop: sharp bursts around {real.hear.harsh.hz} Hz, {real.hear.harsh.bursts_per_bar} times a bar, bars {real.hear.harsh.bars[0]} to {real.hear.harsh.bars[1]}.</> },
   { key: "Explain", title: "Muse Spark says it plainly.", view: Explain,
     text: <>Muse Spark gets only the measured numbers and writes what's wrong the way a producer would say it. Then it picks the fix, as an action from a fixed menu.</> },
   { key: "Fix", title: "The fix happens in Live.", view: Fix,

@@ -290,10 +290,10 @@ export function TryIt() {
 
   // One sentence and one button per step
   const say: Record<Stage, string> = {
-    0: "Ian's song, 16 bars, before any mixing. Tap a track's name to hear it alone.",
+    0: "Our song, 16 bars, before any mixing. Tap a track's name to hear it alone.",
     1: busy ?? "The lead melody is buried. The rest of the song covers it most of the time, so you barely hear it.",
     2: busy ?? "Muse Spark made room for the leads instead of just turning them up:",
-    3: `After the fix and Ian's ${ASKS.length} requests. Same 16 bars, same loudness.` + (lowMids ? ` The boxy low mids are ${Math.abs(lowMids.diff_db)} dB cleaner.` : ""),
+    3: `After the fix and ${ASKS.length} more requests. Same 16 bars, same loudness.` + (lowMids ? ` The boxy low mids are ${Math.abs(lowMids.diff_db)} dB cleaner.` : ""),
   };
   const action: Record<Stage, { label: string; run: () => void } | null> = {
     0: { label: "Check the mix", run: check },
@@ -397,7 +397,7 @@ export function TryIt() {
           {stage === 2 && busy === null && ASKS.length > 0 && (
             <div className="mt-4">
               <button type="button" onClick={() => setMore((x) => !x)} className="text-[13.5px] text-faint underline-offset-4 hover:text-muted hover:underline">
-                {more ? "Hide the rest of the run" : `See what Ian asked next (${ASKS.length} more requests)`}
+                {more ? "Hide the rest of the run" : `See what we asked next (${ASKS.length} more requests)`}
               </button>
               <AnimatePresence>
                 {more && (
@@ -421,7 +421,7 @@ export function TryIt() {
 
       {/* where it came from, in one line */}
       <div className="border-t border-hairline px-5 py-3.5 text-[12.5px] text-faint sm:px-7">
-        Replays Ian's real run in Live with Aria and Muse Spark, faster than real time.{" "}
+        Replays a real run in Live with Aria and Muse Spark, faster than real time.{" "}
         <button type="button" onClick={() => setHow((x) => !x)} className="underline underline-offset-4 hover:text-muted">{how ? "Hide" : "How this was recorded"}</button>
         <AnimatePresence>
           {how && (

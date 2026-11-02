@@ -101,7 +101,7 @@ def main(after_path):
     wb, scale = wave(before, rate)
     scale = max(scale, np.abs(after).max())   # one scale for both, so their heights compare
     wb, _ = wave(before, rate, scale)
-    json.dump({"source": "Before: test-pack/sample/Rough mix.wav. After: Ian's export from Live after the run, shifted "
+    json.dump({"source": "Before: test-pack/sample/Rough mix.wav. After: the export from Live after the run, shifted "
                          f"{k} samples to line up and turned {'down' if gain_db < 0 else 'up'} {abs(gain_db):.1f} dB to Before's loudness (BS.1770).",
                "gain_db": round(gain_db, 1), "hz": [round(float(f), 1) for f in BANDS],
                "before": {**wb, "spectrum": spectrum(before, rate)},
