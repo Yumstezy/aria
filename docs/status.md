@@ -4,6 +4,12 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 1, evening: the judges' site and README, cleaned up.**
+- Try it is one calm card in four steps (Listen, Check, Fix, Compare), after Ian found the Live-style version cluttered.
+- The team section is lanyard badges with photos and LinkedIn links. The buttons are M3 Expressive in Aria's colors.
+- The README was rewritten in the site's order and voice.
+- Ian decided against a "try your own request" mode (live Muse calls on his key): the demo stays a replay of his real run.
+
 **Nov 1, 5:30 PM: the judges' Try it demo is Ian's real run.** Ian's 5:00 to 5:07 run, from Aria's log, in 9 steps:
 - The Mix check: his 5:00 recording, run through the engine again.
 - Fix it on the buried leads, then seven requests: vocal down, leads down, bass low pass at 1 kHz, vocal group down, air on the leads, reverb, delay.
