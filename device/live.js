@@ -860,7 +860,8 @@ function undo() {
       clip.set("warping", u.before.warping);
       try { clip.set("warp_mode", u.before.warp_mode); clip.set("end_marker", u.before.end_marker); clip.set("start_marker", u.before.start_marker); } catch (e) { }
     }
-    send("undo_done", { ok: !!clip, text: clip ? "Put \"" + u.name + "\" back how it was." : "The vocal's clip isn't there any more." });
+    // Popped either way, so it counts as undone: the bridge's stack stays in step with this one
+    send("undo_done", { ok: true, text: clip ? "Put \"" + u.name + "\" back how it was." : "The vocal's clip isn't there any more, so there was nothing to put back." });
   } else if (u.kind === "groove") {
     const at = ids(song.get("tracks")).indexOf(u.track_id);
     if (at >= 0) song.call("delete_track", at);

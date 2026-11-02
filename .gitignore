@@ -35,3 +35,4 @@ release/
 .playwright-cli/
 # Private plans (the paid plugin), kept off the public repo
 docs/private/
+judges/tsconfig.tsbuildinfo

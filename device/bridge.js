@@ -342,7 +342,7 @@ function sendUndoNext() {
 let logShownFrom = 0;
 function sendAskLog() {
   let from = 0;
-  while (from < askLog.length && encode(askLog.slice(from)).length > UI_MAX_CHARS - 2000) from++;
+  while (from < askLog.length - 1 && encode(askLog.slice(from)).length > UI_MAX_CHARS - 2000) from++;
   logShownFrom = from;
   toUI("ask_log", askLog.slice(from));
 }
@@ -350,7 +350,7 @@ function sendAskLog() {
 // ---------- live.js ----------
 
 // Reading the whole set takes longer on big projects than one change does
-const LIVE_SLOW = { live_state: 8000, eq_done: 8000, aria_eqs: 8000, ears_removed: 8000, clips_playing: 8000, vocal_done: 20000, groove_placed: 10000, track_clip: 8000 };
+const LIVE_SLOW = { device_done: 8000, volume_done: 8000, undo_done: 8000, marker_done: 8000, prop_done: 8000, live_state: 8000, eq_done: 8000, aria_eqs: 8000, ears_removed: 8000, clips_playing: 8000, vocal_done: 20000, groove_placed: 10000, track_clip: 8000 };
 function askLive(command, reply, ...args) {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -767,6 +767,8 @@ async function fixStep(stage, results, label) {
     logLine(`fix ${stage}: Muse sent ${res.json.actions.length} changes`);
     const done = [];
     for (const action of res.json.actions) {
+      // A sidechain's routing only follows its own Compressor (else it would rewire the producer's own)
+      if (action.type === "route_sidechain" && done.length && !done[done.length - 1].ok) continue;
       try { done.push({ ...action, ...(await apply(action, context.tracks)) }); }
       catch (e) { done.push({ ...action, ok: false, text: e.message }); }
       logLine(`fix ${stage}: ${action.type} -> ${done[done.length - 1].text}`);
@@ -872,6 +874,8 @@ async function grooveRunNow({ follow, strength = 1, nudge_ms = 0 }) {
       warping: m.warping, warp_markers: m.warp_markers || [], start_marker: m.start_marker, end_marker: m.end_marker, replace_track_id: replace || null }));
     if (replace) { const k = changeStack.findIndex((x) => x.groove); if (k >= 0) changeStack.splice(k, 1); }
     if (placed.ok) { groove.placed = { track_id: placed.track_id, orig_id: placed.orig_id, playing: "after" }; changeStack.push({ at: null, kind: "d", k: 0, groove: true }); sendUndoNext(); }
+    // No clip, but the new track and the muted original are there, with an undo in live.js: Undo must reach it
+    else if (placed.track_id) { changeStack.push({ at: null, kind: "d", k: 0, groove: true }); sendUndoNext(); }
     grooveState({ result: { ...res.json, follow: a ? a.track_name || a.name : "Straight", strength, nudge_ms }, error: placed.ok ? null : placed.text });
     toUI("show_view", { view: "groove" });
     return { ...res.json, placed: placed.ok };
@@ -1236,13 +1240,18 @@ async function apply(action, tracks = []) {
       return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, -1, a.shape || "bell", a.steep ? 1 : 0, a.mode || "aria");
     case "undo": {   // the last change, the last few, or everything (Nov 1: "undo everything" undid one)
       const want = a.all ? 50 : Math.max(1, Math.min(50, a.steps || 1));
-      let n = 0, last = null;
+      let n = 0, last = null, more = false, lost = false;
       while (n < want) {
-        const r = await askLive("undo", "undo_done");
+        // A timeout part way keeps what was undone so far: the chat's crossed-out changes stay in step with Live
+        let r;
+        try { r = await askLive("undo", "undo_done"); } catch (e) { if (!n) throw e; lost = true; break; }
         if (!r.ok) { if (!n) return r; break; }
         n++; last = r;
+        more = n === want;
       }
-      return n === 1 ? { ...last, count: 1 } : { ok: true, count: n, text: a.all ? `Undid all ${n} of Aria's changes.` : `Undid the last ${n} changes.` };
+      const after = lost ? " Live stopped answering after that, so check the rest by hand." : "";
+      if (n === 1) return { ...last, count: 1, text: last.text + after };
+      return { ok: true, count: n, text: (a.all && !more && !lost ? `Undid all ${n} of Aria's changes.` : `Undid the last ${n} changes.`) + after };
     }
     case "check_mix":
       if (busy) return { ok: false, text: "A Mix check is already running." };
@@ -1386,7 +1395,11 @@ async function runAsk(text, imageId = null) {
 function noteChanges(at, done) {
   done.forEach((d, k) => {
     if (!d.ok) return;
-    if (d.type === "undo") for (let n = 0; n < (d.count || 1); n++) undoneTop();
+    if (d.type === "undo") for (let n = 0; n < (d.count || 1); n++) {
+      const top = undoneTop();
+      if (top && top.groove) { groove.placed = null; grooveState({ undone: true }); }
+      if (top && top.vocal) { groove.vocalApplied = false; grooveState(); }
+    }
     else if (UNDOABLE(d.type)) changeStack.push({ at, kind: "d", k });
   });
   sendUndoNext();
@@ -1396,6 +1409,7 @@ function undoneTop() {
   const x = top && askLog.find((e) => e.at === top.at);
   if (x && top.kind === "d" && x.done[top.k]) x.done[top.k].undone = true;
   if (x && top.kind === "s" && x.suggestions[top.k] && x.suggestions[top.k].result) x.suggestions[top.k].result.undone = true;
+  return top;
 }
 
 // The producer answered one of Muse's suggestions. Yes runs it (the engine already checked it).
@@ -1422,6 +1436,8 @@ Max.addHandler("undo", () => serial(async () => {
   const top = changeStack[changeStack.length - 1];
   // Nothing of Aria's left to undo: a passing note in the header, not a line in the chat each press
   if (!out.ok && !top) { toUI("notice", { text: out.text }); sendUndoNext(); return; }
+  // live.js's stack is empty (Aria was re-added, or Live's own undo got there first): nothing here can be undone
+  if (!out.ok && out.text === "Nothing to undo.") { changeStack = []; toUI("notice", { text: out.text }); sendUndoNext(); return; }
   if (out.ok) undoneTop();
   if (out.ok && top && top.groove) { groove.placed = null; grooveState({ undone: true }); }
   if (out.ok && top && top.vocal) { groove.vocalApplied = false; grooveState(); }
