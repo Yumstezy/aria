@@ -5,13 +5,17 @@
 //   - every step is a recorded run (demo-run.json): Aria's findings, Muse Spark's words and the changes Aria made, as
 //     Aria logged them; each "after" is what Live played after that step, exported from Live
 //   - the spectrum is measured live, in the browser, from whatever is playing
-// The page replays the run: Check mix and Fix all play back what really happened, faster than real time, and the
-// chat runs the recorded request that matches what's typed. It says so in the window.
+// The page replays the run: Check mix and Fix it play back what really happened, faster than real time, and the
+// chat runs the recorded request that matches what's typed. It says so in the window. A short guided tour (Ian, Nov 1:
+// "like a tutorial where the judge has to navigate it with little tips") leads to the Before and After reveal.
+// Waveforms are drawn the way the app's Live analyzer draws them (Window.tsx): mirrored, smooth, colored by where the
+// sound is; judges/scripts/make_demo_data.py measured them from the stems.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import song from "@/demo-tracks.json";
 import run from "@/demo-run.json";
+import reveal from "@/demo-reveal.json";
 
 type Done = { text: string; ok: boolean };
 type Step = {
@@ -148,18 +152,37 @@ function useMix() {
 }
 
 /* ---------- pieces ---------- */
-function Wave({ peaks }: { peaks: number[] }) {
-  const n = peaks.length, top: string[] = [], bot: string[] = [];
-  peaks.forEach((v, i) => {
-    const x = ((i + 0.5) / n) * 1000, a = (v / 99) * 19;
-    top.push(`${x.toFixed(1)} ${(20 - a).toFixed(1)}`);
-    bot.unshift(`${x.toFixed(1)} ${(20 + a).toFixed(1)}`);
-  });
-  return (
-    <svg viewBox="0 0 1000 40" preserveAspectRatio="none" className="absolute inset-x-0 bottom-0 h-[calc(100%-13px)] w-full" aria-hidden="true">
-      <path d={`M0 20L${top.join("L")}L1000 20L${bot.join("L")}Z`} fill="rgba(0,0,0,0.72)" />
-    </svg>
-  );
+type Wave = { h: number[]; rgb: number[][] };
+
+// The app's waveform: mirrored, smooth, the color flowing along it by where the sound is (red lows, orange mids,
+// green highs). Drawn once per size; the playhead and the played part are drawn over it.
+function WaveCanvas({ wave, className, dim }: { wave: Wave; className?: string; dim?: boolean }) {
+  const cv = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const el = cv.current;
+    if (!el) return;
+    const draw = () => {
+      const ctx = el.getContext("2d"), dpr = window.devicePixelRatio || 1, cw = el.clientWidth, ch = el.clientHeight;
+      if (!ctx || !cw) return;
+      el.width = Math.round(cw * dpr); el.height = Math.round(ch * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cw, ch);
+      const n = wave.h.length, mid = ch / 2, x = (i: number) => (i / (n - 1)) * cw, y = (i: number) => Math.max(0.6, wave.h[i] * (mid - 2));
+      const grad = ctx.createLinearGradient(0, 0, cw, 0);
+      wave.rgb.forEach((c, i) => grad.addColorStop(i / (n - 1), `rgb(${c[0]},${c[1]},${c[2]})`));
+      ctx.beginPath();
+      ctx.moveTo(0, mid - y(0));
+      for (let i = 1; i < n; i++) { const xm = (x(i - 1) + x(i)) / 2; ctx.quadraticCurveTo(x(i - 1), mid - y(i - 1), xm, mid - (y(i - 1) + y(i)) / 2); }
+      for (let i = n - 1; i > 0; i--) { const xm = (x(i - 1) + x(i)) / 2; ctx.quadraticCurveTo(x(i), mid + y(i), xm, mid + (y(i - 1) + y(i)) / 2); }
+      ctx.closePath();
+      ctx.globalAlpha = dim ? 0.35 : 0.92; ctx.fillStyle = grad; ctx.fill(); ctx.globalAlpha = 1;
+    };
+    draw();
+    const ro = new ResizeObserver(draw);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [wave, dim]);
+  return <canvas ref={cv} className={cn("block size-full", className)} aria-hidden="true" />;
 }
 
 function Spectrum({ analyser, playing, range }: { analyser: () => AnalyserNode | null; playing: boolean; range?: number[] }) {
@@ -177,10 +200,7 @@ function Spectrum({ analyser, playing, range }: { analyser: () => AnalyserNode |
       g.clearRect(0, 0, w, h);
       g.fillStyle = "rgba(255,255,255,0.05)";
       for (const f of [100, 1000, 10000]) g.fillRect(x(f), 0, dpr, h);
-      if (range) {
-        g.fillStyle = "rgba(255,181,50,0.18)";
-        g.fillRect(x(range[0]), 0, x(range[1]) - x(range[0]), h);
-      }
+      if (range) { g.fillStyle = "rgba(255,181,50,0.16)"; g.fillRect(x(range[0]), 0, x(range[1]) - x(range[0]), h); }
       if (a) {
         const data = new Float32Array(a.frequencyBinCount);
         a.getFloatFrequencyData(data);
@@ -188,16 +208,14 @@ function Spectrum({ analyser, playing, range }: { analyser: () => AnalyserNode |
         g.beginPath();
         for (let px = 0; px <= w; px += 2 * dpr) {
           const f = lo * Math.pow(hi / lo, px / w), f2 = lo * Math.pow(hi / lo, (px + 2 * dpr) / w);
-          const k0 = Math.floor(f / bin), k1 = Math.max(k0 + 1, Math.floor(f2 / bin));   // the bins under this pixel
+          const k0 = Math.floor(f / bin), k1 = Math.max(k0 + 1, Math.floor(f2 / bin));
           let sum = 0;
           for (let k = k0; k < k1 && k < data.length; k++) sum += Math.pow(10, data[k] / 10);
-          const db = 10 * Math.log10(sum / (k1 - k0) + 1e-12) + 3 * Math.log2(f / 1000);   // tilted 3 dB/oct, as analyzers show music
+          const db = 10 * Math.log10(sum / (k1 - k0) + 1e-12) + 3 * Math.log2(f / 1000);
           const y = h - ((db + 100) / 80) * h;
           if (px === 0) g.moveTo(px, y); else g.lineTo(px, y);
         }
-        g.strokeStyle = "#ffb532";
-        g.lineWidth = 1.5 * dpr;
-        g.stroke();
+        g.strokeStyle = "#ffb532"; g.lineWidth = 1.5 * dpr; g.stroke();
       }
       if (playing) raf = requestAnimationFrame(draw);
     };
@@ -205,22 +223,36 @@ function Spectrum({ analyser, playing, range }: { analyser: () => AnalyserNode |
     return () => cancelAnimationFrame(raf);
   }, [analyser, playing, range]);
   return (
-    <div className="relative h-[110px] overflow-hidden rounded-[6px] bg-[#141414]">
+    <div className="relative h-[96px] overflow-hidden rounded-[8px] bg-[#141414]">
       <canvas ref={canvas} className="absolute inset-0 size-full" />
       <div className="pointer-events-none absolute inset-x-2 bottom-1 flex justify-between font-mono text-[10px] text-[#6a6a6a]"><span>30 Hz</span><span>Low</span><span>Middle</span><span>High</span><span>16 kHz</span></div>
-      {!playing && <div className="absolute inset-0 grid place-items-center text-[12px] text-[#7a7a7a]">Press play to see the sound, measured as it plays</div>}
+      {!playing && <div className="absolute inset-0 grid place-items-center text-[12px] text-[#7a7a7a]">The sound, measured live as it plays</div>}
     </div>
   );
 }
 
-// A soft pulsing ring that says "press this next"
-function Hint({ on, children, className }: { on: boolean; children: ReactNode; className?: string }) {
+// The two average spectra of the reveal, Before (grey) and After (green), at the same loudness
+function RevealSpectrum({ range }: { range?: number[] }) {
+  const W = 600, H = 150, lo = 30, hi = 16000;
+  const hz = reveal.hz as number[];
+  const all = [...reveal.before.spectrum, ...reveal.after.spectrum] as number[];
+  const top = Math.max(...all), bottom = top - 42;
+  const X = (f: number) => (Math.log(f / lo) / Math.log(hi / lo)) * W;
+  const Y = (db: number) => H - 6 - ((Math.max(bottom, db) - bottom) / (top - bottom)) * (H - 14);
+  const line = (v: number[]) => hz.map((f, i) => (f < lo || f > hi ? null : `${X(f).toFixed(1)},${Y(v[i]).toFixed(1)}`)).filter(Boolean).join(" ");
   return (
-    <span className={cn("relative inline-flex", className)}>
-      {on && <span className="pointer-events-none absolute -inset-1 animate-ping rounded-full border-2 border-[#6ea8ff]/70" />}
-      {children}
-    </span>
+    <svg viewBox={`0 0 ${W} ${H}`} className="block h-[150px] w-full" role="img" aria-label="Average spectrum before and after, at the same loudness">
+      {range && <rect x={X(range[0])} y={0} width={X(range[1]) - X(range[0])} height={H} fill="rgba(255,181,50,0.12)" />}
+      {[100, 1000, 10000].map((f) => <line key={f} x1={X(f)} x2={X(f)} y1={0} y2={H} stroke="rgba(255,255,255,0.06)" />)}
+      <polyline points={line(reveal.before.spectrum as number[])} fill="none" stroke="#8a8a8a" strokeWidth={2} strokeLinejoin="round" />
+      <polyline points={line(reveal.after.spectrum as number[])} fill="none" stroke="#4ade80" strokeWidth={2.2} strokeLinejoin="round" />
+    </svg>
   );
+}
+
+// A soft pulsing ring that says "press this next"
+function Ring({ on }: { on: boolean }) {
+  return on ? <span className="pointer-events-none absolute -inset-1.5 animate-ping rounded-full border-2 border-[#6ea8ff]/80" /> : null;
 }
 
 type Msg =
@@ -229,6 +261,17 @@ type Msg =
   | { kind: "aria"; text: string } | { kind: "chips"; steps: string[] };
 
 const words = (t: string) => t.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 2);
+
+// The guided tour: one short sentence per step, pointing at what to press (Ian, Nov 1)
+type Tour = "play" | "solo" | "check" | "fix" | "ask" | "reveal" | "done";
+const TOUR: Record<Exclude<Tour, "done">, { n: number; text: string; skip?: string }> = {
+  play: { n: 1, text: "This is Ian's song in a small Live, before any mixing. Press play." },
+  solo: { n: 2, text: "Solo the leads. That melody is what gets lost in the full mix.", skip: "Next" },
+  check: { n: 3, text: "Now let Aria listen. It hears every track on its own." },
+  fix: { n: 4, text: "Aria found the problem. Let Muse Spark fix it." },
+  ask: { n: 5, text: "Ask for more, the way Ian did. Tap a request or type one.", skip: "Next" },
+  reveal: { n: 6, text: "That's the whole run. Time for the big reveal." },
+};
 
 /* ---------- the demo ---------- */
 export function TryIt() {
@@ -239,11 +282,17 @@ export function TryIt() {
   const [version, setVersion] = useState<"before" | "after">("before");
   const [mute, setMute] = useState<boolean[]>(song.tracks.map(() => false));
   const [solo, setSolo] = useState<number | null>(null);
-  const [pos, setPos] = useState(0);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [typing, setTyping] = useState(false);
   const [text, setText] = useState("");
+  const [tour, setTour] = useState<Tour>("play");
+  const [showReveal, setShowReveal] = useState(false);
   const thread = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const targets = useRef<Partial<Record<Tour, HTMLElement | null>>>({});
+  const playhead = useRef<HTMLDivElement>(null);
+  const played = useRef<HTMLDivElement>(null);
+  const [tip, setTip] = useState<{ x: number; y: number; below: boolean; arrow: number } | null>(null);
 
   const latestAfter = [...applied].reverse().find((id) => STEPS.find((s) => s.id === id)?.audio) ?? null;
   const showAfter = version === "after" && !!latestAfter;
@@ -254,69 +303,95 @@ export function TryIt() {
   }), [solo, mute, showAfter, latestAfter]);
 
   useEffect(() => { mix.setGains(gains()); }, [gains, mix]);
+  // The playhead and the played part move every screen frame, straight on the elements (no React re-render)
   useEffect(() => {
-    if (mix.state !== "playing") return;
     let raf = 0;
-    const tick = () => { setPos(mix.position()); raf = requestAnimationFrame(tick); };
+    const tick = () => {
+      const p = mix.position() / DUR;
+      if (playhead.current) playhead.current.style.left = `${(p * 100).toFixed(3)}%`;
+      if (played.current) played.current.style.width = `${(p * 100).toFixed(3)}%`;
+      raf = requestAnimationFrame(tick);
+    };
     tick();
     return () => cancelAnimationFrame(raf);
-  }, [mix.state, mix]);
+  }, [mix]);
   useEffect(() => { thread.current?.scrollTo({ top: thread.current.scrollHeight, behavior: "smooth" }); }, [msgs, typing, progress]);
+
+  // Where the tour's tip sits: under (or over) what it points at, inside the window
+  useEffect(() => {
+    if (tour === "done" || showReveal) { setTip(null); return; }
+    let raf = 0;
+    const place = () => {
+      const t = targets.current[tour], b = box.current;
+      if (t && b) {
+        const r = t.getBoundingClientRect(), o = b.getBoundingClientRect();
+        const below = r.bottom - o.top < o.height - 120;
+        setTip((old) => {
+          const cx = r.left + r.width / 2 - o.left, nx = Math.min(Math.max(cx, 150), o.width - 150), ny = below ? r.bottom - o.top + 12 : r.top - o.top - 12;
+          return old && Math.abs(old.x - nx) < 0.5 && Math.abs(old.y - ny) < 0.5 && old.below === below ? old : { x: nx, y: ny, below, arrow: cx - nx };
+        });
+      }
+      raf = requestAnimationFrame(place);
+    };
+    place();
+    return () => cancelAnimationFrame(raf);
+  }, [tour, showReveal]);
 
   const say = (m: Msg) => setMsgs((x) => [...x, m]);
   const playing = mix.state === "playing";
-  const beat = Math.floor((pos / DUR) * song.bars * 4);
   const devices = STEPS.filter((s) => applied.includes(s.id)).flatMap((s) => s.devices);
   const range = phase !== "idle" ? CHECK.finding?.hz_range : undefined;
   const pending = ASKS.filter((s) => !applied.includes(s.id));
   const busy = phase === "checking" || phase === "busy";
+  const leads = song.tracks.findIndex((t) => t.name === "LEADS");
 
-  // Aria's progress, replayed faster than real time (the real check listens to 16 bars: 30 s)
   const walk = async (lines: string[], ms: number) => {
-    for (let i = 0; i < lines.length; i++) {
-      setProgress({ text: lines[i], pct: (i / lines.length) * 100 });
-      await sleep(ms);
-    }
+    for (let i = 0; i < lines.length; i++) { setProgress({ text: lines[i], pct: ((i + 1) / lines.length) * 100 }); await sleep(ms); }
     setProgress(null);
   };
 
+  const play = () => {
+    if (playing) { mix.stop(); return; }
+    mix.play(gains());
+    if (tour === "play") setTour("solo");
+  };
+
   const checkMix = async () => {
-    if (busy) return;
+    if (busy || phase !== "idle") return;
+    setSolo(null);
+    setTour("check");
     setPhase("checking");
-    if (!playing) mix.play(gains(), 0);
-    await walk(["Listening to bars 1 to 16", "Hearing each track on its own", "Finding what covers what", "Muse Spark is reading the measurements"], 1100);
+    if (!playing) mix.play({ ...gains(), stems: song.tracks.map(() => 1) }, 0);
+    await walk(["Listening to bars 1 to 16", "Hearing each track on its own", "Finding what covers what", "Muse Spark is reading the measurements"], 1000);
     if (CHECK.reply) say({ kind: "muse", text: CHECK.reply });
     if (CHECK.note) say({ kind: "card", title: CHECK.note.short, text: CHECK.note.text });
     say({ kind: "plain", text: PLAIN.check(CHECK) });
     setPhase("checked");
+    setTour(FIX ? "fix" : "ask");
   };
 
   const apply = async (s: Step, asked?: string) => {
+    if (busy) return;
     setPhase("busy");
     if (s.kind === "ask") say({ kind: "user", text: s.ask ?? s.label, note: asked && asked.trim().toLowerCase() !== (s.ask ?? "").toLowerCase() ? "the recorded request closest to what you typed" : undefined });
     else say({ kind: "step", text: s.button === "Fix it" && CHECK.note ? `Fix it: ${CHECK.note.short}` : "Fixing the strongest problems" });
     setTyping(true);
-    await sleep(1400);
+    await sleep(1200);
     setTyping(false);
     if (s.reply) say({ kind: "muse", text: s.reply });
-    for (const d of s.done) { await sleep(450); say({ kind: "done", d }); }
+    for (const d of s.done) { await sleep(380); say({ kind: "done", d }); }
     setApplied((a) => [...a, s.id]);
     if (s.kind === "fix" && s.measured) {
-      await walk(["Playing bars 1 to 16 again", "Comparing before and after at the same loudness"], 1100);
+      await walk(["Playing bars 1 to 16 again", "Comparing before and after at the same loudness"], 1000);
       say({ kind: "step", text: "How it went" });
       say({ kind: "muse", text: s.measured });
     }
     if (PLAIN[s.id]) say({ kind: "plain", text: PLAIN[s.id](s) });
-    if (s.audio) {
-      setVersion("after");
-      if (!playing) mix.play({ ...gains(), before: 0 }, 0);
-    }
     setPhase("checked");
+    if (s.kind === "fix") setTour("ask");
+    else if (tour === "ask" && pending.filter((x) => x.id !== s.id).length <= ASKS.length - 3) setTour("reveal");
   };
 
-  const fixAll = () => { if (FIX && !busy && !applied.includes(FIX.id)) apply(FIX); };
-
-  // The chat runs the recorded request that matches what was typed; anything else gets a plain answer
   const send = (raw: string) => {
     const t = raw.trim();
     if (!t || busy) return;
@@ -324,37 +399,50 @@ export function TryIt() {
     const w = words(t), low = t.toLowerCase();
     if (/\bcheck\b/.test(low) && phase === "idle") { say({ kind: "user", text: t }); checkMix(); return; }
     if (phase === "idle") { say({ kind: "user", text: t }); say({ kind: "aria", text: "Run Check mix first, so Aria knows what's in this mix." }); return; }
-    if (FIX && /fix/.test(low) && /(mix|all|everything)/.test(low)) {
-      say({ kind: "user", text: t });
-      if (applied.includes(FIX.id)) say({ kind: "aria", text: "That's done: Fix all already ran on these bars." });
-      else apply(FIX);
-      return;
-    }
-    const scored = ASKS.map((s) => {
+    if (FIX && /fix/.test(low) && !applied.includes(FIX.id)) { say({ kind: "user", text: t }); apply(FIX); return; }
+    const best = ASKS.map((s) => {
       const keys = new Set([...words(s.ask ?? ""), ...words(s.label), ...(s.keywords ?? [])]);
       return { s, score: w.filter((x) => keys.has(x)).length };
-    }).sort((a, b) => b.score - a.score);
-    const best = scored[0];
+    }).sort((a, b) => b.score - a.score)[0];
     if (best && best.score > 0) {
       if (applied.includes(best.s.id)) { say({ kind: "user", text: t }); say({ kind: "aria", text: `That's done already: "${best.s.ask}".` }); }
       else apply(best.s, t);
       return;
     }
     say({ kind: "user", text: t });
-    say({ kind: "aria", text: "This page replays a real run in Live, so it can only do what was recorded. In Live, Aria takes any request." });
+    say({ kind: "aria", text: "This page replays Ian's real run in Live, so it can only do what he asked. In Live, Aria takes any request." });
     const left = [...(FIX && !applied.includes(FIX.id) ? [FIX.id] : []), ...pending.map((s) => s.id)];
     if (left.length) say({ kind: "chips", steps: left });
   };
 
-  const next = phase === "idle" ? "check" : FIX && !applied.includes(FIX.id) ? "fix" : pending.length ? "chat" : latestAfter && version === "before" ? "after" : null;
+  const openReveal = () => {
+    setShowReveal(true);
+    setTour("done");
+    setSolo(null);
+    setVersion("before");
+    if (!playing) mix.play({ ...gains(), stems: song.tracks.map(() => 1), before: 1 }, 0);
+  };
+  const flip = (v: "before" | "after") => {
+    if (v === "after" && !latestAfter) return;
+    setVersion(v);
+    if (!playing) mix.play({ ...gains(), before: v === "after" ? 0 : 1 });
+  };
+  useEffect(() => {
+    if (!showReveal) return;
+    const key = (e: KeyboardEvent) => { if (e.code === "Space" && !(e.target instanceof HTMLInputElement)) { e.preventDefault(); setVersion((v) => (v === "before" ? "after" : "before")); } };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [showReveal]);
+
+  const tipNow = tour !== "done" && !showReveal ? TOUR[tour] : null;
+  const changes = STEPS.reduce((n, s) => n + s.done.length, 0);
 
   return (
     <div className="relative mt-12">
-      {/* the glow that lifts the window off the page */}
       <div className="pointer-events-none absolute -inset-6 rounded-[40px] bg-[radial-gradient(60%_60%_at_30%_20%,rgba(110,168,255,0.38),transparent_70%),radial-gradient(50%_50%_at_80%_80%,rgba(74,222,128,0.22),transparent_70%)] blur-2xl" />
-      <div className="relative overflow-hidden rounded-[16px] border border-[#6ea8ff]/40 bg-[#1e1e1e] text-white shadow-[0_40px_120px_-30px_rgba(0,0,0,0.95),0_0_60px_-10px_rgba(110,168,255,0.35)]">
+      <div ref={box} className="relative overflow-hidden rounded-[16px] border border-[#6ea8ff]/40 bg-[#1b1b1c] text-white shadow-[0_40px_120px_-30px_rgba(0,0,0,0.95),0_0_60px_-10px_rgba(110,168,255,0.35)]">
         {/* window title bar */}
-        <div className="flex h-[34px] items-center gap-[7px] border-b border-black/70 bg-[#161616] px-3">
+        <div className="flex h-[34px] items-center gap-[7px] border-b border-black/70 bg-[#141414] px-3">
           <span className="size-[11px] flex-none rounded-full bg-[#ff5f57]" /><span className="size-[11px] flex-none rounded-full bg-[#febc2e]" /><span className="size-[11px] flex-none rounded-full bg-[#28c840]" />
           <span className="ml-3 truncate text-[12px] text-[#9a9a9a]">BRILL house demo · Aria on Main</span>
           <span className="ml-auto flex flex-none items-center gap-1.5 rounded-full bg-[#4ade80]/12 px-2.5 py-[3px] text-[11.5px] font-medium text-[#4ade80]">
@@ -363,68 +451,77 @@ export function TryIt() {
         </div>
 
         {/* transport */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-black/70 bg-[#2a2a2a] px-3 py-2 sm:gap-3">
-          <button type="button" onClick={() => (playing ? mix.stop() : mix.play(gains()))} disabled={mix.state === "loading"}
-                  className={cn("flex h-8 items-center gap-2 rounded-[6px] px-3 text-[13px] font-medium transition", playing ? "bg-[#7cd38a] text-black" : "bg-[#1b1b1b] text-[#e6e6e6] hover:bg-[#333]")}
-                  aria-label={playing ? "Stop" : "Play"}>
-            {mix.state === "loading" ? "Loading…" : playing ? <><span className="size-[9px] rounded-[1px] bg-black" />Stop</> : <><span className="h-0 w-0 border-y-[5px] border-l-[9px] border-y-transparent border-l-[#7cd38a]" />Play</>}
-          </button>
-          <span className="rounded-[4px] bg-[#1b1b1b] px-2 py-1 font-mono text-[12px] text-[#d8d8d8]">{Math.floor(beat / 4) + 1} . {(beat % 4) + 1}</span>
+        <div className="flex flex-wrap items-center gap-2 border-b border-black/70 bg-[#262626] px-3 py-2 sm:gap-3">
+          <span ref={(el) => { targets.current.play = el; }} className="relative inline-flex">
+            <Ring on={tour === "play"} />
+            <button type="button" onClick={play} disabled={mix.state === "loading"}
+                    className={cn("flex h-8 items-center gap-2 rounded-[8px] px-3.5 text-[13px] font-medium transition", playing ? "bg-[#7cd38a] text-black" : "bg-white text-black hover:bg-white/90")}
+                    aria-label={playing ? "Stop" : "Play"}>
+              {mix.state === "loading" ? "Loading…" : playing ? <><span className="size-[9px] rounded-[1px] bg-black" />Stop</> : <><span className="h-0 w-0 border-y-[5px] border-l-[9px] border-y-transparent border-l-black" />Play</>}
+            </button>
+          </span>
           <span className="hidden font-mono text-[12px] text-[#9a9a9a] sm:inline">{song.tempo} BPM · bars 1 to 16, looping</span>
-          <Hint on={next === "after"} className="ml-auto">
-            <div className="flex rounded-full bg-[#1b1b1b] p-1" role="group" aria-label="Which version plays">
-              {(["before", "after"] as const).map((v) => (
-                <button key={v} type="button" onClick={() => setVersion(v)} disabled={v === "after" && !latestAfter}
-                        className={cn("rounded-full px-3.5 py-1 text-[12.5px] font-medium transition",
-                          (v === "after" ? showAfter : !showAfter) ? (v === "after" ? "bg-[#4ade80] text-black" : "bg-white text-black") : "text-[#9a9a9a] hover:text-white",
-                          v === "after" && !latestAfter && "cursor-not-allowed opacity-40 hover:text-[#9a9a9a]")}>
-                  {v === "before" ? "Before" : "After"}
-                </button>
-              ))}
-            </div>
-          </Hint>
+          <div className="ml-auto flex items-center gap-2">
+            {tour !== "done" && !showReveal && <button type="button" onClick={() => setTour("done")} className="text-[12px] text-[#8a8a8a] hover:text-white">Skip tour</button>}
+            {latestAfter && !showReveal && (
+              <button type="button" onClick={openReveal} ref={(el) => { targets.current.reveal = el; }}
+                      className="relative rounded-full bg-[#4ade80] px-3.5 py-1.5 text-[12.5px] font-semibold text-black transition hover:brightness-110">
+                <Ring on={tour === "reveal"} />Before vs After
+              </button>
+            )}
+          </div>
         </div>
         {mix.state === "error" && <p className="bg-[#3a1d1d] px-4 py-2 text-[13px] text-[#ffb4ac]">The audio didn't load. Reload the page to try again.</p>}
 
         <div className="grid lg:grid-cols-[minmax(0,1fr)_380px]">
           {/* arrangement */}
           <div className="min-w-0 border-black/70 p-3 lg:border-r">
-            <div className="relative [--lane-left:116px] sm:[--lane-left:132px]">
-              <div className="ml-[116px] flex h-5 font-mono text-[10px] text-[#8a8a8a] sm:ml-[132px]">
+            <div className="flex">
+              <div className="w-[118px] flex-none sm:w-[134px]" />
+              <div className="flex h-5 min-w-0 flex-1 font-mono text-[10px] text-[#7a7a7a]">
                 {Array.from({ length: song.bars }, (_, i) => <span key={i} className="flex-1 border-l border-white/10 pl-1">{i % 2 === 0 ? i + 1 : ""}</span>)}
               </div>
+            </div>
+            <div className="relative">
               {song.tracks.map((t, i) => {
                 const color = COLORS[i % COLORS.length], audible = solo !== null ? solo === i : !mute[i];
                 const devs = devices.filter((d) => d.track === t.name);
                 return (
-                  <div key={t.name} className="flex h-[52px] border-t border-black/60">
-                    <div className="flex w-[116px] flex-none items-center gap-1 bg-[#2c2c2c] pr-1.5 sm:w-[132px] sm:gap-1.5 sm:pr-2">
-                      <span className="h-full w-[3px] flex-none" style={{ background: color }} />
-                      <span className="min-w-0 flex-1 truncate pl-1 text-[11px] font-medium sm:text-[12px]">{t.name}</span>
+                  <div key={t.name} className="flex h-[56px] border-t border-black/60">
+                    <div className="flex w-[118px] flex-none items-center gap-1 bg-[#262626] pr-1.5 sm:w-[134px] sm:gap-1.5 sm:pr-2">
+                      <span className="h-full w-[4px] flex-none" style={{ background: color }} />
+                      <span className="min-w-0 flex-1 truncate pl-1.5 text-[11.5px] font-medium sm:text-[12px]">{t.name}</span>
                       <button type="button" onClick={() => setMute((m) => m.map((x, k) => (k === i ? !x : x)))} disabled={showAfter}
-                              className={cn("grid size-[19px] flex-none place-items-center rounded-[3px] text-[10px] font-semibold sm:size-[22px]", mute[i] ? "bg-[#454545] text-[#8a8a8a]" : "bg-[#ffb532] text-black", showAfter && "opacity-40")}
+                              className={cn("grid size-[20px] flex-none place-items-center rounded-[4px] text-[10px] font-semibold transition sm:size-[22px]", mute[i] ? "bg-[#3a3a3a] text-[#7a7a7a]" : "bg-[#ffb532] text-black", showAfter && "opacity-40")}
                               aria-label={`${mute[i] ? "Unmute" : "Mute"} ${t.name}`} title="Mute">{i + 1}</button>
-                      <button type="button" onClick={() => setSolo((s) => (s === i ? null : i))} disabled={showAfter}
-                              className={cn("grid size-[19px] flex-none place-items-center rounded-[3px] text-[10px] font-semibold sm:size-[22px]", solo === i ? "bg-[#5cb8ff] text-black" : "bg-[#454545] text-[#cfcfcf]", showAfter && "opacity-40")}
-                              aria-label={`Solo ${t.name}`} title="Solo">S</button>
+                      <span className="relative inline-flex" ref={i === leads ? (el) => { targets.current.solo = el; } : undefined}>
+                        <Ring on={tour === "solo" && i === leads} />
+                        <button type="button" onClick={() => { setSolo((s) => (s === i ? null : i)); if (tour === "solo" && i === leads) setTimeout(() => setTour((x) => (x === "solo" ? "check" : x)), 2600); }} disabled={showAfter}
+                                className={cn("grid size-[20px] flex-none place-items-center rounded-[4px] text-[10px] font-semibold transition sm:size-[22px]", solo === i ? "bg-[#5cb8ff] text-black" : "bg-[#3a3a3a] text-[#cfcfcf]", showAfter && "opacity-40")}
+                                aria-label={`Solo ${t.name}`} title="Solo">S</button>
+                      </span>
                     </div>
-                    <div className={cn("relative min-w-0 flex-1 overflow-hidden border-l border-black/60 transition-opacity", !audible && "opacity-30")} style={{ background: color }}>
-                      <div className="flex h-[13px] items-center gap-1 bg-black/15 px-1 text-[9.5px] leading-[13px] text-black/85">
-                        <span className="truncate">{t.name}</span>
-                        <AnimatePresence>
-                          {devs.map((d) => (
-                            <motion.span key={d.name} initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }} className="ml-1 flex-none rounded-[2px] bg-black/75 px-1 text-[9px] text-[#4ade80]">{d.name}</motion.span>
-                          ))}
-                        </AnimatePresence>
-                      </div>
-                      <Wave peaks={t.peaks} />
+                    <div className={cn("relative min-w-0 flex-1 overflow-hidden border-l border-black/60 bg-[#151515] transition-opacity duration-300", !audible && "opacity-25")}>
+                      <div className="absolute inset-x-0 inset-y-[6px]"><WaveCanvas wave={t as unknown as Wave} /></div>
+                      <AnimatePresence>
+                        {devs.map((d, k) => (
+                          <motion.span key={d.name} initial={{ opacity: 0, y: -6, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 380, damping: 24 }}
+                                       className="absolute top-1 rounded-[4px] bg-black/80 px-1.5 py-[1px] text-[10px] font-medium text-[#4ade80] ring-1 ring-[#4ade80]/40" style={{ right: 6 + k * 84 }}>
+                            {d.name}
+                          </motion.span>
+                        ))}
+                      </AnimatePresence>
                     </div>
                   </div>
                 );
               })}
-              <span className="pointer-events-none absolute bottom-0 top-5 w-px bg-white" style={{ left: `calc(var(--lane-left) + (100% - var(--lane-left)) * ${(pos / DUR).toFixed(4)})` }} />
+              {/* the played part dims nothing; the unplayed part is shaded, and the playhead glides */}
+              <div className="pointer-events-none absolute inset-y-0 left-[118px] right-0 sm:left-[134px]">
+                <div ref={played} className="absolute inset-y-0 left-0 bg-white/[0.035]" style={{ width: 0 }} />
+                <div ref={playhead} className="absolute inset-y-0 w-[2px] -translate-x-1/2 bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]" style={{ left: 0 }} />
+              </div>
             </div>
-            <p className="mt-2 text-[12px] text-[#8a8a8a]">{showAfter ? "Playing Ian's export from Live after the whole run, at the same loudness as Before. Mute and solo work on the original tracks." : "Mute or solo a track to hear what each one plays."}</p>
+            <p className="mt-2 text-[12px] text-[#8a8a8a]">{showAfter ? "Playing Ian's export from Live after the run, at the same loudness as Before." : "Colors show where each sound lives: red lows, orange mids, green highs."}</p>
             <div className="mt-3">
               <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 text-[12px] text-[#9a9a9a]">
                 <span>The whole mix, measured as it plays</span>
@@ -435,43 +532,49 @@ export function TryIt() {
           </div>
 
           {/* Aria: the strip's buttons, then Ask Muse */}
-          <div className="flex min-h-[520px] min-w-0 flex-col bg-[#0a0a0b] lg:min-h-0">
+          <div className="flex min-h-[540px] min-w-0 flex-col bg-[#0a0a0b] lg:min-h-0">
             <div className="flex items-center gap-2 border-b border-white/[0.08] px-4 py-3">
               <span className="mark size-[18px] text-white" /><span className="text-[14px] font-medium">Aria</span>
               <div className="ml-auto flex gap-2">
-                <Hint on={next === "check"}>
+                <span ref={(el) => { targets.current.check = el; }} className="relative inline-flex">
+                  <Ring on={tour === "check"} />
                   <button type="button" onClick={checkMix} disabled={busy || phase !== "idle"}
                           className={cn("rounded-full px-4 py-1.5 text-[13px] font-medium transition", phase === "idle" ? "bg-white text-black hover:bg-white/90" : "bg-white/10 text-[#8a8a8a]")}>
                     {phase === "checking" ? "Checking…" : phase === "idle" ? "Check mix" : "Checked"}
                   </button>
-                </Hint>
+                </span>
                 {FIX && (
-                  <Hint on={next === "fix"}>
-                    <button type="button" onClick={fixAll} disabled={phase === "idle" || busy || applied.includes(FIX.id)}
+                  <span ref={(el) => { targets.current.fix = el; }} className="relative inline-flex">
+                    <Ring on={tour === "fix"} />
+                    <button type="button" onClick={() => FIX && !applied.includes(FIX.id) && apply(FIX)} disabled={phase === "idle" || busy || applied.includes(FIX.id)}
                             className={cn("rounded-full px-4 py-1.5 text-[13px] font-medium transition",
                               phase !== "idle" && !applied.includes(FIX.id) ? "bg-[#6ea8ff] text-black hover:brightness-110" : "bg-white/10 text-[#6a6a6a]")}>
                       {applied.includes(FIX.id) ? "Fixed" : FIX.button ?? "Fix all"}
                     </button>
-                  </Hint>
+                  </span>
                 )}
               </div>
             </div>
-            {progress && (
-              <div className="border-b border-white/[0.08] px-4 py-2.5">
-                <div className="text-[12.5px] text-[#d0d0d4]">{progress.text}</div>
-                <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-white/10"><motion.div className="h-full bg-[#6ea8ff]" animate={{ width: `${progress.pct + 25}%` }} transition={{ duration: 1 }} /></div>
-              </div>
-            )}
+            <AnimatePresence>
+              {progress && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-b border-white/[0.08]">
+                  <div className="px-4 py-2.5">
+                    <div className="text-[12.5px] text-[#d0d0d4]">{progress.text}</div>
+                    <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-white/10"><motion.div className="h-full bg-[#6ea8ff]" animate={{ width: `${progress.pct}%` }} transition={{ duration: 0.9, ease: "easeInOut" }} /></div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            <div ref={thread} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4 lg:max-h-[440px]">
+            <div ref={thread} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4 lg:max-h-[430px]">
               {!msgs.length && !progress && (
                 <div className="grid h-full place-items-center py-10 text-center text-[13px] leading-relaxed text-[#7a7a7a]">
-                  <div>Press <span className="font-medium text-white">Check mix</span>. Aria listens to the 16 bars<br />and tells you what's wrong, in plain words.</div>
+                  <div>Aria listens to the song and tells you<br />what's wrong, in plain words.</div>
                 </div>
               )}
               <AnimatePresence initial={false}>
                 {msgs.map((m, k) => (
-                  <motion.div key={k} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                  <motion.div key={k} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}>
                     {m.kind === "user" && (
                       <div className="ml-auto max-w-[85%] text-right">
                         <div className="inline-block rounded-[14px] border border-white/[0.08] px-3.5 py-2.5 text-left text-[14px]">{m.text}</div>
@@ -496,7 +599,7 @@ export function TryIt() {
                     {m.kind === "chips" && (
                       <div className="flex flex-wrap gap-1.5">
                         {m.steps.map((id) => { const s = STEPS.find((x) => x.id === id)!; return (
-                          <button key={id} type="button" onClick={() => (s.kind === "fix" ? fixAll() : apply(s))} disabled={busy || applied.includes(id)}
+                          <button key={id} type="button" onClick={() => apply(s)} disabled={busy || applied.includes(id)}
                                   className="rounded-full border border-white/15 px-3 py-1 text-[12.5px] text-[#d0d0d4] hover:bg-white/10 disabled:opacity-40">{s.kind === "fix" ? (s.button ?? "Fix all") : s.label}</button>
                         ); })}
                       </div>
@@ -507,15 +610,13 @@ export function TryIt() {
               {typing && <div className="inline-flex gap-1 rounded-[14px] bg-[#ededef] px-3.5 py-3">{[0, 1, 2].map((i) => <span key={i} className="size-[6px] animate-bounce rounded-full bg-[#0a0a0b]/50" style={{ animationDelay: `${i * 0.15}s` }} />)}</div>}
             </div>
 
-            {/* Ask Muse's input, with the recorded requests as chips */}
+            {/* Ask Muse's input, with Ian's recorded requests as chips */}
             <div className="border-t border-white/[0.08] p-3">
               {phase !== "idle" && pending.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-1.5">
+                <div ref={(el) => { targets.current.ask = el; }} className="mb-2 flex flex-wrap gap-1.5">
                   {pending.map((s) => (
-                    <Hint key={s.id} on={next === "chat" && s === pending[0]}>
-                      <button type="button" onClick={() => apply(s)} disabled={busy}
-                              className="rounded-full border border-white/15 px-3 py-1 text-[12.5px] text-[#d0d0d4] transition hover:bg-white/10 disabled:opacity-40">{s.label}</button>
-                    </Hint>
+                    <button key={s.id} type="button" onClick={() => apply(s)} disabled={busy}
+                            className={cn("rounded-full border px-3 py-1 text-[12.5px] transition disabled:opacity-40", tour === "ask" ? "border-[#6ea8ff]/60 text-white hover:bg-[#6ea8ff]/15" : "border-white/15 text-[#d0d0d4] hover:bg-white/10")}>{s.label}</button>
                   ))}
                 </div>
               )}
@@ -531,7 +632,94 @@ export function TryIt() {
             </div>
           </div>
         </div>
-        <p className="border-t border-black/70 bg-[#161616] px-4 py-2.5 text-[11.5px] leading-relaxed text-[#7a7a7a]">
+
+        {/* the tour's tip, pointing at what to press */}
+        <AnimatePresence>
+          {tipNow && tip && (
+            <div key={tour} className="pointer-events-none absolute z-20 w-[280px]" style={{ left: tip.x, top: tip.y, transform: `translate(-50%, ${tip.below ? "0" : "-100%"})` }}>
+             <motion.div initial={{ opacity: 0, y: tip.below ? -6 : 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}
+                         className="pointer-events-auto relative rounded-[12px] bg-[#6ea8ff] px-3.5 py-2.5 text-[13px] font-medium leading-snug text-[#0a0a0b] shadow-[0_12px_40px_-8px_rgba(110,168,255,0.7)]">
+                <span className={cn("absolute size-3 -translate-x-1/2 rotate-45 bg-[#6ea8ff]", tip.below ? "-top-1.5" : "-bottom-1.5")} style={{ left: `calc(50% + ${tip.arrow}px)` }} />
+                <div className="mb-0.5 text-[11px] font-semibold opacity-60">Step {tipNow.n} of 6</div>
+                {tipNow.text}
+                {tipNow.skip && <button type="button" onClick={() => setTour(tour === "solo" ? "check" : "reveal")} className="ml-2 underline underline-offset-2 opacity-70 hover:opacity-100">{tipNow.skip}</button>}
+             </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* the big reveal: the same 16 bars, before and after, at the same loudness */}
+        <AnimatePresence>
+          {showReveal && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }}
+                        className="absolute inset-0 z-30 overflow-y-auto bg-[#0b0b0c]/[0.97] backdrop-blur-sm">
+              <div className="mx-auto max-w-[880px] px-5 py-8 sm:py-10">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-[12px] font-medium text-[#4ade80]">The reveal</div>
+                    <h3 className="mt-1 text-[clamp(26px,3.4vw,38px)] font-medium leading-[1.1] tracking-[-0.03em]">Before and after Aria.</h3>
+                    <p className="mt-2 max-w-[560px] text-[14px] leading-relaxed text-[#a8a8ad]">The same 16 bars at the same loudness, so you hear the mix, not the volume. {STEPS.length - 1} steps in Live, {changes} changes, every one with Undo. Flip between them while it plays (or press space).</p>
+                  </div>
+                  <button type="button" onClick={() => setShowReveal(false)} className="flex-none rounded-full bg-white/10 px-3 py-1.5 text-[12.5px] text-[#d0d0d4] hover:bg-white/20">Back to the demo</button>
+                </div>
+
+                <div className="mt-6 flex justify-center">
+                  <div className="flex rounded-full bg-[#1b1b1c] p-1.5 ring-1 ring-white/10">
+                    {(["before", "after"] as const).map((v) => (
+                      <button key={v} type="button" onClick={() => flip(v)}
+                              className={cn("relative rounded-full px-8 py-2.5 text-[16px] font-semibold transition sm:px-12",
+                                version === v ? (v === "after" ? "text-black" : "text-black") : "text-[#9a9a9a] hover:text-white")}>
+                        {version === v && <motion.span layoutId="reveal-pill" className={cn("absolute inset-0 rounded-full", v === "after" ? "bg-[#4ade80]" : "bg-white")} transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
+                        <span className="relative">{v === "before" ? "Before" : "After"}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-2">
+                  {(["before", "after"] as const).map((v) => (
+                    <div key={v} className={cn("relative h-[86px] overflow-hidden rounded-[12px] bg-[#151515] ring-1 transition duration-500", version === v ? "ring-white/25" : "opacity-40 ring-transparent")}>
+                      <span className={cn("absolute left-2 top-2 z-10 rounded-full bg-black/75 px-2 py-0.5 text-[11px] font-semibold", v === "after" ? "text-[#4ade80]" : "text-[#cfcfcf]")}>{v === "before" ? "Before: the rough mix" : "After: Ian's run with Aria"}</span>
+                      <div className="absolute inset-x-0 inset-y-[10px]"><WaveCanvas wave={reveal[v] as unknown as Wave} dim={version !== v} /></div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 grid gap-5 md:grid-cols-[minmax(0,1fr)_240px]">
+                  <div className="rounded-[12px] bg-[#151515] p-3">
+                    <div className="mb-1 flex items-center gap-3 text-[12px] text-[#9a9a9a]">
+                      <span>Where the sound sits, averaged over the 16 bars</span>
+                      <span className="ml-auto flex items-center gap-1.5"><span className="h-[2px] w-4 bg-[#8a8a8a]" />Before</span>
+                      <span className="flex items-center gap-1.5"><span className="h-[2px] w-4 bg-[#4ade80]" />After</span>
+                    </div>
+                    <RevealSpectrum range={CHECK.finding?.hz_range} />
+                    <div className="flex justify-between font-mono text-[10px] text-[#6a6a6a]"><span>30 Hz</span><span>Low</span><span>Middle</span><span>High</span><span>16 kHz</span></div>
+                  </div>
+                  <div className="rounded-[12px] bg-[#151515] p-3">
+                    <div className="text-[12px] text-[#9a9a9a]">After, compared with Before</div>
+                    <div className="mt-2 space-y-1.5">
+                      {reveal.bands.map((b) => (
+                        <div key={b.name} className="flex items-center gap-2 text-[12.5px]">
+                          <span className="w-[78px] flex-none text-[#cfcfcf]">{b.name}</span>
+                          <div className="relative h-[6px] flex-1 rounded-full bg-white/[0.06]">
+                            <span className={cn("absolute top-0 h-full rounded-full", b.diff_db < 0 ? "bg-[#6ea8ff]" : "bg-[#4ade80]")}
+                                  style={{ left: b.diff_db < 0 ? `${50 + Math.max(-50, b.diff_db * 12)}%` : "50%", width: `${Math.min(50, Math.abs(b.diff_db) * 12)}%` }} />
+                            <span className="absolute left-1/2 top-[-2px] h-[10px] w-px bg-white/30" />
+                          </div>
+                          <span className="w-[46px] flex-none text-right font-mono text-[11.5px] text-[#d8d8d8]">{b.diff_db > 0 ? "+" : ""}{b.diff_db}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-[11.5px] leading-relaxed text-[#8a8a8a]">dB, at the same loudness. Blue is less, green is more.</p>
+                  </div>
+                </div>
+                <p className="mt-5 text-[11.5px] leading-relaxed text-[#6a6a6a]">{reveal.source} Measured by judges/scripts/make_demo_data.py.</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <p className="border-t border-black/70 bg-[#141414] px-4 py-2.5 text-[11.5px] leading-relaxed text-[#7a7a7a]">
           Recorded, not simulated: this replays a real run, faster than real time. {run.recorded} {run.after_note} The five tracks are in the repo's test-pack/sample, so anyone with Live can run it for real.
         </p>
       </div>
