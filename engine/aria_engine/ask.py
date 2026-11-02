@@ -108,9 +108,13 @@ TOOLS = [
         "name": "eq_band", "description": "Set one band on Live's EQ Eight at the end of the Main track (Aria adds one if needed). Changes the whole mix.",
         "parameters": {"type": "object", "properties": EQ_PROPS, "required": ["freq_hz"]}}},
     {"type": "function", "function": {
-        "name": "track_volume", "description": "Turn one of the producer's tracks up or down by a few dB. Use the exact track name from context.tracks.",
+        "name": "track_volume", "description": "Move one of the producer's tracks' fader: by change_db (\"turn it down 3 dB\", \"a bit louder\"), "
+                                               "or to to_db (\"turn it down to -15\": the fader's own reading, context.tracks gives where each one is now). "
+                                               "Use the exact track name from context.tracks.",
         "parameters": {"type": "object", "properties": {
-            "track": {"type": "string"}, "change_db": {"type": "number", "minimum": -6, "maximum": 6}}, "required": ["track", "change_db"]}}},
+            "track": {"type": "string"}, "change_db": {"type": "number", "minimum": -6, "maximum": 6},
+            "to_db": {"type": "number", "minimum": -70, "maximum": 6, "description": "Set the fader to this many dB instead of moving it by an amount."}},
+            "required": ["track"]}}},
     {"type": "function", "function": {
         "name": "track_eq", "description": "Set one band on Live's EQ Eight on one of the producer's tracks (Aria adds one if needed). Use the exact track name from context.tracks.",
         "parameters": {"type": "object", "properties": {"track": {"type": "string"}, **EQ_PROPS}, "required": ["track", "freq_hz"]}}},
@@ -256,7 +260,8 @@ and say what you used. If a Mix check finding covers that sound, use the finding
 - boxy: bell -3 dB at 500 Hz
 - harsh, sharp, piercing: bell -2 dB at 3500 Hz
 - warmth, body: bell +2 dB at 200 Hz
-- louder or quieter with no amount: 2 dB
+- louder or quieter with no amount: 2 dB. "Turn it down to -15" or "put it at -1" names where the fader should sit:
+  use track_volume to_db with that number (context.tracks gives each fader's reading as volume_db).
 
 eq_band sits on the Main track, so it changes every sound at once. Use it only for things that live in the
 whole mix: a ringing note, harsh hits, or a frequency the producer names. Never use eq_band for a buried sound
@@ -372,6 +377,10 @@ something you didn't call a tool for. If you can't do a part, say which part and
 Every change Aria makes (EQ, volume, devices) is on the track for the whole song, not only the bars a Mix check
 listened to. Never say a change is limited to some bars ("in bars 55 to 70"); say what changes on which track.
 A "suggest" waits for their yes, so offer it ("I can add air with EQ Eight instead"), never say it's done or happening.
+
+When one message asks for several things ("turn down the vocal and add air to the leads"), call a tool for each, in
+this same answer. Never say you'll do something next or later: there is no later, only what you call now. If one
+part can't be done, say which and why.
 
 Reply in one or two short sentences. No emojis, no em dashes."""
 PROMPT = PROMPT.replace("{STOCK_LINES}", "\n".join(f"- {name}: {knobs}" for name, knobs in STOCK.items()))
@@ -672,6 +681,9 @@ def check_action(name, args, tracks=(), plugins=()):
             if not track:
                 return None
             if name == "track_volume":
+                if args.get("to_db") is not None:   # a fader level the producer named ("down to -15"), never over +6
+                    to = float(args["to_db"])
+                    return {"track": track, "to_db": round(to, 1)} if -70 <= to <= 6 else None
                 change = float(args["change_db"])
                 return {"track": track, "change_db": round(change, 1)} if -6 <= change <= 6 and change != 0 else None
             eq = check_action("eq_band", args)

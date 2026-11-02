@@ -394,6 +394,12 @@ Pressing it again is the next try. It builds on the first because of how Aria's 
   - punch, thin bass or a messy synth: Aria's racks
 - Names: what Aria adds is "Aria <what it does>". The racks carry their Aria name inside the file. A stock device Aria adds is renamed "Aria <device>", or by its label (`track_device` `label`, e.g. "Aria Sidechain"). An EQ Eight is "Aria EQ".
 
+### Faders to a level, and two things at once (Nov 1)
+
+- `track_volume {track, change_db}` moves a fader by an amount (±6 dB), or `{track, to_db}` sets it to a level the producer named ("down to -15"), from -70 to +6 dB. live.js `volume <track> <change> <to|none>`.
+- `context.tracks[].volume_db` is each fader's reading ("-inf" as -70), so Muse knows where it starts.
+- The prompt says a message asking for several things gets a tool call for each in the same answer, and Muse never promises to do something "next".
+
 ### The EQ bands Aria already set (Nov 1)
 
 Every Ask Muse and Fix my whole mix context carries `aria_eq: [{track, band, shape, freq, gain, q}]`, read from Live by `aria_eqs` → `aria_eqs {bands}` (Main is `"Main"`, tracks by name, values as Live shows them; bands that are off or flat are left out).

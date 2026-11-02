@@ -1194,8 +1194,8 @@ async function apply(action, tracks = []) {
     return t.index;
   };
   switch (action.type) {
-    case "track_volume":
-      return await askLive("volume", "volume_done", trackIndex(a.track), a.change_db);
+    case "track_volume":   // by change_db, or to to_db (a fader level the producer named, Nov 1)
+      return await askLive("volume", "volume_done", trackIndex(a.track), a.change_db ?? 0, a.to_db ?? "none");
     case "track_eq":
       return await askLive("eq", "eq_done", a.freq_hz, a.gain_db, a.q, trackIndex(a.track), a.shape || "bell", a.steep ? 1 : 0, a.mode || "aria");
     case "track_device":

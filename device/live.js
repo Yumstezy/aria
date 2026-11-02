@@ -92,7 +92,9 @@ function state() {
 function trackList() {
   return ids(song.get("tracks")).map(function (id, i) {
     const t = new LiveAPI("id " + id);
+    const fader = new LiveAPI(t.unquotedpath + " mixer_device volume");
     return { name: String(one(t, "name")), index: i, group: one(t, "is_foldable") === 1, muted: one(t, "mute") === 1, clips: clipCount(t),
+             volume_db: Math.max(-70, displayed(fader, one(fader, "value"))),   // the fader's reading ("-inf" as -70), so "down to -15" can be done (Nov 1)
              devices: ids(t.get("devices")).map(function (d) { return String(one(new LiveAPI("id " + d), "name")); }) };
   });
 }
@@ -870,23 +872,24 @@ function undo() {
 
 // ---------- Track volume: nudge one track up or down, with Undo ----------
 
-function volume(trackIndex, changeDb) {
+function volume(trackIndex, changeDb, toDb) {
   const track = trackAt(trackIndex);
   const fader = new LiveAPI(track.unquotedpath + " mixer_device volume");
   const before = one(fader, "value");
   const now = displayed(fader, before);
   if (now === null) { send("volume_done", { ok: false, text: "Aria couldn't read that track's volume." }); return; }
-  const target = Math.min(6, now + changeDb);
+  const to = toDb === undefined || toDb === "none" ? null : Number(toDb);   // a fader level the producer named (Nov 1)
+  const target = Math.min(6, to !== null ? to : now + changeDb);
   // Nov 1: "up 2 dB, now 5.999 dB" when it was already at the top. +6 dB is Aria's own ceiling (Ian: nothing should go
   // louder than that); past it, lifting the sound's own range with EQ is the better tool, so say so
-  if (changeDb > 0 && target - now < 0.1) {
+  if (target > now && target - now < 0.1) {
     send("volume_done", { ok: false, text: "\"" + one(track, "name") + "\" is already at +6 dB, the most Aria raises a fader. Boost the part of it you want to hear with EQ instead." });
     return;
   }
   undoStack.push({ kind: "params", params: [{ id: Number(fader.id), value: before }], what: "volume", track: trackIndex });
   const shown = setByDisplay(fader, target);
   const moved = Math.round(Math.abs(target - now) * 10) / 10;
-  send("volume_done", { ok: true, text: "\"" + one(track, "name") + "\" " + (changeDb > 0 ? "up" : "down") + " " + moved + " dB, now " + shown + "." });
+  send("volume_done", { ok: true, text: "\"" + one(track, "name") + "\" " + (target > now ? "up" : "down") + " " + moved + " dB, now " + shown + "." });
 }
 
 // ---------- Spike S1: what each device on a track exposes to the Live API ----------

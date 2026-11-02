@@ -161,3 +161,14 @@ def test_track_mode_findings_carry_each_tracks_loudness(tmp_path):
     out = A.find_tracks(paths, rate, mix, {"tempo": 120.0, "start_beat": 0.0})
     assert out["levels_lufs"]["KICK"] - out["levels_lufs"]["LEADS"] == 20.0
     assert all(f["levels_lufs"] == out["levels_lufs"] for f in out["findings"] if f["kind"] in ("masking", "clash"))
+
+
+def test_a_fader_can_be_set_to_a_level_the_producer_names():
+    ctx = {**CONTEXT, "tracks": [{"name": "VOCAL", "volume_db": -6.0}, {"name": "LEADS", "volume_db": 0.0}]}
+    out = ask.ask("turn the vocal down to -15 and give the leads some air", ctx, client=client_for(
+        "Vocal down to -15 dB and a little air on the leads.",
+        call("track_volume", track="VOCAL", to_db=-15), call("track_eq", track="LEADS", shape="high_shelf", freq_hz=10000, gain_db=2)))
+    assert [a["type"] for a in out["actions"]] == ["track_volume", "track_eq"]
+    assert out["actions"][0]["args"] == {"track": "VOCAL", "to_db": -15.0}
+    for bad in ({"to_db": 9}, {"change_db": 0}):
+        assert ask.ask("louder", ctx, client=client_for("", call("track_volume", track="VOCAL", **bad)))["actions"] == []
