@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { GrooveIcon, CheckIcon } from "@/components/icons";
 import { THEIRS, YOURS } from "@/components/ref-chart";
-import { grooveAB, groovePick, grooveRun, undoLast, useAriaSel, vocalAnalyze, vocalApply, type GrooveClip, type GrooveResult, type VocalSync } from "@/lib/aria";
+import { grooveAB, grooveNext, groovePick, grooveRun, undoLast, useAriaSel, vocalAnalyze, vocalApply, type GrooveClip, type GrooveResult, type VocalSync } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
 function ClipCard({ label, clip, onPick, busy }: { label: string; clip: GrooveClip | null; onPick: () => void; busy: boolean }) {
@@ -141,7 +141,8 @@ export function GrooveScreen({ narrow, mode, setMode }: { narrow: boolean; mode:
 
 function LoopsPanel({ narrow }: { narrow: boolean }) {
   const g = useAriaSel((s) => s.groove), tempo = useAriaSel((s) => s.session?.tempo ?? null);
-  const [follow, setFollow] = useState<"straight" | "loop">("straight");
+  // Starts from the last match, so coming back to the screen doesn't show Straight grid for a match that followed a loop
+  const [follow, setFollow] = useState<"straight" | "loop">(() => (g.result && g.result.follow !== "Straight" ? "loop" : "straight"));
   const [strength, setStrength] = useState(100);
   const [nudge, setNudge] = useState(0);
   const r = g.result, busy = !!g.busy;
@@ -202,15 +203,19 @@ function LoopsPanel({ narrow }: { narrow: boolean }) {
             Worst hit: {r.before.max_ms ?? "?"} ms off, now {r.after.max_ms ?? "?"} ms. {r.hits_moved} of {r.hits} hits moved {r.follow === "Straight" ? "onto the grid" : `to follow ${r.follow}`}{r.after.missing ? `. ${r.after.missing} couldn't be heard again` : ""}.
           </span>
           {/* No picture (Ian, Oct 31: the dots, the bars and the waveforms were all "hard to understand"). Listen instead. */}
-          {g.placed && (
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {g.placed && (
               <div className="cp-seg" role="group" aria-label="Listen to">
                 <button aria-pressed={g.placed.playing === "before"} onClick={() => grooveAB("before")}>Original</button>
                 <button aria-pressed={g.placed.playing === "after"} onClick={() => grooveAB("after")}>Matched</button>
               </div>
-              <button className="cp-btn cp-btn-sm ml-auto" onClick={undoLast}>Undo</button>
+            )}
+            {/* The next loop (Ian, Nov 2): clears the loop to fix, keeps the loop to follow */}
+            <div className="ml-auto flex gap-2">
+              <button className="cp-btn cp-btn-sm" disabled={busy} onClick={grooveNext}>Match another loop</button>
+              {g.placed && <button className="cp-btn cp-btn-sm" onClick={undoLast}>Undo</button>}
             </div>
-          )}
+          </div>
         </section>
       ) : !g.moving && (
         <section className={cn("cp-tile cp-card items-center")} style={{ gap: 10, minHeight: 120, placeItems: "center" }}>

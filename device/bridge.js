@@ -844,6 +844,13 @@ Max.addHandler("groove_pick", (s) => serial(async () => {
   }
 }));
 
+// Match another loop (Ian, Nov 2): after a match, clear the loop to fix (and the try it would replace) so the next
+// loop starts fresh. The loop to follow stays, so several loops can follow the same one.
+Max.addHandler("groove_next", () => serial(async () => {
+  groove.moving = null; groove.placed = null;
+  grooveState();
+}));
+
 Max.addHandler("groove_run", (s) => serial(async () => {
   try { await grooveRunNow(decode(s)); }
   catch (e) { grooveState({ error: e instanceof UserError ? e.message : `Something went wrong: ${e.message}` }); }

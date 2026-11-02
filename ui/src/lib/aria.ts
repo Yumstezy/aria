@@ -437,6 +437,10 @@ export function grooveRun(follow: "straight" | "loop", strength: number, nudge_m
   else notice("Groove match needs Aria inside Live.");
 }
 export const grooveAB = (play: "before" | "after") => send("groove_ab", { play });
+/** Match another loop: clears the loop to fix and the last result, keeps the loop to follow */
+export function grooveNext() {
+  if (!send("groove_next")) notice("Groove match needs Aria inside Live.");
+}
 
 // ---------- Reference song (build step 8) ----------
 
