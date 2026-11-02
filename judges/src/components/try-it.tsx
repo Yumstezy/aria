@@ -7,8 +7,8 @@
 //   - the spectrum is measured live, in the browser, from whatever is playing
 // Four steps in order, one sentence and one button each (Ian, Nov 1: the Live-style version was "cluttered and
 // overwhelming and the site is clean"): Listen, Check, Fix, Compare. Check and Fix replay what really happened,
-// faster than real time. Waveforms are drawn the way the app's Live analyzer draws them (Window.tsx): mirrored,
-// smooth, colored by where the sound is; judges/scripts/make_demo_data.py measured them from the stems.
+// faster than real time. Waveforms are detailed, one column a pixel, colored by each moment's lows, mids and highs;
+// judges/scripts/make_demo_data.py measured them from the stems.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
@@ -137,36 +137,41 @@ function useMix() {
 }
 
 /* ---------- pieces ---------- */
-type Wave = { h: number[]; rgb: number[][] };
+type Wave = { n: number; p: string; r: string; c: string };
+const bytes = (b64: string) => Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
 
-// The app's waveform: mirrored, smooth, the color flowing along it by where the sound is (red lows, orange mids,
-// green highs). Drawn once per size.
+// A detailed waveform, drawn the way pro DJ and audio software draws one (Ian, Nov 2): one thin column per screen
+// pixel, its peak faint and its body (RMS) bright inside it, each column colored by its own sound: red lows, pink
+// mids, cyan highs (make_demo_data.py). Heights are the measured levels, eased a little (^0.8) so quiet parts show.
 function WaveCanvas({ wave }: { wave: Wave }) {
   const cv = useRef<HTMLCanvasElement>(null);
+  const data = useMemo(() => ({ p: bytes(wave.p), r: bytes(wave.r), c: bytes(wave.c) }), [wave]);
   useEffect(() => {
     const el = cv.current;
     if (!el) return;
     const draw = () => {
-      const ctx = el.getContext("2d"), dpr = window.devicePixelRatio || 1, cw = el.clientWidth, ch = el.clientHeight;
-      if (!ctx || !cw) return;
-      el.width = Math.round(cw * dpr); el.height = Math.round(ch * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, cw, ch);
-      const n = wave.h.length, mid = ch / 2, x = (i: number) => (i / (n - 1)) * cw, y = (i: number) => Math.max(0.5, wave.h[i] * (mid - 1));
-      const grad = ctx.createLinearGradient(0, 0, cw, 0);
-      wave.rgb.forEach((c, i) => grad.addColorStop(i / (n - 1), `rgb(${c[0]},${c[1]},${c[2]})`));
-      ctx.beginPath();
-      ctx.moveTo(0, mid - y(0));
-      for (let i = 1; i < n; i++) { const xm = (x(i - 1) + x(i)) / 2; ctx.quadraticCurveTo(x(i - 1), mid - y(i - 1), xm, mid - (y(i - 1) + y(i)) / 2); }
-      for (let i = n - 1; i > 0; i--) { const xm = (x(i - 1) + x(i)) / 2; ctx.quadraticCurveTo(x(i), mid + y(i), xm, mid + (y(i - 1) + y(i)) / 2); }
-      ctx.closePath();
-      ctx.fillStyle = grad; ctx.fill();
+      const ctx = el.getContext("2d"), dpr = window.devicePixelRatio || 1;
+      const W = Math.round(el.clientWidth * dpr), H = Math.round(el.clientHeight * dpr);
+      if (!ctx || !W) return;
+      el.width = W; el.height = H;
+      ctx.clearRect(0, 0, W, H);
+      const { p, r, c } = data, n = wave.n, mid = H / 2, ease = (v: number) => Math.pow(v / 255, 0.8) * (mid - dpr);
+      for (let x = 0; x < W; x++) {
+        // The source columns under this pixel: their loudest peak and body, the color of the loudest body
+        const i0 = Math.floor((x * n) / W), i1 = Math.max(i0 + 1, Math.floor(((x + 1) * n) / W));
+        let pk = 0, rm = 0, at = i0;
+        for (let i = i0; i < i1 && i < n; i++) { if (p[i] > pk) pk = p[i]; if (r[i] > rm) { rm = r[i]; at = i; } }
+        const rgb = `${c[at * 3]},${c[at * 3 + 1]},${c[at * 3 + 2]}`;
+        const hp = Math.max(dpr * 0.5, ease(pk)), hr = Math.min(hp, ease(Math.min(255, rm * 1.4)));
+        ctx.fillStyle = `rgba(${rgb},0.42)`; ctx.fillRect(x, mid - hp, 1, hp * 2);
+        ctx.fillStyle = `rgb(${rgb})`; ctx.fillRect(x, mid - hr, 1, hr * 2);
+      }
     };
     draw();
     const ro = new ResizeObserver(draw);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [wave]);
+  }, [wave, data]);
   return <canvas ref={cv} className="block size-full" aria-hidden="true" />;
 }
 
@@ -319,7 +324,7 @@ export function TryIt() {
                 const focus = stage >= 1 && busy === null && stage < 3 ? i === leads : null;   // after the check, the leads are the story
                 const heard = solo === null || solo === i;
                 return (
-                  <div key={t.name} className="flex h-[52px] items-center gap-4 sm:h-[58px]">
+                  <div key={t.name} className="flex h-[60px] items-center gap-4 sm:h-[72px]">
                     <button type="button" onClick={() => setSolo((s) => (s === i ? null : i))}
                             className={cn("w-[58px] flex-none text-left text-[12.5px] transition-colors sm:w-[72px]", solo === i ? "text-ink" : "text-faint hover:text-muted")}
                             aria-pressed={solo === i} aria-label={`Hear ${t.name.toLowerCase()} alone`}>
