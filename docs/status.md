@@ -4,6 +4,16 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 2, overnight: a full check of everything (Ian asked, before bed).** Three reviews (device code, engine corner cases, both websites), a UI pass over every screen, the installer, and a secrets scan. Fixed and pushed:
+- Bridge (a280571): "undo everything" survives a Live timeout and says so; late Live replies were credited to the next action (now 8 s waits); Fix's sidechain routing skips when its Compressor failed; Ask's undo resets the Groove screen; an empty live.js stack clears the Undo pill; the newest chat entry always reaches the window. Checked with a Node harness that stubs Max and Live. **Needs a check in Live.**
+- Engine security (7497f1e): requests whose Origin isn't Aria's pages get 403. Before, any website could POST with no Content-Type and FastAPI parsed it as JSON (an Ask on Ian's key). The per-install token is still the stronger fix after the hackathon.
+- Engine corner cases (a393bf8): empty, very short, over 10 minutes or NaN recordings get a 400 instead of a 500; no clashes on a noise floor; the +6 dB ceiling is counted from the fader and stated; infinite numbers from Muse are skipped. 179 tests pass. A real Check mix on the sample song gives the same result as the old code.
+- Judges' site (5a8f2f8): four Meta models (Demucs added, it splits the mix), Try it says After is the fix plus 7 requests, merged fader steps, header fixed at 768 and 375 px, contrast, reduced motion, absolute share image, "Eight tools".
+- README: Demucs and Audiobox in the Meta table, with the Demucs weights license note.
+- Release zip for v0.2.2 builds, has no key, installs into a scratch home. **Not published**: waiting on Ian's Live check of the bridge.
+- Hero screenshot: on branch `hero-real-screenshot`, rebased on main, waiting on a shot without the Aria Ear warning.
+- Ian's User Library had lost Max Audio Effect/Aria (both devices) around 7:16 PM Nov 1, cause unknown. Reinstalled; Live lists them again.
+
 **Nov 1, 10 PM: judges' site fixes from Ian's read-through.**
 - The Meta AI section now lists every Meta model Aria uses: Muse Spark (advice, 24 tools, questions, screenshots), Muse Voice Transcribe, and Audiobox Aesthetics, which is still being tested for the mix model.
 - "What broke, and how we fixed it" is rewritten in plain words for people who don't make music.
