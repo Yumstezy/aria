@@ -12,10 +12,15 @@
   Meta's <b>Muse Spark</b> explains them and makes the fix, and Aria measures again to prove it worked.
 </p>
 
+<table align="center">
+<tr>
+<td align="center" width="300"><a href="https://aria-judges.vercel.app/demo"><b>Try the demo</b></a><br><sub>Hear Aria fix a real mix in your browser.<br>No Ableton needed.</sub></td>
+<td align="center" width="300"><a href="https://aria-judges.vercel.app"><b>Read the website</b></a><br><sub>What Aria does, how Meta AI powers it,<br>how it's built, and the team.</sub></td>
+</tr>
+</table>
+
 <p align="center">
   <a href="https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip"><b>Download for Mac</b></a> &nbsp;·&nbsp;
-  <a href="https://aria-judges.vercel.app/#try"><b>Try it in your browser</b></a> &nbsp;·&nbsp;
-  <a href="https://aria-judges.vercel.app">Website</a> &nbsp;·&nbsp;
   <a href="#get-aria">Install</a>
 </p>
 
@@ -31,7 +36,7 @@
 
 ## Try it
 
-**[Hear Aria fix a real mix](https://aria-judges.vercel.app/#try), no Ableton needed.** A house demo Ian made, before mixing, in four steps:
+**[Hear Aria fix a real mix](https://aria-judges.vercel.app/demo), no Ableton needed.** A house demo Ian made, before mixing, in four steps:
 
 1. **Listen.** Five tracks: kick, drums, bass, leads, vocal. Tap one to hear it alone.
 2. **Check.** Aria hears each track on its own: *the lead melody is buried, covered by the rest of the song most of the time.*
@@ -221,7 +226,7 @@ cd aria
 
 - Engine tests: `cd engine && .venv/bin/pytest` (170 passing)
 - Screens: `cd ui && npm install && npm run build` (the built pages in `ui/dist/` are committed, so running Aria never needs Node)
-- Website: `cd judges && npm run build` (aria-judges.vercel.app); the demo's data comes from `judges/scripts/make_demo_data.py`
+- Website: `cd judges && npm run build` (aria-judges.vercel.app, deployed by Vercel on every push; the demos page is `/demo`); the demo's data comes from `judges/scripts/make_demo_data.py`
 - The release zip: `scripts/release.sh`
 - The JSON between device, bridge, engine and screens: [`docs/contracts.md`](docs/contracts.md)
 - Where things stand, day by day: [`docs/status.md`](docs/status.md)
