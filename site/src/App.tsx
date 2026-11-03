@@ -165,17 +165,6 @@ function PicSections() {
     </div>
   );
 }
-function PicScore() {
-  return (
-    <div className="grid h-24 place-items-center">
-      <svg viewBox="0 0 120 64" className="h-20 w-32" aria-hidden="true">
-        <path d="M10 60a50 50 0 0 1 100 0" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="8" strokeLinecap="round" />
-        <motion.path d="M10 60a50 50 0 0 1 100 0" fill="none" stroke="var(--color-good)" strokeWidth="8" strokeLinecap="round"
-                     initial={{ pathLength: 0 }} whileInView={{ pathLength: 0.7 }} viewport={{ once: true }} transition={{ duration: 1.6, ease: "easeOut" }} />
-      </svg>
-    </div>
-  );
-}
 function PicBeforeAfter() {
   return (
     <svg viewBox="0 0 200 80" className="h-24 w-full" aria-hidden="true">
@@ -330,6 +319,7 @@ export default function App() {
               ["gold", Icon.check(), "Fix it", "One click. Aria puts the fix into Ableton for you."],
               ["blue", Icon.undo(), "Undo", "Don't like it? One click puts it back."],
               ["white", Icon.split(), "It hears each part", "Meta's Demucs splits your song into drums, bass, vocals and the rest, so Aria can tell which part is the problem."],
+              ["good", Icon.spark(), "Closer to the good mixes", "Aria's mix model learned from mixes our testers rated good or bad. It shows how close yours is, and what would move it closer. Muse Spark explains it and makes the fix."],
             ] as [Accent, ReactNode, string, string][]).map(([a, ic, t, d]) => (
               <div key={t} className="flex gap-3.5"><IconChip color={a === "white" ? undefined : `var(--color-${a})`}>{ic}</IconChip>
                 <div><b className="text-[15.5px] font-medium">{t}</b><p className="mt-0.5 text-[14.5px] leading-relaxed text-muted">{d}</p></div></div>
@@ -389,7 +379,6 @@ export default function App() {
             ["Live analyzer", "Watch your song's sound move while it plays, with problems lighting up as they happen.", "blue", <PicAnalyzer />],
             ["Groove match", "Two loops that don't quite line up? Aria nudges the hits until they play perfectly in time.", "gold", <PicGroove />],
             ["Song sections", "Aria finds the intro, the build and the drop in your song and a reference, side by side, and names them in Ableton for you.", "white", <PicSections />],
-            ["Mix score", "A score for your mix, from a model trained on real songs rated by real producers.", "good", <PicScore />],
             ["Before and after", "After a fix, Aria listens again at the same volume and shows you what changed.", "hot", <PicBeforeAfter />],
             ["One-click install", "Download Aria from this page and drop it into Ableton. No setup.", "white", <div className="grid h-24 place-items-center text-muted">{Icon.download(40)}</div>],
           ] as [string, string, Accent, ReactNode][]).map(([t, d, a, pic], i) => (

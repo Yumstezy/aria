@@ -4,6 +4,21 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 2 to 3, night: the shape model is in Aria.** Ian: use our model with Muse Spark, show where the mix lands, run fixes as normal, add a rating, and put it on the README and websites.
+- Engine (922a30c): `goodmix.py` measures the check the way the rated mixes were measured and runs `ml/data/shape-model.json` (copied into the engine, a test keeps them equal). `/mix/analyze` returns `good_mixes`: the lean ("closer", "between", "further") and the 11 stable directions. The off ones an EQ can move join the problems as `good_mix` findings (at most 2, no reference only), so Muse's notes, Fix it and Fix all handle them. Muse gets the words, not the number.
+- Real run on test-pack Rough mix.wav, Muse Spark, 3 times: "Further from the good mixes than most", highs +3.4 dB (a 3 dB cut at 7.1 kHz offered as the fix), sub -6.7 dB (lift it on the kick or bass). The finished mix leans closer than the rough one (0.24 against 0.06), still "further".
+- Window (f4079e7): "Against the rated mixes" card, a dot from Further to Closer plus the 3 strongest directions (Simple) or all 11 (Detailed). The rating is that lean, never a score out of 100: the model is right 75% of the time, and loudness alone gets 72%. A problem with less than the good mixes counts as Fixed when its range comes back 3 dB higher. Checked in a browser on the real result: Simple and Detailed, dark and light, 1280 and 600 px.
+- README, judges' site and product site: the mix model section, Muse Spark explaining it, what didn't work (it can't grade a mix). Audiobox corrected to "tested", since the model in Aria uses EQ shape only. The product site's "Mix score, in development" card is gone.
+- 191 engine tests pass.
+- **Not pushed yet**, so the websites don't announce it before the download has it. Next: Ian's check in Live (below), then push, publish v0.2.2 (with the bridge fixes still waiting), and the sites deploy.
+- Manual check in Live for Ian:
+  1. Quit and reopen Live, so the engine restarts with the new code (or run `engine/run.sh` again).
+  2. Remove Aria from Main and add it again. Play the drop and press Check.
+  3. In the window's Mix check (Simple), "Against the rated mixes" shows under the top cards: a dot on a line from Further to Closer, a line in words, and up to 3 rows like "More sub". Muse's summary starts with where the mix lands.
+  4. If a "More highs than the good mixes" or "Less sub than the good mixes" problem shows in To fix, press Fix it. Undo should take it back.
+  5. Press Detailed: the same card lists 11 rows.
+  6. Choose a reference song and Check again: the card stays in Detailed, but no good_mix problems are in To fix.
+
 **Nov 2, overnight: a full check of everything (Ian asked, before bed).** Three reviews (device code, engine corner cases, both websites), a UI pass over every screen, the installer, and a secrets scan. Fixed and pushed:
 - Bridge (a280571): "undo everything" survives a Live timeout and says so; late Live replies were credited to the next action (now 8 s waits); Fix's sidechain routing skips when its Compressor failed; Ask's undo resets the Groove screen; an empty live.js stack clears the Undo pill; the newest chat entry always reaches the window. Checked with a Node harness that stubs Max and Live. **Needs a check in Live.**
 - Engine security (7497f1e): requests whose Origin isn't Aria's pages get 403. Before, any website could POST with no Content-Type and FastAPI parsed it as JSON (an Ask on Ian's key). The per-install token is still the stronger fix after the hackathon.

@@ -60,6 +60,16 @@ One problem, start to finish. Aria's loop is the same for every problem it finds
 
 ---
 
+## The mix model
+
+**Where your mix lands, from mixes people rated.** Raghav trained it on 63 mixes our testers rated good or bad, on the shape of the EQ alone, with loudness taken out. On songs it had never heard, it told good from bad 75% of the time. Chance is 50%, and a shuffle test puts luck at p = 0.002.
+
+- **A lean, not a score.** After a Mix check, Aria shows where your mix sits, from further from the good mixes to closer, and what would move it closer: *more sub, less highs, smoother mids.*
+- **Muse Spark explains it and fixes it.** It gets the model's directions as measured numbers. On Ian's rough mix: *"The sub around 42 Hz sits 6.7 dB below the good mixes."* Too much of something gets an EQ cut you can undo. Too little gets lifted on the track that carries it, never a louder fader.
+- **Honest about what it is.** Loudness alone tells the same mixes apart 72% of the time, so shape isn't a stronger judge. It's the one that points to an EQ move. Aria shows only the 11 directions that pointed the same way in at least 40 of 50 test rounds ([results](ml/results/shape-experiment.md)).
+
+---
+
 ## Why it matters
 
 **Finishing a song stops at the mix.** Most producers learn to make a drop long before they learn why it sounds muddy next to the songs they love. The usual answers are an engineer, a course, or guessing with plugins. Aria works where they already are, in Ableton, on their own song.
@@ -74,18 +84,19 @@ One problem, start to finish. Aria's loop is the same for every problem it finds
 
 ## Meta AI
 
-**Four of Meta's models: Muse Spark, Muse Voice Transcribe, Demucs and Audiobox Aesthetics.** Muse Spark does the work you see, not a chat box on the side. It never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it. You can undo any change it makes.
+**Four of Meta's models: Muse Spark, Muse Voice Transcribe and Demucs in Aria, and Audiobox Aesthetics in our mix model tests.** Muse Spark does the work you see, not a chat box on the side. It never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it. You can undo any change it makes.
 
 | | |
 |---|---|
 | **Muse Spark writes it** `muse-spark-1.3` | Turns Aria's measurements into plain advice and a fix. It only ever sees measured numbers, and Aria checks its answer before anything happens. |
+| **Muse Spark explains the mix model** | Aria's own model says where your mix lands against mixes our testers rated good or bad, and which way to move. Muse Spark turns those directions into plain advice and a fix, like any other problem. |
 | **Muse Spark does it** | 24 tools in Live through tool calling: EQ, faders, 20 stock devices and 26 custom racks, sidechain, markers, groove match, vocal sync, Check again, Undo. It picks the tool a mix engineer would: drums fighting the bass get a sidechain, mud gets low cuts, a buried sound gets space made for it, never a louder fader. |
 | **Muse Spark fixes the whole mix** | "Fix my whole mix": it fixes the strongest problems, Aria plays the same bars again and measures each one, and Muse reports what's fixed from the measurements alone. |
 | **Muse Spark asks** | When it can't tell which track you mean, it asks: *"Which vocal track do you mean, VOCAL TEST or Vox 2?"* It also names the parts of your song: Intro, Build, Drop. |
 | **Muse Spark looks at your screen** | Attach a screenshot of any plugin and it reads the settings. On EQ Eight it read *band 4, 3.62 kHz, -3.50 dB, Q 6.00* and tied it to the harsh spot Aria had measured. |
 | **Muse Voice Transcribe hears it** `muse-voice-transcribe-1.0` | Hold a key and say it. *"Cut the mud on the bass"* came back as text in 1.4 seconds and ran like a typed request. |
 | **Demucs splits it** `htdemucs` | Meta's open source separation model pulls the recording apart into drums, bass, vocals and the rest, so Aria can say which part is causing a problem. |
-| **Audiobox Aesthetics rates it** | Meta's open model that scores how good audio sounds. We're testing it in the mix model, which learns from 99 mixes people rated. |
+| **Audiobox Aesthetics, tested** | Meta's open model that scores how good audio sounds. We tested its scores as an input to the mix model. The model in Aria uses the EQ shape alone. |
 
 ---
 
@@ -167,12 +178,13 @@ flowchart LR
 |---|---|
 | **The device** (`device/`) | Sits last on the Main track. Records bars for a check, reads and sets things through the Live API, and runs the live analyzer 20 times a second. Aria Ear, on any track, lets Aria hear that track by name. |
 | **The bridge** (`device/bridge.js`) | Node for Max. Carries messages between Live, the screens and the engine, and keeps every change on an Undo stack. |
-| **The engine** (`engine/`) | Python and FastAPI, on this Mac. Measures the audio and talks to Muse Spark. It returns numbers; the words come from Muse. 170 tests. |
+| **The engine** (`engine/`) | Python and FastAPI, on this Mac. Measures the audio and talks to Muse Spark. It returns numbers; the words come from Muse. 191 tests. |
 | **The screens** (`ui/`) | React, inside Live's own web view: the strip on the device, and the window docked over Live. |
 
 <details>
 <summary>How it measures</summary>
 
+- **The mix model:** the loudest 60 s of the check, its EQ curve in twelfth octaves against its own loudness, the same way the rated mixes were measured, then a logistic regression on 13 measurements of that curve ([`engine/aria_engine/goodmix.py`](engine/aria_engine/goodmix.py)).
 - **Clarity rules:** buried sounds, mud, harsh bursts, ringing notes, bass clicks and clashing tracks, from the split parts or from each track by name, with its bars and range. A sound that ducks under the kick (a sidechain) isn't called buried during its ducks, and every finding carries each track's loudness.
 - **Always at the same loudness:** reference compares and before and after are loudness matched (BS.1770, pyloudnorm).
 - **Hits to the millisecond:** onsets pinned to the start of the attack, moved by slicing just before each hit, then found again in the new file by cross-correlation.
@@ -199,7 +211,7 @@ Found by using Aria on real songs inside Live, every day of the build.
 
 ### What didn't work
 
-- **The mix model is still being tested.** It learns from 99 mixes people rated good, mid or bad, with Meta's Audiobox Aesthetics scores as one input. It goes into Aria only if it beats simple baselines ([`ml/HANDOFF-shape-model.md`](ml/HANDOFF-shape-model.md)).
+- **The mix model can't grade a mix.** Across good, mid and bad, nothing beat loudness alone: 0.49 against 0.45, and 0.51 with Audiobox Aesthetics. Only good against bad, on the EQ shape, held up, so that's what's in Aria. Adding stereo and clarity measurements didn't help (0.72 against 0.74) ([`ml/results`](ml/results)).
 - **Getting the right tempo was harder than expected. Tempo detection can land on the wrong reading, especially on vocals. Aria shows the next likely tempos alongside each reading, and the song’s own tempo is one tap away.
 - **Without a reference, a broad low-mid boost is hard to hear:** the rules found 1 of 3 planted problems. That's why the reference compare exists.
 
@@ -258,7 +270,7 @@ cd aria
 <tr>
 <td valign="top">Built Aria end to end: the engine and its Muse Spark integration, the screens inside Live and the websites, and the Max for Live devices. Designed the product, tested it in Live every day, and now leads security.</td>
 <td valign="top">Organized the team, ran planning and check-ins, and kept the build on schedule. Set priorities and coordinated the hand-offs to the submission.</td>
-<td valign="top">Built the mix model: the rated mixes, their measurements, and the ordinal model with its ship rule. Ran the Audiobox side experiment and reported what it showed.</td>
+<td valign="top">Built the mix model: the rated mixes, their measurements, and the ordinal model with its ship rule. Ran the Audiobox side experiment and reported what it showed. Built the shape model that's in Aria.</td>
 </tr>
 <tr>
 <td align="center"><a href="https://www.linkedin.com/in/ianabarrie/">LinkedIn</a> · <a href="https://github.com/Yumstezy">GitHub</a></td>

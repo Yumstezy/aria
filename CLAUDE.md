@@ -36,7 +36,8 @@ Done means a real Check mix in Live shows real measurements and real Muse Spark 
 This is a hard rule for code, tests, UI and the video.
 
 - The engine reports only what it measured from real audio. If it can't measure something, it says so and returns null. It never fills in a plausible number.
-- With no reference track, the engine doesn't compare the mix with anything: it finds clashes and problem spots only. "Too bright" or "too quiet" needs a reference. (A comparison with the rated "good" mixes was tried on Oct 30 and taken out the same day: Ian found it confusing, and 30 mixes aren't an industry standard.)
+- With no reference track, the engine doesn't compare the mix with a song: it finds clashes and problem spots, and the shape model says where the mix lands against the rated mixes. "Too bright" or "too quiet" needs a reference.
+  - The shape model (Ian, Nov 2) is in the app: `engine/aria_engine/goodmix.py`, trained in `ml/experiments/shape.py` on 63 mixes rated good or bad, EQ shape only. It shows a lean (closer to or further from the good mixes) and the directions that held steady, never a score or a percentage, and Muse Spark explains them. (An earlier comparison, each band against where 8 in 10 good mixes sit, was tried on Oct 30 and taken out the same day: Ian found it confusing.)
 - Muse Spark gets only measured numbers, and its prompt says to use only those. Validate its JSON. If the call fails or there's no key, show "no advice" and the reason. Never fall back to canned advice text.
 - The UI never shows example numbers outside a development mode clearly labeled as such. The numbers in `design/screens/` are illustrations for layout only. Don't copy them into code as data.
 - Tests may generate test tones. Those stay in tests and never reach the app.
@@ -51,7 +52,7 @@ This is a hard rule for code, tests, UI and the video.
 - `DESIGN.md`: the short design reference (type, color, space, voice). `design/ds/README.md` has the full rules.
 - `docs/design-fixes.md`: the latest design corrections (round 1, Oct 27). The layouts are in `design/screens/10` to `12`. Aria fills them with its own findings, not a reference comparison, until the reference step is built.
 - `design/ds/README.md`: design rules. "Say it plainly" is the most important section.
-- `docs/ml-plan.md`: the good mix vs bad mix model. It's a parallel track for the teammate who knows ML, and it plugs into the engine later.
+- `docs/ml-plan.md`: the good mix vs bad mix model. The shape-only version passed on Nov 2 and is in the engine (`goodmix.py`, contracts "Against the rated mixes").
 
 ## Architecture
 
@@ -114,7 +115,7 @@ docs/          build steps, contracts, screens
 
 - Python 3.11, FastAPI, uvicorn, numpy, scipy, soundfile, librosa, pyloudnorm. Add a library only when a step needs it, and note why in the commit.
 - Every endpoint has a test that runs on files from `test-pack/`. `pytest` must pass before a step counts as done.
-- Today's clarity findings (buried, mud, harsh, ringing, clicks) come from measurement rules, version 1. They are not the finished product (Ian, Oct 27): the mix model trained on rated mixes (`docs/ml-plan.md`, `ml/`) is what makes the data accurate. Keep the UI fed by data shapes the model can fill (the band row, the problem cards), and wire `POST /mix/score` in after the Oct 31 checkpoint if the model beats its baselines.
+- Today's clarity findings (buried, mud, harsh, ringing, clicks) come from measurement rules, version 1. They are not the finished product (Ian, Oct 27): the mix model trained on rated mixes (`docs/ml-plan.md`, `ml/`) is what makes the data accurate. The shape model (Nov 2) fills the good_mixes block and good_mix problem cards inside `/mix/analyze`; there is no separate `/mix/score`.
 - Third-party plugins (Oct 27, Ian): Aria changes only Live's own devices. For a plugin the producer names, Muse shows how it should look (`plugin_guide`: the EQ curve and bands from one of the producer's own presets, or a stated starting point) and the producer sets it. The Remote Script in `device/remote/` no longer loads plugins; it only puts Aria Ears on key tracks ("Listen to my key tracks").
 - Analysis returns numbers. Words come from Muse Spark only. If the model is down, the UI shows the measurements and says advice is unavailable.
 - Loudness is LUFS (pyloudnorm). Before and after comparisons are always loudness matched.

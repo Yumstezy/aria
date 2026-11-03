@@ -123,7 +123,7 @@ const NAV: LiquidNavItem[] = [
 ];
 
 // Every Meta model Aria uses (Ian, Nov 1: "talk about all the tools we used from meta like the thing for the model
-// the voice spark etc."). Audiobox is still being tested for the mix model, so it says so.
+// the voice spark etc."). Audiobox was tested for the mix model, but the model in Aria uses EQ shape alone, so it says so.
 const META: [string, string, Accent, ReactNode][] = [
   ["Muse Spark writes it", "Turns Aria's measurements into plain advice and a fix. It only ever sees measured numbers, and Aria checks its answer before anything happens.", "gold", I.spark()],
   ["Muse Spark does it", "24 tools in Live through tool calling: EQ, faders, stock devices, 26 custom racks, sidechain, vocal sync. Each is checked against a fixed menu and limits, and each can be undone.", "blue", I.check()],
@@ -131,8 +131,8 @@ const META: [string, string, Accent, ReactNode][] = [
   ["Muse Spark sees it", "Paste a screenshot into the chat, like a plugin you're stuck on, and Muse Spark looks at it along with what you asked.", "hot", I.image()],
   ["Muse Spark names the parts", "Aria hears the whole song and Muse Spark names its parts, Intro, Build, Drop, so a check compares your drop with a reference's drop.", "blue", I.split()],
   ["Muse Voice Transcribe hears it", "Hold a key and say it. \"Cut the mud on the bass\" came back as text in 1.4 seconds and ran like a typed request.", "white", I.mic()],
-  ["Demucs splits it", "Meta's open model that pulls a mix apart into drums, bass, vocals and the rest, so Aria can say which part is causing a problem.", "good", I.knob()],
-  ["Audiobox Aesthetics rates it", "Meta's open model that scores how good audio sounds. We're testing it in our mix model, which learns from 99 mixes people rated.", "gold", I.wave()],
+  ["Demucs splits it", "Meta's open model that pulls a mix apart into drums, bass, vocals and the rest, so Aria can say which part is causing a problem. We also tested Meta's Audiobox Aesthetics for the mix model.", "good", I.knob()],
+  ["Muse Spark explains our model", "Aria's mix model says where your mix lands against mixes our testers rated good or bad, and which way to move. Muse Spark says it plainly and makes the fix.", "gold", I.wave()],
 ];
 
 const TOOLS: { crop: number; skip?: number; title: string; line: string; src: string; alt: string }[] = [
@@ -161,6 +161,7 @@ const BROKE: [string, string][] = [
 ];
 
 const MISSES = [
+  "Our mix model can't give a mix a grade. Across good, okay and bad mixes, it did no better than going by loudness alone. It can tell good from bad 75% of the time, by the shape of the sound, so Aria shows that as a lean and a direction, never a score.",
   "One vocal still reads at the wrong speed: one of ours, at 148 beats a minute, reads as 192. So Aria shows its best guesses, and you can pick your song's own speed with one tap.",
   "Without a song to compare with, a mix that's a little muddy is hard to catch. In our test, Aria found 1 of the 3 problems we planted. That's why you can add a reference song to compare against.",
 ];
@@ -176,7 +177,7 @@ const BADGES: LanyardMember[] = [
     bio: "Organized the team, ran planning and check-ins, kept the schedule.",
     tags: ["Planning", "Hand-offs"], links: [{ label: "LinkedIn", href: "https://www.linkedin.com/in/dylan-haman-735116266/" }, { label: "GitHub", href: "https://github.com/Hamqnn" }] },
   { id: "raghav", name: "Raghav Agarwal", role: "Machine learning", team: "Aria · Mix model", tone: 3, image: "/img/team/raghav.jpg",
-    bio: "Built the mix model: rated mixes, their measurements, the ordinal model.",
+    bio: "Built the mix model: rated mixes, their measurements, and the shape model that's in Aria.",
     tags: ["Mix model", "Audiobox"], links: [{ label: "LinkedIn", href: "https://www.linkedin.com/in/raghav-agarwal-csu/" }, { label: "GitHub", href: "https://github.com/RaghavAgarwal18" }] },
 ];
 
@@ -275,7 +276,7 @@ export default function App() {
       </Section>
 
       <Section id="meta" label="Meta AI" title="Built on Meta's AI." dim="Not a chat box on the side."
-               sub="Four of Meta's models: Muse Spark, Muse Voice Transcribe, Demucs and Audiobox Aesthetics. Muse never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it. You can undo any change it makes.">
+               sub="Four of Meta's models: Muse Spark, Muse Voice Transcribe and Demucs in Aria, and Audiobox Aesthetics in our mix model tests. Muse never touches Live directly: it answers with actions from a fixed menu, Aria checks each one, and only then applies it. You can undo any change it makes.">
         <div className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {META.map(([t, d, a, ic], i) => (
             <Rise key={t} delay={i * 0.06}><GlowCard accent={a} className="h-full">
