@@ -73,6 +73,24 @@ Meta's Audiobox Aesthetics model scores audio on Production Quality, Production 
 - Where to run it: `aesthetics.py` downloads the model from Hugging Face on first use, so it needs a machine that can reach it. It ran on Raghav's Windows laptop (about 20 minutes for 99 mixes, CPU only).
 - Proposal, not run: Audiobox may not separate finished masters at all, but could on unmastered work-in-progress mixes, which is what producers check in Aria. Testing that needs a few rated unmastered mixes.
 
+### Planned before running: shape-only good vs bad (written Nov 2, before running; Ian's request of Oct 31)
+
+Question: does the spectral shape of a mix, with loudness taken out, separate the good-rated mixes from the bad-rated ones, and in which direction? Ian's hypothesis: good mixes have a powerful deep low end and clean mids, and are otherwise balanced. Mid is left out: "the mids vs goods will be hard to tell, cuz it's purely a talent and time difference."
+
+- Data: good (30) and bad (33) from `data/curves.csv` (each mix's twelfth-octave curve, 31.5 Hz to 16 kHz, in dB against its own loudness, from its loudest 60 s). Song and producer groups come from `data/features.csv` (with the `data/song_groups.csv` fixes), matched by file name. Mid is scored only afterwards, as a sanity check: on average it should land between good and bad.
+- Three measurement sets, no more:
+  - **bands (8):** the curve averaged (mean of its dB points) inside the 8 bands of `detail.py`: sub 30-60, low 60-120, low mids 120-400, mids 400-1k, upper mids 1-2.5k, presence 2.5-5k, highs 5-10k, air 10-16k Hz.
+  - **hypothesis (5):** low-end power (mean of 30-120 Hz minus mean of 200 Hz-2 kHz); mid bumpiness (spread of the 200 Hz-2 kHz curve after subtracting its own smoothed version, a 1-octave moving average); low-mid build-up (mean of 200-500 Hz minus the mean of its neighbours, 100-200 Hz and 500 Hz-1 kHz); tilt (slope of a straight line through the whole curve, dB per octave); top-end spread (how far the curve strays from that line above 2 kHz, as an RMS in dB).
+  - **both (13):** the two together.
+- Models: logistic regression (L2, C = 0.3) is the model that would ship, because its weights are the direction. A small random forest (300 trees, at least 3 mixes per leaf) is reported as a check only, and is not part of the pick. Standardized inside each training fold only.
+- Testing: the same song and producer grouped 5-fold split, repeated 10 times (50 rounds). Loudness only (good vs bad, on the same splits) is reported as a reference, not a bar.
+- Pick-the-best step: the set where logistic regression scores best. The shuffle test (500 shuffles, full 10 repeats each) redoes that whole pick on shuffled good/bad labels.
+- **The bar for this question (Ian, Oct 31; written Nov 2). It applies to this good vs bad direction question only, not the old 3-tier score, whose 80% rule is unchanged:**
+  1. Balanced accuracy on held-out songs above chance (0.50), with shuffle p under 0.05.
+  2. Direction stable: a feature's weight has the same sign as in the model trained on all 63 mixes in at least 40 of the 50 rounds. Only stable features may ever be shown in the app.
+  3. Ian's hypothesis is checked, not assumed: good should have more low-end power, less mid bumpiness and less low-mid build-up than bad. Whatever the medians show is reported plainly.
+- Output: `experiments/shape.py` writes `results/shape-experiment.md`. Only if the bar is met, it also writes `data/shape-model.json` (feature definitions, scaler, weights, the good and bad medians, which features are stable) for the engine. If the bar isn't met, the app shows nothing from it.
+
 ## Timeline
 
 | Day | What |
