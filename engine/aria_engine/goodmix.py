@@ -129,11 +129,12 @@ def compare(audio, rate, bars=None, model=None):
         lo, hi = f["good_iqr"]
         off = (toward > 0 and v < lo) or (toward < 0 and v > hi)   # past the middle half of the good mixes, the far way
         hz = _hz(f)
+        strength = abs(f["weight"]) * abs(v - good) / f["scaler_scale"]   # how hard the model pulls on it here
         shown.append({"name": f["name"], "hz": list(hz) if hz else None, "value": round(v, 2), "good_median": good,
                       "bad_median": f["bad_median"], "good_range": [lo, hi], "toward": toward, "off": bool(off),
-                      "diff": round(v - good, 2)})
+                      "diff": round(v - good, 2), "strength": round(strength, 3)})
         if off and f["name"] in FIXABLE:
-            findings.append((abs(f["weight"]) * abs(v - good) / f["scaler_scale"], {
+            findings.append((strength, {
                 "kind": "good_mix", "feature": f["name"], "band": BAND_NAMES[f["name"]],
                 "hz": reference._nice(np.sqrt(hz[0] * hz[1])), "hz_range": list(hz),
                 "diff_db": round(v - good, 1), "good_median_db": round(good, 1), "toward": toward,

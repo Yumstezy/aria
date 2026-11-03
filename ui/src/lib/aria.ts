@@ -7,7 +7,7 @@ import { problemsOf as problemsOfResult } from "@/lib/problems";   // used only 
 
 export const ENGINE = "http://127.0.0.1:8765";
 
-export type Kind = "resonance" | "buildup" | "harsh" | "masking" | "bass_click" | "clash" | "reference";
+export type Kind = "resonance" | "buildup" | "harsh" | "masking" | "bass_click" | "clash" | "reference" | "good_mix";
 export interface Finding {
   kind: Kind;
   hz?: number;
@@ -28,6 +28,7 @@ export interface Finding {
   shape?: "stretch" | "band";   // reference: a stretch that stands out, or a whole band off
   band?: string;
   stands_out_db?: number;
+  feature?: string; good_median_db?: number; toward?: 1 | -1;   // good_mix: against the rated mixes
 }
 /** One part of a song (Arrangement, build step 8b). name comes from Muse Spark, or null with the letter shown. */
 export interface Part { name: string | null; label: string; start_bar: number; bars: number; start_sec: number; end_sec: number; energy_db: number; rise_db_per_bar: number; confidence: number }
@@ -51,9 +52,21 @@ export interface RefCompare {
 export interface EqFix { type: "eq_band"; freq_hz: number; gain_db: number; q: number }
 export interface Note { finding: number; kind: Kind; short: string | null; text: string; fix: EqFix | null }
 export interface Spectra { hz: number[]; mix: number[]; parts: Record<string, number[] | null> }
+/** One of the shape model's stable directions. toward 1: the good mixes have more of it. off: past their middle half the far way. */
+export interface GoodMixFeature { name: string; hz: [number, number] | null; value: number; good_median: number; bad_median: number;
+  good_range: [number, number]; toward: 1 | -1; off: boolean; diff: number; strength: number }
+export interface GoodMixes { lean: number | null; lean_word: "closer" | "between" | "further" | null; mixes?: { good: number; bad: number };
+  heldout_accuracy?: number; loudness_only_accuracy?: number; features: GoodMixFeature[]; error: string | null }
+/** A problem the fix should raise, not lower: less of something than the good mixes have */
+export const wantsMore = (f: Finding | undefined) => !!f && f.kind === "good_mix" && (f.diff_db ?? 0) < 0;
+export const heardFixed = (f: Finding | undefined, change: number | null) =>
+  change !== null && (wantsMore(f) ? change >= -FIXED_DB : change <= FIXED_DB);
+
 export interface Result {
   recording: { path: string; start_beat: number | null; tempo: number | null; bars: number | null };
   reference?: RefCompare | null;
+  /** Where the shape model puts the mix against the rated mixes (Nov 2, contracts "Against the rated mixes") */
+  good_mixes?: GoodMixes | null;
   measured: {
     integrated_lufs: number | null; true_peak_dbtp: number | null;
     bands_db: Record<string, number | null>; width: Record<string, number | null>;
@@ -624,7 +637,7 @@ function fixesAfter(log: Exchange[], newest: Exchange | null): Record<string, Fi
   return fixes;
 }
 
-// Check again measured each problem's range: 3 dB or more lower is fixed, otherwise it's back in To fix
+// Check again measured each problem's range: 3 dB or more lower is fixed (higher, for less than the good mixes), otherwise it's back in To fix
 function fixesHeard(b: BeforeAfter): Record<string, FixState> {
   const fixes = { ...state.fixes }, r = state.result;
   if (!r) return fixes;
@@ -633,7 +646,7 @@ function fixesHeard(b: BeforeAfter): Record<string, FixState> {
     const p = f && problemsOfResult(r).find((x) => x.findings.includes(f));
     const key = p && problemKey(p);
     if (!key || !fixes[key]) continue;
-    fixes[key] = { ...fixes[key], state: c.change_db !== null && c.change_db <= FIXED_DB ? "fixed" : "still", change_db: c.change_db };
+    fixes[key] = { ...fixes[key], state: heardFixed(f, c.change_db) ? "fixed" : "still", change_db: c.change_db };
   }
   return fixes;
 }
@@ -687,7 +700,7 @@ export function showResult(r: Result | null) { set({ result: r && known(r), prog
 
 // A result saved before a kind of problem was taken out (Oct 30: "typical", the good-mixes comparison) would break
 // the screen: drop findings of kinds this screen doesn't know, and Muse's notes on them, keeping the notes' indexes right.
-const KNOWN: Kind[] = ["resonance", "buildup", "harsh", "masking", "bass_click", "clash", "reference"];
+const KNOWN: Kind[] = ["resonance", "buildup", "harsh", "masking", "bass_click", "clash", "reference", "good_mix"];
 function known(r: Result): Result {
   const fs = r.clarity?.findings ?? [];
   if (fs.every((f) => KNOWN.includes(f.kind))) return r;
@@ -747,6 +760,13 @@ export function describe(f: Finding): { name: string; where: string; size: strin
     return { name: `${band} ${more ? "fuller" : "thinner"} than your reference`,
       where, size: `${more ? "+" : "−"}${Math.abs(f.diff_db!).toFixed(1)} dB`,
       about: `${where} is ${Math.abs(f.diff_db!).toFixed(1)} dB ${more ? "louder" : "quieter"} than in your reference, at the same loudness.` };
+  }
+  if (f.kind === "good_mix") {
+    const more = (f.diff_db ?? 0) > 0, by = Math.abs(f.diff_db!).toFixed(1);
+    const name = f.feature === "lowmid_buildup_db" ? `${more ? "More" : "Less"} low-mid build-up than the good mixes`
+      : `${more ? "More" : "Less"} ${f.band!.toLowerCase()} than the good mixes`;
+    return { name, where: hzRange(f.hz_range), size: `${more ? "+" : "−"}${by} dB`,
+      about: `${hzRange(f.hz_range)} sits ${by} dB ${more ? "above" : "below"} the middle of the mixes our testers rated good.` };
   }
   if (f.kind === "bass_click") {
     return { name: "Bass click", where: "Note starts", size: `+${Math.round(f.size_db!)} dB`,

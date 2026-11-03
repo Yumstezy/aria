@@ -409,3 +409,11 @@ def test_a_level_past_the_ceiling_goes_to_the_ceiling():
     out = ask.interpret(msg("Vocal to +10.", call("track_volume", track="VOCAL", to_db=10)), context, "raise the vocal to +10")
     assert out["actions"] == [{"type": "track_volume", "args": {"track": "VOCAL", "to_db": 6.0}}]
     assert out["reply"] is None and "not +10" in out["problems"][0]
+
+
+def test_a_good_mix_lift_is_fixed_by_more_not_less():
+    from aria_engine.ask import heard_fixed
+    findings = [{"kind": "good_mix", "diff_db": -6.7}, {"kind": "good_mix", "diff_db": 3.4}, {"kind": "resonance"}]
+    assert heard_fixed(findings, {"index": 0, "change_db": 3.1}) and not heard_fixed(findings, {"index": 0, "change_db": -3.5})
+    assert heard_fixed(findings, {"index": 1, "change_db": -3.0}) and not heard_fixed(findings, {"index": 1, "change_db": 3.0})
+    assert heard_fixed(findings, {"index": 2, "change_db": -4.0}) and not heard_fixed(findings, {"index": 2, "change_db": None})

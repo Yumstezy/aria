@@ -17,11 +17,11 @@ import { ProblemThumb } from "@/components/problem-thumb";
 import { GrooveScreen } from "./Groove";
 import { KINDS, KindMark, findingIcon, rangeOf } from "@/components/problem-mark";
 import { AnalyzerIcon, ArrangementIcon, BackIcon, BuriedIcon, ClashIcon, ChatIcon, CheckIcon, ClickIcon, CloseIcon, DockLeftIcon, DockRightIcon, EarIcon, ExpandIcon, GrooveIcon, LayoutIcon, MinimizeIcon, HarshIcon, HomeIcon, MicIcon, MixIcon, MoonIcon, MudIcon,
-         ReferenceIcon, RingIcon, SunIcon, SwapIcon } from "@/components/icons";
+         ReferenceIcon, RingIcon, SunIcon, SwapIcon, GoodMixIcon } from "@/components/icons";
 import { BANDS, bandsWith, barsOf, problemsOf, statusWord, type Problem } from "@/lib/problems";
-import { FIXED_DB, fixAgain, problemKey, send, undoLast, type Exchange, type FixState } from "@/lib/aria";
+import { fixAgain, heardFixed, problemKey, send, undoLast, wantsMore, type Exchange, type FixState, type GoodMixes, type GoodMixFeature } from "@/lib/aria";
 import { onScope } from "@/lib/aria";
-import { ANALYZER_HZ, askMuse, addArrangementMarkers, barsLabel, checkMix, clearReference, editArrangement, hearSong, onAnalyzer, recheck, stopHearing, closeChat, closeWindow, fixIt, hz, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
+import { ANALYZER_HZ, askMuse, addArrangementMarkers, barsLabel, checkMix, clearReference, editArrangement, hearSong, onAnalyzer, recheck, stopHearing, closeChat, closeWindow, fixIt, hz, hzRange, jumpTo, shortName, lastDock, listenTracks, minimize, notice, openChat, referenceOf, restore, setAskOpen, setReferenceFile, setTheme, setWindowMode, stopListening,
          partColor, partNames, soundName, useAria, useAriaSel, useViewport, type Kind, type Part, type RefCompare, type Result, type SongParts } from "@/lib/aria";
 import { cn } from "@/lib/utils";
 
@@ -653,7 +653,7 @@ const colorOf = (p: Problem) => rangeOf(...spanOf(p)).color;
 const MarkOf = ({ p, size }: { p: Problem; size?: number }) => <KindMark icon={iconFor(p)} color={colorOf(p)} size={size} title={`${p.name}, ${rangeOf(...spanOf(p)).name}`} />;
 /** Louder than the reference is gold (yours is fuller), quieter is blue (theirs is) */
 const refColor = (p: Problem) => ((p.findings[0].diff_db ?? 0) > 0 ? YOURS : THEIRS);
-const compared = (p: Problem) => p.findings[0].kind === "reference";
+const compared = (p: Problem) => p.findings[0].kind === "reference" || p.findings[0].kind === "good_mix";
 const iconFor = (p: Problem) => findingIcon(p.findings[0]);
 
 /** Before the first check: the Simple view's layout greyed out. Its shapes say what will appear; no sentences. */
@@ -716,15 +716,16 @@ function BeforeAfterCard({ r, narrow }: { r: Result; narrow: boolean }) {
               {ba.problems.filter((c) => list.some((x) => x.findings.some((f) => r.clarity.findings.indexOf(f) === c.index))).map((c) => {
                 const p = list.findIndex((x) => x.findings.some((f) => r.clarity.findings.indexOf(f) === c.index));
                 const name = p >= 0 ? list[p].name : `Problem ${c.index + 1}`;
-                const down = (c.change_db ?? 0) < -0.4, up = (c.change_db ?? 0) > 0.4;
+                const down = (c.change_db ?? 0) < -0.4, up = (c.change_db ?? 0) > 0.4, f = r.clarity.findings[c.index];
+                const better = wantsMore(f) ? up : down, worse = wantsMore(f) ? down : up;   // less sub than the good mixes: up is the fix
                 return (
                   <div key={c.index} className="flex items-center gap-2.5 text-[13px]">
                     {p >= 0 && <MarkOf p={list[p]} size={22} />}
                     <span className="truncate text-ink">{name}</span>
-                    <span className="ae-mono ml-auto" style={{ color: down ? "var(--good)" : up ? "var(--hot)" : undefined }}>
+                    <span className="ae-mono ml-auto" style={{ color: better ? "var(--good)" : worse ? "var(--hot)" : undefined }}>
                       {c.change_db === null ? "not measured" : `${fmtDb(c.change_db)} ${down ? "less" : up ? "more" : "same"}`}</span>
                     {/* What to do next (Ian, Oct 30: "there's no fix prompts"): fixed, try again stronger, or fix it */}
-                    {p >= 0 && (c.change_db !== null && c.change_db <= FIXED_DB
+                    {p >= 0 && (heardFixed(f, c.change_db)
                       ? <span className="w-[92px] text-right text-[12.5px]" style={{ color: "var(--good)" }}>Fixed</span>
                       : fixes[problemKey(list[p])]
                         ? <button className="cp-btn cp-btn-sm w-[92px] justify-center" onClick={() => fixAgainWithMuse(list[p], c.change_db)}>Fix it again</button>
@@ -1125,6 +1126,8 @@ const Simple = memo(function Simple({ r, open, setOpen, narrow }: { r: Result; o
         )}
       </div>
 
+      {r.good_mixes && !r.reference && <Rise i={3}><GoodMixCard g={r.good_mixes} narrow={narrow} /></Rise>}
+
       {r.reference && !r.reference.error && r.reference.curve && (
         <Rise i={3}>
           <section className="cp-tile cp-card" style={{ gap: 10 }}>
@@ -1295,8 +1298,9 @@ const Detailed = memo(function Detailed({ r, narrow }: { r: Result; narrow: bool
           {stems.map(([k, v], i) => <Meter key={k} label={soundName(k)} value={f1(v)} unit="dB" lo={-30} hi={0} mark={-20} color={partColor(k, i)} dot={partColor(k, i)} />)}
         </section>
       )}
+      {r.good_mixes && <div className={span(narrow, 12)}><GoodMixCard g={r.good_mixes} narrow={narrow} all /></div>}
       <section className={cn("cp-tile cp-card", span(narrow, stems.length ? 12 : 6))} style={{ gap: 0, paddingTop: 12, paddingBottom: 6 }}>
-        <span className="cp-cap pb-1" title="Found by Aria's measurement rules (version 1). The mix model we're training on rated mixes joins in once it beats its baselines.">Everything Muse Spark said</span>
+        <span className="cp-cap pb-1" title="Found by Aria's measurement rules and, without a reference, its mix model trained on rated mixes.">Everything Muse Spark said</span>
         {r.advice ? r.advice.notes.map((note, i) => (
           <div key={i} className="grid items-start gap-3 border-t border-hairline py-2.5 first-of-type:border-t-0" style={{ gridTemplateColumns: "26px minmax(0, 1fr)" }}>
             {(() => { const f = r.clarity.findings[note.finding]; return f ? <KindMark icon={findingIcon(f)} color={rangeOf(f.hz_range[0], f.hz_range[1]).color} /> : <span className="ae-pin">{i + 1}</span>; })()}
@@ -1307,6 +1311,77 @@ const Detailed = memo(function Detailed({ r, narrow }: { r: Result; narrow: bool
     </div>
   );
 });
+
+// ---------- Against the rated mixes (Nov 2): the shape model's lean and its directions ----------
+
+/** Each of the model's directions, by name: what it is, and the move toward the good mixes */
+const GOOD_FEATURES: Record<string, { label: string; more: string; less: string; unit?: string }> = {
+  band_sub_db: { label: "Sub", more: "More sub", less: "Less sub" },
+  band_mid_db: { label: "Mids", more: "More mids", less: "Less mids" },
+  band_himid_db: { label: "Upper mids", more: "More upper mids", less: "Less upper mids" },
+  band_presence_db: { label: "Presence", more: "More presence", less: "Less presence" },
+  band_brilliance_db: { label: "Highs", more: "More highs", less: "Less highs" },
+  band_air_db: { label: "Air", more: "More air", less: "Less air" },
+  low_power_db: { label: "Low end", more: "Stronger low end", less: "Lighter low end" },
+  mid_bumpiness_db: { label: "Mid bumps", more: "Bumpier mids", less: "Smoother mids" },
+  lowmid_buildup_db: { label: "Low-mid build-up", more: "More build-up", less: "Less build-up" },
+  tilt_db_per_oct: { label: "Lows to highs", more: "Brighter overall", less: "Darker overall", unit: "dB/oct" },
+  top_spread_db: { label: "Top-end bumps", more: "Bumpier top end", less: "Smoother top end" },
+};
+const LEAN_WORDS = { closer: "Closer to the good mixes", between: "Between the good and the weaker mixes", further: "Further from the good mixes" };
+
+/** One direction: the grey bar is where the middle half of the good mixes sit, the tick their middle, the dot yours
+    (gold when it's past them the far way). Each row has its own scale, wide enough for the dot. */
+function GoodMixRow({ f, narrow }: { f: GoodMixFeature; narrow: boolean }) {
+  const w = GOOD_FEATURES[f.name] ?? { label: f.name, more: "More", less: "Less" };
+  const [lo, hi] = f.good_range, spanOf = Math.max(Math.abs(f.diff) * 1.2, (hi - lo) * 2);
+  const x = (v: number) => `${((Math.max(-spanOf, Math.min(spanOf, v - f.good_median)) + spanOf) / (2 * spanOf)) * 100}%`;
+  const unit = w.unit ?? "dB", color = f.off ? YOURS : "var(--ink)";
+  return (
+    <div className="grid items-center gap-3" style={{ gridTemplateColumns: `${narrow ? "6rem" : "8.5rem"} minmax(0, 1fr) ${narrow ? "7.25rem" : "8rem"}` }}
+         title={`${w.label}${f.hz ? `, ${hzRange(f.hz)}` : ""}: yours ${f.value} ${unit}, the good mixes' middle half ${lo} to ${hi} ${unit}`}>
+      <span className="truncate text-[13px] text-ink-muted">{w.label}</span>
+      <span className="relative h-4">
+        <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-hairline" />
+        <span className="absolute top-1/2 h-2 -translate-y-1/2 rounded-full" style={{ left: x(lo), right: `calc(100% - ${x(hi)})`, background: "var(--track)" }} />
+        <span className="absolute top-0 h-4 w-px bg-ink-faint" style={{ left: x(f.good_median) }} />
+        <span className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: x(f.value), background: color, boxShadow: "0 0 0 2px var(--card)" }} />
+      </span>
+      <span className="truncate text-right text-[12.5px]" style={{ color: f.off ? color : "var(--ink-faint)" }}>
+        {f.off ? (f.toward > 0 ? w.more : w.less) : "With them"}</span>
+    </div>
+  );
+}
+
+/** Where the shape model puts the mix (Nov 2): a lean from further to closer, never a score, then the directions.
+    Simple shows the few that are off the most; Detailed shows every one. */
+function GoodMixCard({ g, narrow, all }: { g: GoodMixes; narrow: boolean; all?: boolean }) {
+  const rows = all ? g.features : [...g.features].filter((f) => f.off).sort((a, b) => b.strength - a.strength).slice(0, 3);   // the model's strongest pulls
+  const n = g.mixes ? g.mixes.good + g.mixes.bad : null;
+  return (
+    <section className="cp-tile cp-card" style={{ gap: 12 }}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="cp-cap inline-flex items-center gap-1.5"><GoodMixIcon style={{ width: 14, height: 14 }} />Against the rated mixes</span>
+        {n && <span className="ml-auto font-mono text-[11px] text-ink-faint"
+                    title={`Aria's mix model looks at the EQ shape only, with loudness taken out. On songs it hadn't heard, it told good from weaker mixes ${Math.round((g.heldout_accuracy ?? 0) * 100)}% of the time.`}>
+          model from {n} mixes our testers rated</span>}
+      </div>
+      {g.lean === null || g.lean_word === null ? <p className="cp-meta m-0">{g.error ?? "Not compared."}</p> : (
+        <>
+          <div className="grid gap-2">
+            <span style={{ fontSize: narrow ? 17 : 20, lineHeight: "26px", fontWeight: 500, letterSpacing: "-.01em" }}>{LEAN_WORDS[g.lean_word]}</span>
+            <span className="relative h-2.5 rounded-full" style={{ background: `linear-gradient(90deg, var(--well), color-mix(in srgb, var(--good) 45%, var(--well)))` }}>
+              <span className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink" style={{ left: `${Math.min(97, Math.max(3, g.lean * 100))}%`, boxShadow: "0 0 0 2px var(--card)" }} />
+            </span>
+            <span className="flex justify-between text-[11.5px] text-ink-faint"><span>Further</span><span>Closer</span></span>
+          </div>
+          {rows.length ? <div className="grid gap-2.5">{rows.map((f) => <GoodMixRow key={f.name} f={f} narrow={narrow} />)}</div>
+            : <p className="cp-meta m-0">Every direction the model checks sits with the good mixes.</p>}
+        </>
+      )}
+    </section>
+  );
+}
 
 /** Minimized: a small tab on the docked edge. Tap it to bring the window back as it was. */
 function MinTab() {

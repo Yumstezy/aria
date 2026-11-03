@@ -97,12 +97,13 @@ Every Mix check result has `good_mixes`, where the shape model (`ml/experiments/
   "mixes": {"good": 30, "bad": 33}, "heldout_accuracy": 0.749, "loudness_only_accuracy": 0.723,
   "features": [                 // only the model's stable directions (show = true in the model file), in its order
     {"name": "band_sub_db", "hz": [30, 60], "value": -24.51, "good_median": -17.778, "bad_median": -21.063,
-     "good_range": [-20.119, -16.468], "toward": 1, "off": true, "diff": -6.73}
+     "good_range": [-20.119, -16.468], "toward": 1, "off": true, "diff": -6.73, "strength": 0.755}
   ],
   "error": null                 // with a reason, and lean null and no features: too short (under 4 s), silent, model missing
 }
 ```
 
+- `strength`: how hard the model pulls on this measurement for this mix (its weight times the standardized distance from the good mixes' middle). Simple view shows the 3 strongest `off` ones; the `good_mix` findings are ranked the same way.
 - `toward`: 1 when the good mixes have more of it, -1 when less. `off`: this mix is past the good mixes' middle half (`good_range`), the far way. `hz` is null for the measurements that aren't one range (bumpiness, tilt, top-end spread, low end against the mids).
 - Units are dB against the mix's loudness, except `tilt_db_per_oct` (dB per octave).
 - The `off` measurements an EQ move can change (the bands, and the low-mid build-up) join `clarity.findings` as `good_mix` findings, at most 2, after the clarity rules' findings, only without a reference: `{"kind": "good_mix", "feature", "band", "hz", "hz_range", "diff_db", "good_median_db", "toward", "bars"}`. `diff_db` is this mix minus the good mixes' middle. Positive (more than them): Muse may fix it with an EQ cut, like a reference finding. Negative: lift it on the track that carries it (Ask, Fix all), never a fader.

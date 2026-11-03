@@ -1022,6 +1022,15 @@ stage "report": call no tools. In two short sentences, tell the producer how it 
 which didn't move enough, using only the numbers in context.results. If some didn't, say Fix all again tries more."""
 
 
+def heard_fixed(findings, result):
+    """FIXED_DB or more lower in its range. A good_mix finding with less there than the good mixes is fixed by more."""
+    change, i = result.get("change_db"), result.get("index")
+    if change is None:
+        return False
+    f = findings[i] if isinstance(i, int) and 0 <= i < len(findings) else {}
+    return change >= -FIXED_DB if f.get("kind") == "good_mix" and f.get("diff_db", 0) < 0 else change <= FIXED_DB
+
+
 def fix_round(stage, context, results=None, client=None):
     """One round of Fix my whole mix. Returns {reply, actions, problems, error}."""
     if stage not in FIX_STAGES:
@@ -1030,7 +1039,7 @@ def fix_round(stage, context, results=None, client=None):
     if not context.get("findings"):
         return {"reply": None, "actions": [], "problems": [], "error": "Run a Mix check first, so Aria knows what to fix."}
     if results is not None:
-        context["results"] = [{**r, "fixed": r.get("change_db") is not None and r["change_db"] <= FIXED_DB} for r in results]
+        context["results"] = [{**r, "fixed": heard_fixed(context["findings"], r)} for r in results]
     client = _client(client)
     if client is None:
         return {"reply": None, "actions": [], "problems": [], "error": "No Muse Spark key. Add MODEL_API_KEY to engine/.env and restart the engine."}
