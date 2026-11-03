@@ -4,13 +4,21 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 3, about 1 AM: maintenance pass, and v0.2.2 is the download.** Ian asked for a full check and the download updated before bed.
+- Checked: 193 engine tests; the UI and both sites type-check and build (`ui/dist` matched its source); the engine as installed (health, a foreign Origin gets 403, a real check of the rough mix in 22 s); 3 real Fix all rounds on the model's problems (each cut the highs 3 dB and lifted the sub 3 dB on BASS or KICK, no faders); a 5-track key tracks result is 10.9 KB of the 30 KB the web view takes; the strip shows "2 to fix"; no key in tracked files or recent history; Ian's installed devices match the repo.
+- An independent review of the model commits confirmed the measurements match `ml/` exactly on all test-pack files, and found issues, fixed in 898114f: Muse could slip a made-up score past the validator ("scores 4 out of 10", "bottom 33 percent of the rated mixes"), now blocked; a small model problem could never count as Fixed (now: half its gap, at most 3 dB, in the engine, the window and the chat); mono read 3 dB off; "than most" in Muse's summary implied a rank. 3 real checks after the fix kept Muse's summary and both notes.
+- Known limit, said on screen ("These bars against the rated mixes"): the model was trained on the loudest 60 s of whole songs and hears only the checked bars, so an intro or a break leans further. Every test-pack mix, Ian's finished mix too, lands further or between.
+- v0.2.2 published from 898114f: https://github.com/Yumstezy/aria/releases/tag/v0.2.2. Test-installed into a scratch home (devices, 26 racks, helper, engine answers; with no key it shows the measurements and says advice needs the key). The latest-download link serves it byte for byte.
+- Pushed. The judges' site redeployed and shows the model. **The product site didn't**: it deploys with the Vercel CLI, not on push, and that deploy needs Ian's go-ahead. Run `cd site && vercel --prod`.
+- Still to do in Live (Ian): the check list in the entry below, and the bridge fixes from Nov 2 (a280571), which are now in the download.
+
 **Nov 2 to 3, night: the shape model is in Aria.** Ian: use our model with Muse Spark, show where the mix lands, run fixes as normal, add a rating, and put it on the README and websites.
 - Engine (922a30c): `goodmix.py` measures the check the way the rated mixes were measured and runs `ml/data/shape-model.json` (copied into the engine, a test keeps them equal). `/mix/analyze` returns `good_mixes`: the lean ("closer", "between", "further") and the 11 stable directions. The off ones an EQ can move join the problems as `good_mix` findings (at most 2, no reference only), so Muse's notes, Fix it and Fix all handle them. Muse gets the words, not the number.
 - Real run on test-pack Rough mix.wav, Muse Spark, 3 times: "Further from the good mixes than most", highs +3.4 dB (a 3 dB cut at 7.1 kHz offered as the fix), sub -6.7 dB (lift it on the kick or bass). The finished mix leans closer than the rough one (0.24 against 0.06), still "further".
 - Window (f4079e7): "Against the rated mixes" card, a dot from Further to Closer plus the 3 strongest directions (Simple) or all 11 (Detailed). The rating is that lean, never a score out of 100: the model is right 75% of the time, and loudness alone gets 72%. A problem with less than the good mixes counts as Fixed when its range comes back 3 dB higher. Checked in a browser on the real result: Simple and Detailed, dark and light, 1280 and 600 px.
 - README, judges' site and product site: the mix model section, Muse Spark explaining it, what didn't work (it can't grade a mix). Audiobox corrected to "tested", since the model in Aria uses EQ shape only. The product site's "Mix score, in development" card is gone.
 - 191 engine tests pass.
-- **Not pushed yet**, so the websites don't announce it before the download has it. Next: Ian's check in Live (below), then push, publish v0.2.2 (with the bridge fixes still waiting), and the sites deploy.
+- Pushed and released as v0.2.2 later the same night (entry above).
 - Manual check in Live for Ian:
   1. Quit and reopen Live, so the engine restarts with the new code (or run `engine/run.sh` again).
   2. Remove Aria from Main and add it again. Play the drop and press Check.
