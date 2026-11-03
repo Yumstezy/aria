@@ -23,6 +23,7 @@ You're building the part of Aria that can say how finished an EDM mix sounds, ev
 | `muse_rater.py` | Muse Spark as a second rater, on the same split |
 | `aesthetics.py` | Meta's Audiobox Aesthetics scores (production quality, complexity, enjoyment, usefulness) for each mix. Writes `data/aesthetics.csv` |
 | `curves.py` | Each mix's EQ curve (twelfth octaves, loudness taken out) for the app's "typical good mix" chart. Writes `data/curves.csv`, numbers only |
+| `curves_multi.py` | Each mix's six loudest 20-second stretches, measured like `curves.py`. Writes `data/curves_multi.csv` |
 | `experiments/` | Side experiments. Never the official result |
 | `data/features.csv` | The measurements (about 2 KB per mix). No audio |
 | `data/song_groups.csv` | Fixes for file names the grouping rule gets wrong, each with a reason |
@@ -122,6 +123,21 @@ Question: does adding six stereo and clarity measurements we already have to the
 - Output: `experiments/shape_plus.py` writes `results/shape-plus-experiment.md`. It never overwrites `data/shape-model.json`.
 
 **Result (run Nov 2, as planned; `results/shape-plus-experiment.md`): it does not pass.** The 19 score 0.72 against the 13's 0.74 on the same splits (scikit-learn 1.6.1), beat them in only 9 of 50 rounds, shuffle p = 0.343. No 0.80. The four stereo measurements have stable directions (good mixes: narrower mids, slightly wider highs, more mono-safe) but add nothing the shape doesn't already carry, so nothing from this run goes in the app. The app keeps the 13-measurement shape model.
+
+### More of each song, plus Audiobox (Nov 3, planned before running; Raghav)
+
+Ian asked whether good vs bad could reach 0.80. The shape model sits at 0.75 and every model we'd tried landed around there, so this looked at the data instead of the model: measure more of each song, and let the mid mixes help with training. The eight options were written down before running, then tested in a way that can't flatter itself: in each round only the training songs choose the option, and the choice is scored on songs it has never heard (nested cross-validation).
+
+- **More of each song:** `curves_multi.py` measures each mix's six loudest 20-second stretches (usually the drops), the same way as `curves.py`. It writes `data/curves_multi.csv`, numbers only.
+- **The options:** the current shape model; shape averaged over the six clips; every clip as its own example; each of those with the mid mixes added as halfway examples; and the averaged clips plus loudness, with and without Meta's Audiobox Aesthetics scores.
+- Script: `experiments/search80b.py`. Report: `results/search80b-experiment.md`.
+
+What we found:
+
+- **The strongest option was the six-clip shape plus loudness and Meta's Audiobox scores: 0.77 on its own**, and the search picked it more than any other (26 of 50 rounds).
+- **Counting the whole search honestly, the held-out score is 0.75** (chance 0.50, shuffle p = 0.010). The 0.77 is the best of eight tries, so it's a little optimistic.
+- More clips on their own barely moved it (0.74), and the mid mixes made it slightly worse, since they blur the line between good and bad. An earlier try the same night, adding loudness and Audiobox to the single-clip shape, landed at 0.73.
+- **No option clears 0.80 yet.** With 63 good and bad mixes, a score moves about 0.05 either way depending on which songs end up in the test, so 0.75 and 0.80 can't really be told apart on this data. More rated mixes is what would settle it. The app keeps the shape model for now, and the Audiobox combination is the strongest candidate once there's more data.
 
 ## Timeline
 
@@ -251,6 +267,7 @@ Ideas that came after seeing the official results. Each has its own script in `e
 | Experiment | Question | Result |
 |---|---|---|
 | `experiments/shape.py` (planned before running) | Does the shape of the EQ curve, loudness taken out, separate good from bad, and which way? | Yes: 0.75 (chance 0.50), shuffle p = 0.002, 11 stable directions. Good mixes: more sub and air, smoother mids, less low-mid build-up. Loudness alone 0.72. See `results/shape-experiment.md`. |
+| `experiments/search80b.py` (planned before running) | Can more of each song, the mid mixes, loudness or Audiobox get good vs bad to 0.80? | Not yet. Best option (six clips + loudness + Audiobox) 0.77; the whole search, counted honestly, 0.75 (shuffle p = 0.010). See `results/search80b-experiment.md`. |
 | `experiments/audiobox.py` (planned before running) | Do Meta's Audiobox Aesthetics scores tell the tiers apart better than loudness? | No. Best 0.51 (Audiobox plus tone and stereo) vs loudness 0.46, beats loudness in 52% of rounds (bar 80%), shuffle p = 0.010. Audiobox scores are almost the same in every tier. See `results/aesthetics-experiment.md`. |
 | `experiments/no_loudness.py` | Can the model tell the tiers apart without loudness? | Yes, better than chance: tone and stereo alone score about 0.49 (chance 0.33), shuffle test p = 0.01. Not better than loudness alone (0.45) by enough to ship. Good mixes have more sub-bass and narrower mids. See `results/no-loudness-experiment.md`. |
 
