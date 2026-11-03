@@ -294,3 +294,4 @@ docs/        build steps, contracts, the rubric, status
 - **No commercial music** anywhere in the repo or the video. The 99 rated mixes were given to us or released for free for us to use; only their measurements are in the repo, never the audio. The sample song is Ian's own.
 - **Fonts:** the system font on Mac, and Geist, bundled under the OFL.
 - **Audiobox Aesthetics:** CC-BY 4.0, used in the mix model experiments (`ml/`).
+- **4Times4** Ending Music Credits, ('https://soundcloud.com/4times4-music').
