@@ -28,7 +28,7 @@ Every window screen shares a side rail:
 - Six status cards (Treble, Bass, Chorus lift, Mids, Loudness, Width). Each has an icon, a status word, one line and You vs Pro bars.
 - "Where it happens": the song's sections, with the problem sections outlined. Clicking a section jumps the playhead.
 
-- As built, Nov 2: without a reference, "Against the rated mixes" sits under the top cards. A lean from Further to Closer (a dot, never a number), "Further from the good mixes" in words, and the model's 3 strongest directions as rows ("More sub", "Less highs"), each against the good mixes' middle half. The model's fixable directions are also problems in To fix.
+- As built, Nov 2, reworded Nov 3 (Ian): without a reference, "Compared with good mixes" sits under the top cards. A lean from Far to Close (a dot, never a number), "Far from good mixes" in words, then "To get closer:" and the model's 3 strongest directions as rows ("More sub", "Less highs"): a white dot for the mix, green where the middle half of good mixes sit. Problem names read like reference ones: "Highs fuller than good mixes". The model's fixable directions are also problems in To fix.
 
 ## 04 Mix check, Detailed
 
@@ -38,7 +38,7 @@ The full charts against the reference:
 - stereo width
 - energy across the song
 
-As built, Nov 2: "Against the rated mixes" shows all 11 of the model's directions, with or without a reference.
+As built, Nov 2: "Compared with good mixes" shows all 11 of the model's directions, with or without a reference.
 
 Simple and Detailed sit on a segmented toggle in the header.
 

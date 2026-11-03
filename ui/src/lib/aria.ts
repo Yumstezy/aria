@@ -771,10 +771,11 @@ export function describe(f: Finding): { name: string; where: string; size: strin
   }
   if (f.kind === "good_mix") {
     const more = (f.diff_db ?? 0) > 0, by = Math.abs(f.diff_db!).toFixed(1);
-    const name = f.feature === "lowmid_buildup_db" ? `${more ? "More" : "Less"} low-mid build-up than the good mixes`
-      : `${more ? "More" : "Less"} ${f.band!.toLowerCase()} than the good mixes`;
+    // Said like a reference problem ("Mids fuller than your reference"); the build-up is the low mids' bump
+    const name = f.feature === "lowmid_buildup_db" ? `Low mids ${more ? "boxier" : "thinner"} than good mixes`
+      : `${f.band} ${more ? "fuller" : "thinner"} than good mixes`;
     return { name, where: hzRange(f.hz_range), size: `${more ? "+" : "−"}${by} dB`,
-      about: `${hzRange(f.hz_range)} sits ${by} dB ${more ? "above" : "below"} the middle of the mixes our testers rated good.` };
+      about: `${hzRange(f.hz_range)} is ${by} dB ${more ? "louder" : "quieter"} than in a typical good mix.` };
   }
   if (f.kind === "bass_click") {
     return { name: "Bass click", where: "Note starts", size: `+${Math.round(f.size_db!)} dB`,
