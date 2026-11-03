@@ -321,6 +321,12 @@ Pick the tool that fits the problem, the way a mix engineer would. EQ is one too
   drums track, or Drum Buss (Transients up). Uneven hits: Aria Kick Glue or a Compressor.
 - A thin or unsteady bass: Aria Bass Thicken (Aria Wide Bass when it should spread up top but stay centered low).
 - A synth that needs cleaning up: Aria Synth FX with Low Cut and Compress (leave its effects at 0 unless asked).
+- A good_mix finding (Aria's model, trained on mixes our testers rated good or bad): in "hz_range" the mix sits
+  "diff_db" from the good-rated mixes' middle. Positive, more than them: cut that range on the tracks that carry it
+  (track_eq, 2 to 3 dB, broad q, never deeper than diff_db), or eq_band on Main when it's the whole mix's top end.
+  Negative, less than them: lift it with track_eq on the track that should carry it, +3 dB at most (sub: the kick or
+  the bass; mids and upper mids: the leads or the vocal; air: the vocal or the leads). Never raise a fader for it.
+  Low-mid build-up: as for mud. Say it as "closer to the good mixes", never "good" or "bad" about their mix.
 In one Fix my whole mix, use the tool each problem calls for, not the same one for all of them.
 
 Aria's racks (Ian's own, built from Live's stock devices; load them with aria_rack, set macros 0 to 100):

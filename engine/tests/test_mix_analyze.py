@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import pytest
 from fastapi.testclient import TestClient
 
 import numpy as np
@@ -101,7 +104,7 @@ def test_a_reference_window_compares_with_just_that_part(tmp_path, monkeypatch):
 
 
 def test_without_a_reference_nothing_is_compared(tmp_path, monkeypatch):
-    """Ian, Oct 30: the "good mixes" comparison is out. With no reference song, only the clarity rules speak."""
+    """With no reference song, no song is compared (the rated mixes are their own block, good_mixes, since Nov 2)."""
     monkeypatch.setenv("MODEL_API_KEY", "")
     path = write(tmp_path / "mix.wav", sine(3000, 0.5), sine(3000, 0.5))
     body = client.post("/mix/analyze", json={"mix_path": path}).json()
@@ -141,3 +144,30 @@ def test_a_noise_floor_has_no_clashes(tmp_path, monkeypatch):
     path = write(tmp_path / "hiss.wav", noise, noise)
     body = client.post("/mix/analyze", json={"mix_path": path, "tempo": 120.0}).json()
     assert body["clarity"]["findings"] == [] and "under -50 dB" in body["clarity"]["quiet"]
+
+
+SAMPLE = Path(__file__).resolve().parents[2] / "test-pack" / "sample" / "Rough mix.wav"
+
+
+@pytest.mark.skipif(not SAMPLE.exists(), reason="test-pack audio is local only")
+def test_a_real_mix_lands_against_the_rated_mixes_and_its_directions_join_the_problems(monkeypatch):
+    seen = {}
+
+    def fake_advise(measured, context, findings=None, good_mixes=None):
+        seen.update(findings=findings, good_mixes=good_mixes)
+        return {"summary": "ok", "notes": []}, None
+
+    monkeypatch.setattr(muse, "advise", fake_advise)
+    body = client.post("/mix/analyze", json={"mix_path": str(SAMPLE), "tempo": 128.0, "bars": 16, "start_beat": 0.0}).json()
+    good = body["good_mixes"]
+    assert good["error"] is None and 0 < good["lean"] < 1 and good["features"]
+    kinds = [f["kind"] for f in body["clarity"]["findings"]]
+    assert "good_mix" in kinds and kinds.index("good_mix") == len(kinds) - kinds.count("good_mix")   # after the clarity rules
+    assert seen["good_mixes"]["features"] == good["features"] and "lean" not in seen["good_mixes"]   # words, not the number
+
+
+def test_a_short_recording_says_why_it_isnt_compared(tmp_path, monkeypatch):
+    monkeypatch.setenv("MODEL_API_KEY", "")
+    path = write(tmp_path / "mix.wav", sine(1000, 0.5), sine(1000, 0.5))
+    good = client.post("/mix/analyze", json={"mix_path": path}).json()["good_mixes"]
+    assert good["lean"] is None and "too short" in good["error"]

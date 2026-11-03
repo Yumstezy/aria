@@ -16,7 +16,7 @@ import pyloudnorm as pyln
 from pydantic import BaseModel
 import soundfile as sf
 
-from aria_engine import __version__, analysis, ask, clarity, groove, muse, reference, sections, split, stems, vocal, voice
+from aria_engine import __version__, analysis, ask, clarity, goodmix, groove, muse, reference, sections, split, stems, vocal, voice
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 # When the code this engine runs was last changed. The bridge compares it with the files on disk
@@ -290,6 +290,13 @@ def mix_analyze(req: MixRequest):
                        req.reference_window, req.reference_part) if req.reference_path else None
     if ref and ref["findings"]:
         found["findings"] = (ref["findings"] + found["findings"])[:SPLIT_TOP_N + 1]
+    # Where the mix lands against the rated mixes (Nov 2, the shape model). Its directions join the problems only
+    # without a reference: with one, the producer picked what to aim for.
+    good = goodmix.compare(audio, rate, found.get("bars")) if peak_db >= -50 and "all" not in measured["unmeasured"] \
+        else goodmix.unavailable("Nothing loud enough to compare with the rated mixes.")
+    if not ref:
+        found["findings"] = found["findings"] + good["findings"]
+    good_for_muse = not ref and good["lean"] is not None and {k: good[k] for k in ("lean_word", "mixes", "features")}   # words, not the number: never a score
 
     context = {k: v for k, v in {"bars": req.bars, "tempo": req.tempo}.items() if v is not None}
     if "all" in measured["unmeasured"]:
@@ -298,11 +305,13 @@ def mix_analyze(req: MixRequest):
         advice, advice_error = muse.advise(measured, context, findings=found["findings"],
                                            reference={"name": ref["name"], "bands": ref["bands"]})
     else:
-        advice, advice_error = muse.advise(measured, context, findings=found["findings"])
+        advice, advice_error = muse.advise(measured, context, findings=found["findings"],
+                                           **({"good_mixes": good_for_muse} if good_for_muse else {}))
 
     return {
         "recording": {"path": str(path), "start_beat": req.start_beat, "tempo": req.tempo, "bars": req.bars},
         "reference": ref and {k: ref[k] for k in ("name", "path", "part", "bands", "curve", "error")},
+        "good_mixes": {k: v for k, v in good.items() if k != "findings"},
         "measured": measured,
         "clarity": found,
         "advice": advice,

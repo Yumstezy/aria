@@ -153,3 +153,36 @@ def test_a_quieter_than_reference_stretch_gets_no_cut():
                    "fix": {"type": "eq_band", "freq_hz": 500, "gain_db": -3, "q": 1.4}}]}),
         reference={"name": "control.wav", "bands": []})
     assert advice["notes"][0]["fix"] is None
+
+
+# Against the rated mixes (Nov 2): the shape model's findings and where the mix lands
+GOOD_HIGHS = {"kind": "good_mix", "feature": "band_brilliance_db", "band": "Highs", "hz": 7100, "hz_range": [5000, 10000],
+              "diff_db": 3.4, "good_median_db": -30.7, "toward": -1, "bars": [1, 8]}
+GOOD_SUB = {"kind": "good_mix", "feature": "band_sub_db", "band": "Sub", "hz": 42, "hz_range": [30, 60],
+            "diff_db": -6.7, "good_median_db": -17.8, "toward": 1, "bars": [1, 8]}
+GOOD_MIXES = {"lean_word": "further", "mixes": {"good": 30, "bad": 33},
+              "features": [{"name": "band_sub_db", "value": -24.51, "good_median": -17.778, "toward": 1, "off": True}]}
+
+
+def test_muse_sees_where_the_mix_lands_and_may_cut_what_the_good_mixes_have_less_of():
+    seen = {}
+
+    def create(**kw):
+        seen.update(kw)
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps({
+            "summary": "Further from the good mixes than most of the 63 rated mixes. The sub is 6.7 dB under theirs.",
+            "notes": [{"finding": 0, "kind": "good_mix", "text": "Your highs sit 3.4 dB above the good mixes. Try a 2 dB cut.",
+                       "fix": {"type": "eq_band", "freq_hz": 7000, "gain_db": -2, "q": 0.7}},
+                      {"finding": 1, "kind": "good_mix", "text": "Lift the sub on the kick, 6.7 dB under the good mixes.",
+                       "fix": {"type": "eq_band", "freq_hz": 42, "gain_db": -2, "q": 1}}]})))])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    advice, error = muse.advise(MEASURED, CONTEXT, findings=[GOOD_HIGHS, GOOD_SUB], client=client, good_mixes=GOOD_MIXES)
+    assert error is None and json.loads(seen["messages"][1]["content"])["good_mixes"] == GOOD_MIXES
+    assert advice["notes"][0]["fix"] == {"type": "eq_band", "freq_hz": 7000, "gain_db": -2.0, "q": 0.7}
+    assert advice["notes"][1]["fix"] is None   # less than the good mixes: a cut on Main can't add it
+
+
+def test_good_mixes_numbers_dont_open_the_door_to_invented_ones():
+    advice, error = muse.advise(MEASURED, CONTEXT, findings=[GOOD_SUB], client=reply({
+        "summary": "Your mix scores 41 out of 100 against the good mixes.", "notes": []}), good_mixes=GOOD_MIXES)
+    assert advice is None and "didn't measure" in error

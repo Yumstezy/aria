@@ -86,9 +86,28 @@ With no reference, the engine compares nothing. It returns what it measured and 
 - `tracks_playing` (key tracks mode, Oct 29): `{track name: true | false | null}`, Live's word on whether each track had unmuted clips in the checked bars (null: no Arrangement clips at all, so Live can't say). For the producer's own tracks, silent means `false` here or, when null, near-digital silence (under -60 dBFS); a quiet track is still drawn and checked for being buried. The 20 dB-under-the-mix rule stays for split mode, where it filters Demucs bleed.
 - `reference_path` (build step 8, as built Oct 29): see "With a reference" below.
 
-### Against good mixes (Oct 30)
+### Against the rated mixes: the shape model (Nov 2)
 
-Without `reference_path`, nothing is compared: `reference` is null and the findings are the clarity rules' only. (The `typical` comparison with the rated good mixes was removed on Oct 30.)
+Every Mix check result has `good_mixes`, where the shape model (`ml/experiments/shape.py`, report in `ml/results/shape-experiment.md`) puts the mix. It was trained on 63 of our testers' mixes rated good or bad, on EQ shape only (loudness taken out): 0.75 on held-out songs, shuffle p = 0.002. The engine measures the recording's loudest 60 s exactly as the rated mixes were (`engine/aria_engine/goodmix.py`; the model file is a copy of `ml/data/shape-model.json`, kept the same by a test).
+
+```json
+"good_mixes": {
+  "lean": 0.06,                 // the model's chance of "good", 0 to 1. Drawn as a position, never shown as a number or a score
+  "lean_word": "further",       // "closer" (0.6 and up), "between", "further" (0.4 and under)
+  "mixes": {"good": 30, "bad": 33}, "heldout_accuracy": 0.749, "loudness_only_accuracy": 0.723,
+  "features": [                 // only the model's stable directions (show = true in the model file), in its order
+    {"name": "band_sub_db", "hz": [30, 60], "value": -24.51, "good_median": -17.778, "bad_median": -21.063,
+     "good_range": [-20.119, -16.468], "toward": 1, "off": true, "diff": -6.73}
+  ],
+  "error": null                 // with a reason, and lean null and no features: too short (under 4 s), silent, model missing
+}
+```
+
+- `toward`: 1 when the good mixes have more of it, -1 when less. `off`: this mix is past the good mixes' middle half (`good_range`), the far way. `hz` is null for the measurements that aren't one range (bumpiness, tilt, top-end spread, low end against the mids).
+- Units are dB against the mix's loudness, except `tilt_db_per_oct` (dB per octave).
+- The `off` measurements an EQ move can change (the bands, and the low-mid build-up) join `clarity.findings` as `good_mix` findings, at most 2, after the clarity rules' findings, only without a reference: `{"kind": "good_mix", "feature", "band", "hz", "hz_range", "diff_db", "good_median_db", "toward", "bars"}`. `diff_db` is this mix minus the good mixes' middle. Positive (more than them): Muse may fix it with an EQ cut, like a reference finding. Negative: lift it on the track that carries it (Ask, Fix all), never a fader.
+- Muse Spark gets `lean_word`, `mixes` and `features`, not the number, and its summary says where the mix lands in words.
+- With a reference, `good_mixes` is still measured but neither joins the problems nor goes to Muse: the producer picked what to aim for.
 
 ### Before and after (Oct 30)
 

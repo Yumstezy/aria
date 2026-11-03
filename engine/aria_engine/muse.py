@@ -53,10 +53,19 @@ You get JSON:
     "stands_out_db" apart from the frequencies around it, like a boosted instrument; "band" means the whole named
     "band" is off. Fix when positive: an EQ cut inside the range ("fix" as for resonance, gain no deeper than diff_db).
     When negative: bring that range up on the part that should carry it, in words, "fix" null.
+  - "good_mix": Aria's model, trained on 63 of our testers' mixes rated good or bad, compares the EQ shape (loudness
+    taken out). In "hz_range" ("band") this mix sits "diff_db" from the good-rated mixes' middle ("good_median_db").
+    Positive: more there than the good mixes. Fix: an EQ cut inside the range ("fix" as for resonance, gain no deeper
+    than diff_db). Negative: less there. Say to lift it on the part that should carry it (sub: the kick or bass; air:
+    the vocal or leads), in words, "fix" null.
   In key tracks mode, "masked" and "by" are the producer's track names, not split sounds. Use them as they are.
   "bars" is [first, last]. "share" and "clicky_share" are fractions (0.97 means 97 percent).
 - "measured": loudness and band levels, for background.
 - "reference": null, or the song the producer compares with: its "name" and each band's "diff_db" against it.
+- "good_mixes": null, or where the model puts this mix's EQ shape: "lean_word" is "closer" (to the good-rated mixes),
+  "between" or "further"; "features" are its measurements, each with this mix's "value", the good mixes' "good_median"
+  and "good_range" (their middle half), "toward" (1: good mixes have more of it, -1: less) and "off" (true when this
+  mix is past the good mixes' middle half the far way).
 
 Rules:
 - Use only numbers from the JSON. Never invent a number.
@@ -70,6 +79,9 @@ Rules:
     Never say to turn the covered sound up: that fights for volume instead of making space (Ian, Nov 1). "fix" is null,
     because Aria can't change a split sound directly.
   - bass_click: in words. Check the bass sample's start, add a few milliseconds of fade-in on the bass notes, or soften the attack. "fix" is null.
+- When "good_mixes" is given, the summary starts with where the mix lands, in words: "Closer to the good mixes than
+  most", "Between the good and the weaker mixes" or "Further from the good mixes than most", then the one change the
+  model points to most. It's a lean from 63 rated mixes, not a grade: never a score, a percentage or "your mix is bad".
 - If there are no findings, say nothing stuck out in these bars, and that Key tracks mode (Aria Ear on the main tracks) can show which sounds clash.
 - Short sentences. No emojis, no exclamation marks, no em dashes.
 - Call sounds by everyday names: "vocals" is the vocal, "other" is the synths and keys, "the rest" is everything else.
@@ -78,7 +90,7 @@ Rules:
 
 Answer with JSON only:
 {"summary": "one sentence, the most useful thing to know",
- "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click|clash|reference, copied from the finding", "short": "at most 10 words", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
+ "notes": [{"finding": 0, "kind": "resonance|buildup|harsh|masking|bass_click|clash|reference|good_mix, copied from the finding", "short": "at most 10 words", "text": "one or two sentences", "fix": {"type": "eq_band", "freq_hz": 340, "gain_db": -3, "q": 4} or null}]}"""
 
 
 def _numbers(text):
@@ -123,12 +135,12 @@ def _in_measured_range(n, findings):
 
 # An EQ cut on the master only helps a problem that lives in the master itself. A buried
 # vocal or a clicking bass in split mode isn't fixable by cutting the whole mix.
-EQ_FIXABLE = {"resonance", "harsh", "buildup"}   # and "reference" when it's louder than the reference (a cut helps)
+EQ_FIXABLE = {"resonance", "harsh", "buildup"}   # and "reference" or "good_mix" when it's louder there (a cut helps)
 
 
 def _valid_fix(fix, finding):
     """An eq_band cut inside the finding's frequency range and the action menu's limits."""
-    cuttable = finding.get("kind") in EQ_FIXABLE or (finding.get("kind") == "reference" and finding.get("diff_db", 0) > 0)
+    cuttable = finding.get("kind") in EQ_FIXABLE or (finding.get("kind") in ("reference", "good_mix") and finding.get("diff_db", 0) > 0)
     if not isinstance(fix, dict) or fix.get("type") != "eq_band" or not cuttable:
         return None
     try:
@@ -186,9 +198,10 @@ def validate(raw, measured, context, findings, has_reference=False):
     return {"summary": _plain(data["summary"]), "notes": notes}, None
 
 
-def advise(measured, context, findings=None, client=None, reference=None):
+def advise(measured, context, findings=None, client=None, reference=None, good_mixes=None):
     """Ask Muse Spark for clarity advice on measured findings. Returns (advice, error).
-    reference: {"name", "bands"} when the producer picked a reference song (build step 8)."""
+    reference: {"name", "bands"} when the producer picked a reference song (build step 8).
+    good_mixes: where the shape model puts the mix (goodmix.compare, Nov 2), without a reference."""
     findings = findings or []
     key = os.environ.get("MODEL_API_KEY", "").strip()
     if client is None and not key:
@@ -198,7 +211,7 @@ def advise(measured, context, findings=None, client=None, reference=None):
         client = OpenAI(api_key=key, base_url=os.environ.get("MUSE_BASE_URL", "https://api.meta.ai/v1"),
                         timeout=TIMEOUT_SEC, max_retries=1)
     model = os.environ.get("MUSE_MODEL", "muse-spark-1.3")
-    payload = {**context, "reference": reference, "findings": findings,
+    payload = {**context, "reference": reference, "good_mixes": good_mixes, "findings": findings,
                "measured": {k: v for k, v in measured.items() if k != "unmeasured"}}
 
     try:
@@ -215,6 +228,9 @@ def advise(measured, context, findings=None, client=None, reference=None):
         return None, "Muse Spark returned an empty reply."
     if reference:   # its band differences are measured numbers the advice may cite
         return validate(raw, measured, {**context, "reference_bands": [b["diff_db"] for b in reference["bands"]]}, findings, has_reference=True)
+    if good_mixes:   # its measured values may be cited too
+        return validate(raw, measured, {**context, "good_mixes": good_mixes["features"],
+                                                  "rated_mixes": sum(good_mixes["mixes"].values())}, findings)
     return validate(raw, measured, context, findings)
 
 
