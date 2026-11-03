@@ -200,7 +200,7 @@ Found by using Aria on real songs inside Live, every day of the build.
 ### What didn't work
 
 - **The mix model is still being tested.** It learns from 99 mixes people rated good, mid or bad, with Meta's Audiobox Aesthetics scores as one input. It goes into Aria only if it beats simple baselines ([`ml/HANDOFF-shape-model.md`](ml/HANDOFF-shape-model.md)).
-- **One vocal still reads the wrong tempo** (Ian's 148 BPM stem reads 192), so every reading comes with the next likely ones, and the song's own tempo is one tap.
+- **Getting the right tempo was harder than expected. Tempo detection can land on the wrong reading, especially on vocals. Aria shows the next likely tempos alongside each reading, and the song’s own tempo is one tap away.
 - **Without a reference, a broad low-mid boost is hard to hear:** the rules found 1 of 3 planted problems. That's why the reference compare exists.
 
 ---
