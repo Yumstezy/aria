@@ -974,12 +974,12 @@ def ask(request, context, client=None, image=None):
     # "Fix this for the whole song: ..." (a Fix it button) always wants a change. Meta's API takes only tool_choice
     # "auto", so when Muse answers one with words and no change, it gets one more try (Nov 1)
     wants_fix = request.lower().startswith("fix this")
+    messages = [{"role": "system", "content": PROMPT}, {"role": "user", "content": user}]
     for attempt in range(2 if wants_fix else 1):
         try:
             res = client.chat.completions.create(
                 model=os.environ.get("MUSE_MODEL", "muse-spark-1.3"), max_tokens=MAX_TOKENS, reasoning_effort="minimal",
-                tools=TOOLS, tool_choice="auto",
-                messages=[{"role": "system", "content": PROMPT}, {"role": "user", "content": user}])
+                tools=TOOLS, tool_choice="auto", messages=messages)
         except OpenAIError as e:
             return {"reply": None, "actions": [], "suggestions": [], "guides": [], "reads": [], "dropped": 0, "problems": [],
                     "error": f"Muse Spark is unavailable right now ({type(e).__name__})."}
@@ -988,6 +988,9 @@ def ask(request, context, client=None, image=None):
         out = interpret(res.choices[0].message, context, request)
         if out["actions"] or out["suggestions"] or not wants_fix:
             break
+        # The try again shows Muse its own words-only reply and says nothing changed (Nov 3, as in fix_round)
+        messages = messages[:2] + [{"role": "assistant", "content": res.choices[0].message.content or ""},
+                                   {"role": "user", "content": "You called no tools, so nothing changed in Live. Call the tool for this fix now."}]
     if wants_fix and not out["actions"] and not out["suggestions"]:
         out["reply"] = None   # "Fixing your leads" with nothing done would promise a change that never happened
         out["problems"] = out["problems"] or ["Muse didn't pick a change for that one. Press Fix it again."]
@@ -1009,6 +1012,8 @@ FIX_KINDS = ("eq_band", "track_volume", "track_eq", "track_device", "sidechain",
 FIX_TOOLS = [t for t in TOOLS if t["function"]["name"] in FIX_KINDS]
 FIX_ACTIONS = ("eq_band", "track_volume", "track_eq", "track_device", "route_sidechain", "aria_rack")   # sidechain is two steps
 FIX_STAGES = ("fix", "report")
+NO_CHANGE = ("You called no tools, so nothing changed in Live. Call the tools now: one fix per problem in "
+             "context.findings, strongest first. Words alone don't change the mix.")
 
 FIX_PROMPT = PROMPT + """
 
@@ -1051,13 +1056,15 @@ def fix_round(stage, context, results=None, client=None):
     request = {"fix": "Fix my whole mix.", "report": "How did it go?"}[stage]
     extra = {"tools": FIX_TOOLS, "tool_choice": "auto"} if stage != "report" else {}
     # A fix round that names no change gets up to two more tries (Nov 1: Muse said "Fixing the buried leads" and sent
-    # nothing; Meta's API takes only tool_choice "auto", so a tool call can't be required)
+    # nothing; Meta's API takes only tool_choice "auto", so a tool call can't be required). Nov 3: the same request again
+    # got the same text three times in Live, so a retry shows Muse its own reply and says nothing changed.
+    messages = [{"role": "system", "content": FIX_PROMPT},
+                {"role": "user", "content": json.dumps({"stage": stage, "context": context, "request": request})}]
     for attempt in range(3 if stage == "fix" else 1):
         try:
             res = client.chat.completions.create(
                 model=os.environ.get("MUSE_MODEL", "muse-spark-1.3"), max_tokens=MAX_TOKENS, reasoning_effort="minimal", **extra,
-                messages=[{"role": "system", "content": FIX_PROMPT},
-                          {"role": "user", "content": json.dumps({"stage": stage, "context": context, "request": request})}])
+                messages=messages)
         except OpenAIError as e:
             return {"reply": None, "actions": [], "problems": [], "error": f"Muse Spark is unavailable right now ({type(e).__name__})."}
         if not res.choices:
@@ -1070,6 +1077,7 @@ def fix_round(stage, context, results=None, client=None):
         print(f"fix {stage}: actions={actions} problems={out['problems']} reply={out['reply']!r}", flush=True)
         if actions or stage != "fix":
             break
+        messages = messages[:2] + [{"role": "assistant", "content": res.choices[0].message.content or ""}, {"role": "user", "content": NO_CHANGE}]
     if stage == "fix" and not actions:
         out["reply"] = None   # "Fixing it" with nothing done would promise a change that never happened
     return {"reply": out["reply"], "actions": actions, "problems": out["problems"],

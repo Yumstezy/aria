@@ -137,12 +137,19 @@ def test_a_fix_round_with_no_change_asks_again_then_says_so():
     seen = []
     out = ask.fix_round("fix", CONTEXT, client=client_for("Fixing the buried leads.", seen=seen))
     assert len(seen) == 3 and out["actions"] == [] and out["reply"] is None and "Fix all" in out["error"]
+    # Each try again shows Muse its own words-only reply and says nothing changed, not the same request again (Nov 3)
+    assert len(seen[0]["messages"]) == 2
+    for kw in seen[1:]:
+        m = kw["messages"]
+        assert m[:2] == seen[0]["messages"] and m[2] == {"role": "assistant", "content": "Fixing the buried leads."}
+        assert m[3]["role"] == "user" and "called no tools" in m[3]["content"]
 
 
 def test_a_fix_it_answered_with_words_only_asks_again_then_says_so():
     seen = []
     out = ask.ask("Fix this for the whole song: LEADS buried (150 Hz to 1 kHz).", CONTEXT, client=client_for("Fixing your leads.", seen=seen))
     assert len(seen) == 2 and out["reply"] is None and "Fix it again" in out["error"]
+    assert seen[1]["messages"][2]["content"] == "Fixing your leads." and "called no tools" in seen[1]["messages"][3]["content"]
     seen = []
     ask.ask("what's wrong with my mix", CONTEXT, client=client_for("The harsh hits at 3.4 kHz.", seen=seen))
     assert len(seen) == 1   # a question gets words, once
