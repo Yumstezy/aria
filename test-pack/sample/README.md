@@ -10,7 +10,9 @@
 
 ## What Aria finds
 
-Without a reference, nothing on these 16 bars goes over Aria's thresholds for clashes or buried sounds. The closest is the leads, covered by the rest at 400 to 1000 Hz for 49% of the time against a 50% threshold. With the finished mix as the reference, Aria finds the rough mix 4.7 dB fuller from 220 to 350 Hz (around 310 Hz). Ian took that boxiness out by hand when he mixed it.
+Without a reference, nothing on these 16 bars goes over Aria's thresholds for clashes or buried sounds. The closest is the leads, covered by the rest at 400 to 1000 Hz for 49% of the time against a 50% threshold.
+
+The mix model (Nov 2) puts the rough mix further from the good mixes, and gives two problems to fix: the highs (5 to 10 kHz) sit 3.4 dB above the good mixes' middle, and the sub (30 to 60 Hz) sits 6.7 dB below it. In three Fix all runs, Muse Spark cut 3 dB at 7.1 kHz (on Main or the leads) and lifted 42 Hz by 3 dB on the bass or the kick. Ian's finished mix leans closer than the rough mix, but is still on the further side. With the finished mix as the reference, Aria finds the rough mix 4.7 dB fuller from 220 to 350 Hz (around 310 Hz). Ian took that boxiness out by hand when he mixed it.
 
 ## Try it in Live (Live 12 Suite, Aria installed)
 
