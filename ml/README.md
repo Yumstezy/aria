@@ -103,6 +103,24 @@ Question: does the spectral shape of a mix, with loudness taken out, separate th
 - Added after seeing the first run, stricter only: a stable weight is shown in the app only if it also agrees with the good-vs-bad medians. Low mids (120-400 Hz) is stable but points opposite ways (features overlap), so it isn't shown. The wording of the plain-language lines was also fixed. Re-run with the same seeds: identical numbers.
 - `data/shape-model.json` is written for the engine: 11 features with `show: true`, their definitions, scaler, weights and good and bad medians.
 
+### Planned before running: shape plus stereo and clarity (written Nov 2, before running; Ian's request of Nov 2)
+
+Question: does adding six stereo and clarity measurements we already have to the shape-only model (above) separate good from bad better, without bringing loudness back in? Ian asked whether the shape model can reach 0.80. This is the one try for tonight, not a search.
+
+- Data: the same 30 good and 33 bad mixes, groups and splits as `experiments/shape.py`. Mid scored afterwards only.
+- Sets, two and no more:
+  - **shape (13):** exactly the shape-only "both" set, rerun here so both sets use the same splits and the same scikit-learn.
+  - **shape + stereo + clarity (19):** the 13, plus from `data/features.csv`: `width_mids`, `width_treble`, `width_low`, `lr_correlation` (stereo) and `harsh_share`, `resonance_db` (clarity). All six are ratios, so loudness stays out.
+  - Left out on purpose: loudness, true peak, crest, punch, loudness spread, song range, drop lift and clipping (they measure how hard a mix is mastered, which is loudness again); `width_bass` (rounds to 0 for most mixes); `mud_db` (the same as the shape set's low-mid build-up).
+- Model: logistic regression, L2, C = 0.3, standardized inside each training fold, as in shape.py. No tuning.
+- Testing: the same grouped 5-fold split, 10 repeats (50 rounds), the same seeds.
+- **The bar for proposing the 19 over the 13** (Ian's ship rule, applied to "does it add anything"):
+  1. The 19 beat the 13 on average and in at least 80% of the 50 rounds (a tie doesn't count as a win).
+  2. Shuffle test: the six new columns shuffled across mixes together (keeping each mix's shape), 500 times; the 19's average must beat the 13's by as much as it really does in fewer than 5% of shuffles (p under 0.05).
+  3. Directions: the same rule as shape.py (same sign in at least 40 of 50 rounds, and the weight agrees with the good-vs-bad medians) before any new measurement is shown.
+- Reported plainly whatever it shows, including whether it reaches 0.80. If the bar isn't met, the app keeps the 13-measurement shape model and nothing changes.
+- Output: `experiments/shape_plus.py` writes `results/shape-plus-experiment.md`. It never overwrites `data/shape-model.json`.
+
 ## Timeline
 
 | Day | What |
