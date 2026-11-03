@@ -15,7 +15,7 @@ const http = require("http");
 const net = require("net");
 const os = require("os");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
 const Max = require("max-api");
 
 const ENGINE = { host: "127.0.0.1", port: 8765 };
@@ -1059,6 +1059,37 @@ function savePrefs(prefs) {
   }
 }
 
+// ---------- Live in full screen (Nov 3) ----------
+// With Live full screen on a Mac, showing a Max window crashed Live three times in a row (Live 12.4, Max 9: a null
+// read in juce toFront, from "front" and from the flags change in sizeWindow). Max can't open windows safely there,
+// so Aria doesn't try: the strip says to leave full screen. Live's main window covering a whole screen, menu bar
+// row included, means full screen. Window sizes need no permission from macOS (names would).
+const FULL_SCREEN_CHECK = `ObjC.import("CoreGraphics"); ObjC.import("AppKit");
+const wins = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly | $.kCGWindowListExcludeDesktopElements, 0))) || [];
+const screens = $.NSScreen.screens.js, top = screens.length ? screens[0].frame.size.height : 0;
+const full = wins.some((w) => w.kCGWindowOwnerName === "Live" && w.kCGWindowLayer === 0 && screens.some((sc) => {
+  const f = sc.frame, b = w.kCGWindowBounds;
+  return b.X === f.origin.x && b.Y === top - f.origin.y - f.size.height && b.Width === f.size.width && b.Height === f.size.height;
+}));
+full ? "full" : "windowed";`;
+function liveFullScreen() {
+  return new Promise((resolve) => {
+    execFile("/usr/bin/osascript", ["-l", "JavaScript", "-e", FULL_SCREEN_CHECK], { timeout: 2000 }, (err, out) => {
+      if (err) { Max.post(`Full screen check failed (${err.message}); opening the window anyway.`); resolve(false); return; }
+      resolve(String(out).trim() === "full");
+    });
+  });
+}
+const FULL_SCREEN_TEXT = "Live is full screen, and Aria's window can't open over it. Press Ctrl+Cmd+F to leave full screen, then try again.";
+// Runs fn only when it's safe to show or change Aria's windows
+function whenWindowed(fn) {
+  return async (...args) => {
+    if (await liveFullScreen()) { logLine("window: Live is full screen, not opening"); toUI("error", { text: FULL_SCREEN_TEXT }); return; }
+    toUI("full_screen_clear", {});
+    fn(...args);
+  };
+}
+
 function showWindow(url) {
   // Load the page every time, so the window always shows the latest UI files.
   // The page says "ready" when it loads, and the bridge replays the latest result.
@@ -1082,18 +1113,18 @@ function showWindow(url) {
 // A screen that failed to draw says why, so it shows in the Max log
 Max.addHandler("ui_error", (s) => Max.post(`ui_error: ${decode(s).message}`));
 
-Max.addHandler("open_window", (s) => {
+Max.addHandler("open_window", whenWindowed((s) => {
   const screen = s && decode(s).screen;
   if (screen) savePrefs({ ...loadWindowPrefs(), screen });
   showWindow(pageUrl("window"));
-});
-Max.addHandler("open_chat", (s) => openChatWindow(s && decode(s).screen));
+}));
+Max.addHandler("open_chat", whenWindowed((s) => openChatWindow(s && decode(s).screen)));
 
 // The mapped key (the strip's "Ask key" in Live's Key Map): hold to talk to Muse, let go to send.
 // Pressing it opens Ask Muse; the chat page records while it's held.
 Max.addHandler("ask_key", (v) => {
   const down = v === undefined || v === "bang" || Number(v) !== 0;
-  if (down && !chatOpen) openChatWindow(null);
+  if (down && !chatOpen) { whenWindowed(() => { openChatWindow(null); toUI("voice_key", { down }); })(); return; }
   toUI("voice_key", { down });
 });
 
@@ -1135,7 +1166,7 @@ Max.addHandler("close_window", () => {
   if (chatOpen) placeChatAlone(loadWindowPrefs());
 });
 
-Max.addHandler("window_mode", (s) => {
+Max.addHandler("window_mode", whenWindowed((s) => {
   // Keep the rest of the saved choices (theme, Name my tracks): only the layout changes here
   const prefs = { ...loadWindowPrefs(), ...decode(s) };
   if (prefs.mode === "left" || prefs.mode === "right") prefs.side = prefs.mode;
@@ -1145,10 +1176,10 @@ Max.addHandler("window_mode", (s) => {
   if (chatOpen && prefs.mode !== "full") { placeStack(prefs.mode, prefs.screen || FALLBACK_SCREEN); return; }
   if (chatOpen) { chatOpen = false; Max.outlet("chat", "wclose"); }
   placeWindow(prefs);
-});
+}));
 // Minimize: the docked window becomes a small tab on its edge (the chat hides too). The tab brings it back.
 const TAB = { w: 44, h: 132 };
-Max.addHandler("minimize", () => {
+Max.addHandler("minimize", whenWindowed(() => {
   const prefs = loadWindowPrefs(), sc = prefs.screen || FALLBACK_SCREEN;
   const side = prefs.mode === "right" || (prefs.mode !== "left" && prefs.side === "right") ? "right" : "left";
   minimized = { chat: chatOpen };
@@ -1159,7 +1190,7 @@ Max.addHandler("minimize", () => {
   tabAt = { x, y, from: y };
   sizeWindow("window", "aria-window-ui", { x, y, ...TAB }, true);
   Max.outlet("window", "front");
-});
+}));
 
 // Slide the tab along its edge (Ian, Oct 31: so it can be moved out of the way). The page sends how far the pointer
 // has moved since the drag began; only the window's position changes, so it follows smoothly.
@@ -1180,13 +1211,13 @@ Max.addHandler("tab_drag_end", () => {
   if (!minimized || !tabAt) return;
   savePrefs({ ...loadWindowPrefs(), tabY: tabAt.y });
 });
-Max.addHandler("restore", () => {
+Max.addHandler("restore", whenWindowed(() => {
   const was = minimized;
   minimized = null;
   if (was && was.chat) { openChatWindow(null); return; }
   placeWindow(loadWindowPrefs());
   Max.outlet("window", "front");
-});
+}));
 
 Max.addHandler("jump_to", (s) => serial(() => askLive("jump", "jump_done", decode(s).bar).catch(() => {})));
 Max.addHandler("add_marker", (s) => serial(async () => {

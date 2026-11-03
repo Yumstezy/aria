@@ -4,6 +4,14 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 3, midday: fixes from Ian's use in Live.**
+- Good mixes card reworded (e7d2803): "Compared with good mixes", Far to Close, plain colors, problem names like "Highs fuller than good mixes".
+- Fix all said "Muse Spark didn't pick a change" (2cc4f4c): Muse answered three tries in words with no tool call, because each try was the same request. A try again now shows Muse its own reply and says nothing changed. With a forced words-only first reply, 4 of 4 real retries made the changes. Fix it gets the same.
+- **Live crashed opening Aria's window in full screen** (3 crash reports, 11:51 to 11:52: Live 12.4, a null read in Max's juce `toFront`, from `front` and from the flags change in `sizeWindow`). Max can't show a window safely over full screen Live, so the bridge checks first (Live's window covering a whole screen, read with no permission prompt, 78 ms). In full screen, the strip says "Full screen" and why, and no window opens. **Needs a check in Live:**
+  1. Quit and reopen Live (the bridge reloads). Leave Live windowed and press the strip's Open button: the window opens as before.
+  2. Close it. Press Ctrl+Cmd+F to make Live full screen, then press Open again: no window, no crash, and the strip's word reads "Full screen".
+  3. Leave full screen (Ctrl+Cmd+F) and press Open: the window opens and the strip's word goes back.
+
 **Nov 3, about 1 AM: maintenance pass, and v0.2.2 is the download.** Ian asked for a full check and the download updated before bed.
 - Checked: 193 engine tests; the UI and both sites type-check and build (`ui/dist` matched its source); the engine as installed (health, a foreign Origin gets 403, a real check of the rough mix in 22 s); 3 real Fix all rounds on the model's problems (each cut the highs 3 dB and lifted the sub 3 dB on BASS or KICK, no faders); a 5-track key tracks result is 10.9 KB of the 30 KB the web view takes; the strip shows "2 to fix"; no key in tracked files or recent history; Ian's installed devices match the repo.
 - An independent review of the model commits confirmed the measurements match `ml/` exactly on all test-pack files, and found issues, fixed in 898114f: Muse could slip a made-up score past the validator ("scores 4 out of 10", "bottom 33 percent of the rated mixes"), now blocked; a small model problem could never count as Fixed (now: half its gap, at most 3 dB, in the engine, the window and the chat); mono read 3 dB off; "than most" in Muse's summary implied a rank. 3 real checks after the fix kept Muse's summary and both notes.

@@ -338,6 +338,8 @@ export function connect() {
     on<Progress>("progress", (p) => set({ progress: p, error: null }));
     on<Result>("mix_result", (r) => set({ result: known(r), progress: null, error: null, beforeAfter: null, fixes: {} }));   // a new check: a new "before", nothing fixed yet
     on<{ text: string }>("error", (e) => set({ error: e?.text || "Something went wrong.", progress: null }));
+    // The window opened after all (Live left full screen): the strip stops saying "Full screen"
+    on("full_screen_clear", () => { if (state.error?.startsWith("Live is full screen")) set({ error: null }); });
     on<{ bar: number; name: string }>("marker_done", (m) => set({ marker: m }));
     on<{ request: string | null; auto?: boolean; image_id?: string | null }>("ask_pending", (p) => {
       // The answer already arrived in ask_log: keep the thread as it is (no flicker)

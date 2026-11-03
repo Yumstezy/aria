@@ -20,7 +20,7 @@ export function Strip() {
   const [lamp, word, why] = progress
     ? ["is-busy", `${STEP[progress.step] ?? "Checking"}${progress.step === "record" && progress.detail ? ` ${progress.detail}` : ""}`, progress.text]
     : down ? ["is-hot", "Engine off", engine.text]
-    : error ? ["is-hot", "Didn't finish", error]
+    : error ? ["is-hot", error.startsWith("Live is full screen") ? "Full screen" : "Didn't finish", error]   // bridge.js FULL_SCREEN_TEXT
     : engine.state === "starting" ? ["", "Starting", engine.text]
     : found === null ? ["", "Ready", "Play the busiest part, then press Check"]
     : found ? ["is-hot", `${found} to fix`, "Open the window to see them"]
