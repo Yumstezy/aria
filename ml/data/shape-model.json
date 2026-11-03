@@ -1,0 +1,335 @@
+{
+  "what": "Shape-only good vs bad direction (ml/experiments/shape.py). Not a quality score. Show only features with show = true (stable, and the weight agrees with the good-vs-bad medians). Words: closer to / further from the good mixes, never 'bad'.",
+  "loudness_only_reference": 0.723,
+  "date": "2026-11-02",
+  "measure_like": "ml/curves.py: loudest 60 s, engine/aria_engine/reference.py _spectrum and _levels on FINE (1000 * 2 ** (k / 12), k = -60..48), dB against the mix's own loudness",
+  "set": "both",
+  "trained_on": {
+    "good": 30,
+    "bad": 33,
+    "groups": 45
+  },
+  "heldout_balanced_accuracy": 0.749,
+  "shuffle_p": 0.002,
+  "intercept": -0.19723188206631856,
+  "features": [
+    {
+      "name": "band_sub_db",
+      "words": "sub (30-60 Hz)",
+      "definition": {
+        "kind": "mean_db",
+        "lo_hz": 30,
+        "hi_hz": 60
+      },
+      "weight": 0.4884,
+      "scaler_mean": -20.2947,
+      "scaler_scale": 4.3594,
+      "stable": true,
+      "same_sign_rounds": 50,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": -17.778,
+      "bad_median": -21.063,
+      "good_iqr": [
+        -20.119,
+        -16.468
+      ]
+    },
+    {
+      "name": "band_low_db",
+      "words": "bass (60-120 Hz)",
+      "definition": {
+        "kind": "mean_db",
+        "lo_hz": 60,
+        "hi_hz": 120
+      },
+      "weight": -0.0577,
+      "scaler_mean": -17.6231,
+      "scaler_scale": 1.2982,
+      "stable": false,
+      "same_sign_rounds": 32,
+      "rounds": 50,
+      "agrees_with_medians": false,
+      "show": false,
+      "good_median": -17.685,
+      "bad_median": -17.703,
+      "good_iqr": [
+        -18.385,
+        -17.046
+      ]
+    },
+    {
+      "name": "band_lowmid_db",
+      "words": "low mids (120-400 Hz)",
+      "definition": {
+        "kind": "mean_db",
+        "lo_hz": 120,
+        "hi_hz": 400
+      },
+      "weight": 0.1617,
+      "scaler_mean": -25.9688,
+      "scaler_scale": 1.5145,
+      "stable": true,
+      "same_sign_rounds": 44,
+      "rounds": 50,
+      "agrees_with_medians": false,
+      "show": false,
+      "good_median": -26.21,
+      "bad_median": -25.518,
+      "good_iqr": [
+        -27.064,
+        -25.119
+      ]
+    },
+    {
+      "name": "band_mid_db",
+      "words": "mids (400 Hz-1 kHz)",
+      "definition": {
+        "kind": "mean_db",
+        "lo_hz": 400,
+        "hi_hz": 1000
+      },
+      "weight": 0.3934,
+      "scaler_mean": -29.5857,
+      "scaler_scale": 2.3205,
+      "stable": true,
+      "same_sign_rounds": 50,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": -28.937,
+      "bad_median": -29.822,
+      "good_iqr": [
+        -30.285,
+        -28.059
+      ]
+    },
+    {
+      "name": "band_himid_db",
+      "words": "upper mids (1-2.5 kHz)",
+      "definition": {
+        "kind": "mean_db",
+        "lo_hz": 1000,
+        "hi_hz": 2500
+      },
+      "weight": 0.5322,
+      "scaler_mean": -30.2646,
+      "scaler_scale": 2.2343,
+      "stable": true,
+      "same_sign_rounds": 50,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": -29.541,
+      "bad_median": -30.492,
+      "good_iqr": [
+        -30.332,
+        -28.918
+      ]
+    },
+    {
+      "name": "band_presence_db",
+      "words": "presence (2.5-5 kHz)",
+      "definition": {
+        "kind": "mean_db",
+        "lo_hz": 2500,
+        "hi_hz": 5000
+      },
+      "weight": 0.2845,
+      "scaler_mean": -31.041,
+      "scaler_scale": 2.3718,
+      "stable": true,
+      "same_sign_rounds": 50,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": -30.905,
+      "bad_median": -31.124,
+      "good_iqr": [
+        -31.71,
+        -29.917
+      ]
+    },
+    {
+      "name": "band_brilliance_db",
+      "words": "highs (5-10 kHz)",
+      "definition": {
+        "kind": "mean_db",
+        "lo_hz": 5000,
+        "hi_hz": 10000
+      },
+      "weight": -0.5471,
+      "scaler_mean": -30.4937,
+      "scaler_scale": 2.0654,
+      "stable": true,
+      "same_sign_rounds": 50,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": -30.671,
+      "bad_median": -30.459,
+      "good_iqr": [
+        -31.404,
+        -29.779
+      ]
+    },
+    {
+      "name": "band_air_db",
+      "words": "air (10-16 kHz)",
+      "definition": {
+        "kind": "mean_db",
+        "lo_hz": 10000,
+        "hi_hz": 16000
+      },
+      "weight": 0.2368,
+      "scaler_mean": -34.8369,
+      "scaler_scale": 3.0453,
+      "stable": true,
+      "same_sign_rounds": 48,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": -33.691,
+      "bad_median": -35.675,
+      "good_iqr": [
+        -35.242,
+        -33.097
+      ]
+    },
+    {
+      "name": "low_power_db",
+      "words": "low end (30-120 Hz) against the 200 Hz-2 kHz average",
+      "definition": {
+        "kind": "mean_db_minus_mean_db",
+        "a_hz": [
+          30,
+          120
+        ],
+        "b_hz": [
+          200,
+          2000
+        ]
+      },
+      "weight": 0.0856,
+      "scaler_mean": 10.2822,
+      "scaler_scale": 3.3239,
+      "stable": true,
+      "same_sign_rounds": 49,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": 10.619,
+      "bad_median": 10.197,
+      "good_iqr": [
+        9.494,
+        12.772
+      ]
+    },
+    {
+      "name": "mid_bumpiness_db",
+      "words": "bumpiness of the 200 Hz-2 kHz curve",
+      "definition": {
+        "kind": "std_of_curve_minus_1_octave_moving_average",
+        "lo_hz": 200,
+        "hi_hz": 2000,
+        "window_points": 13
+      },
+      "weight": -0.7369,
+      "scaler_mean": 2.3141,
+      "scaler_scale": 0.7624,
+      "stable": true,
+      "same_sign_rounds": 50,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": 1.95,
+      "bad_median": 2.519,
+      "good_iqr": [
+        1.681,
+        2.227
+      ]
+    },
+    {
+      "name": "lowmid_buildup_db",
+      "words": "low-mid build-up (200-500 Hz against its neighbours)",
+      "definition": {
+        "kind": "mean_db_minus_neighbours",
+        "band_hz": [
+          200,
+          500
+        ],
+        "neighbours_hz": [
+          [
+            100,
+            200
+          ],
+          [
+            500,
+            1000
+          ]
+        ]
+      },
+      "weight": -0.5154,
+      "scaler_mean": -2.2298,
+      "scaler_scale": 1.6033,
+      "stable": true,
+      "same_sign_rounds": 50,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": -3.013,
+      "bad_median": -1.67,
+      "good_iqr": [
+        -3.568,
+        -2.258
+      ]
+    },
+    {
+      "name": "tilt_db_per_oct",
+      "words": "overall tilt (dB per octave)",
+      "definition": {
+        "kind": "slope_of_line_fit_db_vs_log2_hz",
+        "lo_hz": 31.5,
+        "hi_hz": 16000
+      },
+      "weight": -0.301,
+      "scaler_mean": -1.8066,
+      "scaler_scale": 0.4812,
+      "stable": true,
+      "same_sign_rounds": 50,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": -1.877,
+      "bad_median": -1.616,
+      "good_iqr": [
+        -2.052,
+        -1.719
+      ]
+    },
+    {
+      "name": "top_spread_db",
+      "words": "how far the top end (above 2 kHz) strays from the tilt line",
+      "definition": {
+        "kind": "rms_of_curve_minus_tilt_line",
+        "lo_hz": 2000,
+        "hi_hz": 16000
+      },
+      "weight": -0.2056,
+      "scaler_mean": 3.0339,
+      "scaler_scale": 1.2335,
+      "stable": true,
+      "same_sign_rounds": 50,
+      "rounds": 50,
+      "agrees_with_medians": true,
+      "show": true,
+      "good_median": 2.495,
+      "bad_median": 3.178,
+      "good_iqr": [
+        2.066,
+        2.905
+      ]
+    }
+  ]
+}

@@ -7,6 +7,7 @@ You're building the part of Aria that can say how finished an EDM mix sounds, ev
 - **Data:** 99 rated mixes from the shared Drive (good 30, mid 36, bad 33), in 71 song and producer groups.
 - **Official result** (`results/train-report.md`): the best model scores 0.49 on songs it never saw, against 0.45 for "just look at loudness" (0.33 is a coin toss). It wins only 66% of test rounds and fails the shuffle test (p = 0.70), so **by the ship rule, nothing ships yet.**
 - **Side experiment** (`results/no-loudness-experiment.md`, added after the official run): with loudness taken out, tone and stereo alone still separate the tiers better than chance. See "Side experiments" below.
+- **Shape-only good vs bad (Nov 2, planned before running)** (`results/shape-experiment.md`): passes Ian's "points the right way" bar. 0.75 on held-out songs (chance 0.50), shuffle p = 0.002, 11 directions stable and shown. Loudness alone scores 0.72 on the same question, so the value is the loudness-free direction, not a better score. Writes `data/shape-model.json` for the app.
 - **Audiobox side experiment (Oct 30, planned before any scores existed)** (`results/aesthetics-experiment.md`): Meta's Audiobox Aesthetics scores don't beat loudness. Best 0.51 (Audiobox plus tone and stereo) against loudness 0.46; it beats loudness in only 52% of rounds (the bar is 80%). Shuffle p = 0.010 says it's better than chance, not better than loudness. **Not proposed for the next official run.**
 - **Permission (answered by Ian, Oct 30):** the mixes were given to the team or released by their artists for free download for us to use.
 - **In the app (Oct 30):** the classifier doesn't ship, but the good-rated mixes' band balance does, as Aria's "against good mixes" comparison when no reference song is picked (`engine/aria_engine/typical.py`). It measures exactly as `detail.py` does and only reads `data/features.csv`.
@@ -28,6 +29,7 @@ You're building the part of Aria that can say how finished an EDM mix sounds, ev
 | `data/excluded.csv` | Files left out on purpose, each with a reason |
 | `data/manifest.csv` | Where each mix and its rating came from, and permission. To fill in |
 | `data/aesthetics.csv` | Audiobox Aesthetics scores (PQ, PC, CE, CU) for the 99 mixes, from `aesthetics.py` |
+| `data/shape-model.json` | The shape-only good vs bad direction for the app, from `experiments/shape.py`. Show only features with `show: true` |
 | `data/curves.csv` | Each mix's EQ curve: 109 points from 31.5 Hz to 16 kHz, loudness taken out, from `curves.py` |
 | `results/` | The reports |
 
@@ -90,6 +92,16 @@ Question: does the spectral shape of a mix, with loudness taken out, separate th
   2. Direction stable: a feature's weight has the same sign as in the model trained on all 63 mixes in at least 40 of the 50 rounds. Only stable features may ever be shown in the app.
   3. Ian's hypothesis is checked, not assumed: good should have more low-end power, less mid bumpiness and less low-mid build-up than bad. Whatever the medians show is reported plainly.
 - Output: `experiments/shape.py` writes `results/shape-experiment.md`. Only if the bar is met, it also writes `data/shape-model.json` (feature definitions, scaler, weights, the good and bad medians, which features are stable) for the engine. If the bar isn't met, the app shows nothing from it.
+
+**Result (run Nov 2, as planned; full report in `results/shape-experiment.md`): it passes.**
+
+- Best set: both (13 measurements), logistic regression **0.75** on held-out songs (chance 0.50), above chance in 94% of the 50 rounds, shuffle **p = 0.002**. The 8 bands alone 0.72, the hypothesis alone 0.73. Random forest check: 0.76.
+- **Loudness alone scores 0.72 on the same question.** Shape separates good from bad about as well as loudness, not better. What it adds is that it's loudness-free and points to EQ moves a producer can make.
+- Direction: 12 of 13 measurements keep their sign in at least 40 of 50 rounds. Good mixes have more sub (+3.3 dB), smoother mids, less low-mid build-up (200-500 Hz, -1.3 dB), more air (+2.0 dB), a slightly stronger low end against the mids, a slightly steeper downward tilt and a smoother top end.
+- Ian's hypothesis holds on all three counts: more powerful low end, cleaner (smoother) mids, less low-mid build-up. The sub band carries most of the low-end difference; 60-120 Hz is the same in good and bad.
+- Mid sanity check: average chance of "good" is 0.64 for good mixes, 0.50 for mid, 0.34 for bad. Mid lands between, as it should.
+- Added after seeing the first run, stricter only: a stable weight is shown in the app only if it also agrees with the good-vs-bad medians. Low mids (120-400 Hz) is stable but points opposite ways (features overlap), so it isn't shown. The wording of the plain-language lines was also fixed. Re-run with the same seeds: identical numbers.
+- `data/shape-model.json` is written for the engine: 11 features with `show: true`, their definitions, scaler, weights and good and bad medians.
 
 ## Timeline
 
@@ -218,6 +230,7 @@ Ideas that came after seeing the official results. Each has its own script in `e
 
 | Experiment | Question | Result |
 |---|---|---|
+| `experiments/shape.py` (planned before running) | Does the shape of the EQ curve, loudness taken out, separate good from bad, and which way? | Yes: 0.75 (chance 0.50), shuffle p = 0.002, 11 stable directions. Good mixes: more sub and air, smoother mids, less low-mid build-up. Loudness alone 0.72. See `results/shape-experiment.md`. |
 | `experiments/audiobox.py` (planned before running) | Do Meta's Audiobox Aesthetics scores tell the tiers apart better than loudness? | No. Best 0.51 (Audiobox plus tone and stereo) vs loudness 0.46, beats loudness in 52% of rounds (bar 80%), shuffle p = 0.010. Audiobox scores are almost the same in every tier. See `results/aesthetics-experiment.md`. |
 | `experiments/no_loudness.py` | Can the model tell the tiers apart without loudness? | Yes, better than chance: tone and stereo alone score about 0.49 (chance 0.33), shuffle test p = 0.01. Not better than loudness alone (0.45) by enough to ship. Good mixes have more sub-bass and narrower mids. See `results/no-loudness-experiment.md`. |
 
