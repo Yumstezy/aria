@@ -121,6 +121,8 @@ Question: does adding six stereo and clarity measurements we already have to the
 - Reported plainly whatever it shows, including whether it reaches 0.80. If the bar isn't met, the app keeps the 13-measurement shape model and nothing changes.
 - Output: `experiments/shape_plus.py` writes `results/shape-plus-experiment.md`. It never overwrites `data/shape-model.json`.
 
+**Result (run Nov 2, as planned; `results/shape-plus-experiment.md`): it does not pass.** The 19 score 0.72 against the 13's 0.74 on the same splits (scikit-learn 1.6.1), beat them in only 9 of 50 rounds, shuffle p = 0.343. No 0.80. The four stereo measurements have stable directions (good mixes: narrower mids, slightly wider highs, more mono-safe) but add nothing the shape doesn't already carry, so nothing from this run goes in the app. The app keeps the 13-measurement shape model.
+
 ## Timeline
 
 | Day | What |
