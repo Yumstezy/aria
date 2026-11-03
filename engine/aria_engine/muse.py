@@ -21,6 +21,9 @@ CUT_DB = (-6.0, -0.5)
 Q_RANGE = (0.3, 12.0)
 
 # Without a reference there is nothing to compare against, so these verdicts are off limits.
+# With the mix model's lean: it's a direction, not a grade. A score, a rank or a share of the way is never measured.
+SCORE = re.compile(r"\b(scores?|scored|scoring|out of \d+|grades?|graded|rank(s|ed|ing)?|percentile|of the way)\b"
+                   r"|(%|\bpercent)\s+of\s+(the\s+)?[\w ]{0,20}mixes|\b(bottom|top)\s+(\d|half|third|quarter|fifth|tenth)|\b(better than|worse than|ahead of)\b[^.]{0,40}\bmixes\b", re.I)
 COMPARISON = re.compile(r"\btoo (bright|dark|dull|quiet|loud|wide|narrow|thin|muddy|harsh|boomy|light|heavy)\b", re.I)
 # With a reference the comparison is the point: the no-verdicts rule becomes "compare with that song, by name".
 NO_REFERENCE_RULE = """- There is no reference track. Never say "too bright", "too muddy" or similar. Say what sticks out and by how much."""
@@ -79,8 +82,8 @@ Rules:
     Never say to turn the covered sound up: that fights for volume instead of making space (Ian, Nov 1). "fix" is null,
     because Aria can't change a split sound directly.
   - bass_click: in words. Check the bass sample's start, add a few milliseconds of fade-in on the bass notes, or soften the attack. "fix" is null.
-- When "good_mixes" is given, the summary starts with where the mix lands, in words: "Closer to the good mixes than
-  most", "Between the good and the weaker mixes" or "Further from the good mixes than most", then the one change the
+- When "good_mixes" is given, the summary starts with where the mix lands, in words: "Closer to the good mixes",
+  "Between the good and the weaker mixes" or "Further from the good mixes", then the one change the
   model points to most. It's a lean from 63 rated mixes, not a grade: never a score, a percentage or "your mix is bad".
 - If there are no findings, say nothing stuck out in these bars, and that Key tracks mode (Aria Ear on the main tracks) can show which sounds clash.
 - Short sentences. No emojis, no exclamation marks, no em dashes.
@@ -159,7 +162,7 @@ def _plain(text):
     return re.sub(r"\s*[\u2013\u2014]\s*", ", ", text).strip()
 
 
-def validate(raw, measured, context, findings, has_reference=False):
+def validate(raw, measured, context, findings, has_reference=False, no_score=False):
     """Return (advice, error). Drops any note that cites a number we didn't measure,
     judges without a reference, or points at a finding that doesn't exist."""
     try:
@@ -173,6 +176,8 @@ def validate(raw, measured, context, findings, has_reference=False):
 
     def ok(text, extra=()):
         if any(round(n, 2) not in allowed | set(extra) and not _in_measured_range(n, findings) for n in _numbers(text)):
+            return False
+        if no_score and SCORE.search(text):
             return False
         return has_reference or not COMPARISON.search(text)
 
@@ -228,9 +233,10 @@ def advise(measured, context, findings=None, client=None, reference=None, good_m
         return None, "Muse Spark returned an empty reply."
     if reference:   # its band differences are measured numbers the advice may cite
         return validate(raw, measured, {**context, "reference_bands": [b["diff_db"] for b in reference["bands"]]}, findings, has_reference=True)
-    if good_mixes:   # its measured values may be cited too
-        return validate(raw, measured, {**context, "good_mixes": good_mixes["features"],
-                                                  "rated_mixes": sum(good_mixes["mixes"].values())}, findings)
+    if good_mixes:   # each direction's value and the good mixes' middle may be cited, and nothing that reads as a score
+        cited = [[f["value"], f["good_median"]] for f in good_mixes["features"]]
+        return validate(raw, measured, {**context, "good_mixes": cited, "rated_mixes": good_mixes["mixes"]["good"] + good_mixes["mixes"]["bad"]},
+                        findings, no_score=True)
     return validate(raw, measured, context, findings)
 
 

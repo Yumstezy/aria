@@ -66,7 +66,7 @@ One problem, start to finish. Aria's loop is the same for every problem it finds
 
 - **A lean, not a score.** After a Mix check, Aria shows where your mix sits, from further from the good mixes to closer, and what would move it closer: *more sub, less highs, smoother mids.*
 - **Muse Spark explains it and fixes it.** It gets the model's directions as measured numbers. On Ian's rough mix: *"The sub around 42 Hz sits 6.7 dB below the good mixes."* Too much of something gets an EQ cut you can undo. Too little gets lifted on the track that carries it, never a louder fader.
-- **Honest about what it is.** Loudness alone tells the same mixes apart 72% of the time, so shape isn't a stronger judge. It's the one that points to an EQ move. Aria shows only the 11 directions that pointed the same way in at least 40 of 50 test rounds ([results](ml/results/shape-experiment.md)).
+- **Honest about what it is.** Loudness alone tells the same mixes apart 72% of the time, so shape isn't a stronger judge. It's the one that points to an EQ move. Aria shows only the 11 directions that pointed the same way in at least 40 of 50 test rounds and agreed with how the good and bad mixes actually differ ([results](ml/results/shape-experiment.md)).
 
 ---
 
@@ -178,7 +178,7 @@ flowchart LR
 |---|---|
 | **The device** (`device/`) | Sits last on the Main track. Records bars for a check, reads and sets things through the Live API, and runs the live analyzer 20 times a second. Aria Ear, on any track, lets Aria hear that track by name. |
 | **The bridge** (`device/bridge.js`) | Node for Max. Carries messages between Live, the screens and the engine, and keeps every change on an Undo stack. |
-| **The engine** (`engine/`) | Python and FastAPI, on this Mac. Measures the audio and talks to Muse Spark. It returns numbers; the words come from Muse. 191 tests. |
+| **The engine** (`engine/`) | Python and FastAPI, on this Mac. Measures the audio and talks to Muse Spark. It returns numbers; the words come from Muse. 193 tests. |
 | **The screens** (`ui/`) | React, inside Live's own web view: the strip on the device, and the window docked over Live. |
 
 <details>

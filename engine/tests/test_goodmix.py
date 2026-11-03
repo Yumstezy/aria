@@ -59,6 +59,13 @@ def test_too_short_or_silent_says_why_with_no_numbers():
     assert silent["lean"] is None and silent["findings"] == [] and "silent" in silent["error"]
 
 
+@needs_sample
+def test_mono_lands_where_the_same_sound_in_stereo_does():
+    audio, rate = sf.read(str(SAMPLE / "Rough mix.wav"), always_2d=True, dtype="float64")
+    left = audio[:, :1]
+    assert goodmix.compare(left, rate)["lean"] == goodmix.compare(np.repeat(left, 2, axis=1), rate)["lean"]
+
+
 def test_a_missing_model_says_so(tmp_path):
     assert goodmix.load_model(tmp_path / "nope.json") is None
 

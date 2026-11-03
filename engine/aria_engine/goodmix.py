@@ -100,7 +100,8 @@ def _hz(f):
 
 
 def unavailable(error):
-    return {"lean": None, "lean_word": None, "features": [], "findings": [], "error": error}
+    return {"lean": None, "lean_word": None, "mixes": None, "heldout_accuracy": None, "loudness_only_accuracy": None,
+            "features": [], "findings": [], "error": error}
 
 
 def compare(audio, rate, bars=None, model=None):
@@ -109,6 +110,8 @@ def compare(audio, rate, bars=None, model=None):
     model = model or load_model()
     if model is None:
         return unavailable("The good mixes model isn't installed.")
+    if audio.ndim == 2 and audio.shape[1] == 1:   # mono reads 3 dB off against stereo (BS.1770 sums the channels)
+        audio = np.repeat(audio, 2, axis=1)
     if len(audio) < MIN_SEC * rate:
         return unavailable(f"The recording is under {MIN_SEC:.0f} seconds, too short to compare with the rated mixes.")
     spec = reference._spectrum(loudest_excerpt(audio, rate), rate)

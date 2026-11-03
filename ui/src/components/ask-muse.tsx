@@ -3,7 +3,7 @@
 // or its own small window when popped out. Both show the same history, which the bridge saves on this Mac.
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
-import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, hz, screenshotUrl, sendScreenshot, setAskOpen, soundName, toggleVoice, undoLast, useAria, useAriaSel, type Finding, type FixResult, type Guide, type GuideBand, type Result, type ScreenRead, type Suggestion } from "@/lib/aria";
+import { answerSuggestion, askMuse, backToWindow, clearHistory, closeChat, heardFixed, hz, screenshotUrl, sendScreenshot, setAskOpen, soundName, toggleVoice, undoLast, useAria, useAriaSel, type Finding, type FixResult, type Guide, type GuideBand, type Result, type ScreenRead, type Suggestion } from "@/lib/aria";
 import { problemsOf } from "@/lib/problems";
 import { EqCurve } from "@/components/eq-curve";
 import { BackIcon, CheckIcon, CloseIcon, ImageIcon, MicIcon, SendIcon, UndoIcon } from "@/components/icons";
@@ -132,7 +132,7 @@ function FixResults({ results, result }: { results: FixResult[]; result: Result 
         const name = p ? `${p.name}, ${p.where}` : c.hz_range[0] && c.hz_range[1] ? `${hz(c.hz_range[0])} to ${hz(c.hz_range[1])}` : "A problem";
         if (seen.has(name)) return null;
         seen.add(name);
-        const fixed = c.change_db !== null && c.change_db <= -3;
+        const fixed = heardFixed(f, c.change_db);
         const moved = c.change_db === null ? "not measured" : c.change_db < 0 ? `${Math.abs(c.change_db).toFixed(1)} dB lower` : `${c.change_db.toFixed(1)} dB higher`;
         return <Did key={c.index} ok={fixed} text={`${name}: ${moved}${fixed ? ", Fixed" : ", not enough yet"}`} />;
       })}

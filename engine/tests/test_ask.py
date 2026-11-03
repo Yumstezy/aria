@@ -413,7 +413,10 @@ def test_a_level_past_the_ceiling_goes_to_the_ceiling():
 
 def test_a_good_mix_lift_is_fixed_by_more_not_less():
     from aria_engine.ask import heard_fixed
-    findings = [{"kind": "good_mix", "diff_db": -6.7}, {"kind": "good_mix", "diff_db": 3.4}, {"kind": "resonance"}]
+    findings = [{"kind": "good_mix", "diff_db": -6.7}, {"kind": "good_mix", "diff_db": 3.4}, {"kind": "resonance"},
+                {"kind": "good_mix", "diff_db": 1.2}]
     assert heard_fixed(findings, {"index": 0, "change_db": 3.1}) and not heard_fixed(findings, {"index": 0, "change_db": -3.5})
-    assert heard_fixed(findings, {"index": 1, "change_db": -3.0}) and not heard_fixed(findings, {"index": 1, "change_db": 3.0})
+    assert heard_fixed(findings, {"index": 1, "change_db": -1.8}) and not heard_fixed(findings, {"index": 1, "change_db": -1.5})
     assert heard_fixed(findings, {"index": 2, "change_db": -4.0}) and not heard_fixed(findings, {"index": 2, "change_db": None})
+    # a small gap: half of it is enough, since Muse may cut no deeper than the gap
+    assert heard_fixed(findings, {"index": 3, "change_db": -0.7}) and not heard_fixed(findings, {"index": 3, "change_db": -0.4})

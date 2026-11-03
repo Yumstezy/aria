@@ -55,12 +55,20 @@ export interface Spectra { hz: number[]; mix: number[]; parts: Record<string, nu
 /** One of the shape model's stable directions. toward 1: the good mixes have more of it. off: past their middle half the far way. */
 export interface GoodMixFeature { name: string; hz: [number, number] | null; value: number; good_median: number; bad_median: number;
   good_range: [number, number]; toward: 1 | -1; off: boolean; diff: number; strength: number }
-export interface GoodMixes { lean: number | null; lean_word: "closer" | "between" | "further" | null; mixes?: { good: number; bad: number };
-  heldout_accuracy?: number; loudness_only_accuracy?: number; features: GoodMixFeature[]; error: string | null }
+export interface GoodMixes { lean: number | null; lean_word: "closer" | "between" | "further" | null; mixes?: { good: number; bad: number } | null;
+  heldout_accuracy?: number | null; loudness_only_accuracy?: number | null; features: GoodMixFeature[]; error: string | null }
 /** A problem the fix should raise, not lower: less of something than the good mixes have */
 export const wantsMore = (f: Finding | undefined) => !!f && f.kind === "good_mix" && (f.diff_db ?? 0) < 0;
-export const heardFixed = (f: Finding | undefined, change: number | null) =>
-  change !== null && (wantsMore(f) ? change >= -FIXED_DB : change <= FIXED_DB);
+/** Fixed: FIXED_DB lower in its range. A good_mix problem is fixed once it moved toward the good mixes by half its gap,
+    at most 3 dB (Muse cuts no deeper than the gap). The same rule as the engine's ask.heard_fixed. */
+export function heardFixed(f: Finding | undefined, change: number | null) {
+  if (change === null) return false;
+  if (f?.kind === "good_mix" && f.diff_db) {
+    const need = Math.min(-FIXED_DB, Math.abs(f.diff_db) / 2);
+    return f.diff_db < 0 ? change >= need : change <= -need;
+  }
+  return change <= FIXED_DB;
+}
 
 export interface Result {
   recording: { path: string; start_beat: number | null; tempo: number | null; bars: number | null };

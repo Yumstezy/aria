@@ -183,6 +183,19 @@ def test_muse_sees_where_the_mix_lands_and_may_cut_what_the_good_mixes_have_less
 
 
 def test_good_mixes_numbers_dont_open_the_door_to_invented_ones():
-    advice, error = muse.advise(MEASURED, CONTEXT, findings=[GOOD_SUB], client=reply({
-        "summary": "Your mix scores 41 out of 100 against the good mixes.", "notes": []}), good_mixes=GOOD_MIXES)
-    assert advice is None and "didn't measure" in error
+    # Scores built from numbers that are in the JSON (the review found these passed): still not measured
+    for summary in ("Your mix scores 41 out of 100 against the good mixes.", "Your mix scores 4 out of 10 against the good mixes.",
+                    "Your mix is 30 percent of the way to the good mixes.", "Ranked in the bottom 33 of the rated mixes.",
+                    "Your mix is in the bottom 30 percent of the rated mixes.", "Better than 30 percent of the good mixes."):
+        advice, error = muse.advise(MEASURED, CONTEXT, findings=[GOOD_SUB], client=reply({"summary": summary, "notes": []}),
+                                    good_mixes=GOOD_MIXES)
+        assert advice is None and "didn't measure" in error, summary
+
+
+def test_a_share_of_the_time_still_passes_with_the_model():
+    masked = {"kind": "masking", "masked": "vocals", "by": "drums", "range": "mid", "hz_range": [400, 1000], "gap_db": -6.2,
+              "share": 0.97, "bars": [1, 8]}
+    advice, error = muse.advise(MEASURED, CONTEXT, findings=[masked], good_mixes=GOOD_MIXES, client=reply({
+        "summary": "Further from the good mixes. The vocal sits 6.2 dB under the drums 97 percent of the time, and the top end is bumpier than in the good mixes.", "notes": []}))
+    assert error is None and advice["summary"].startswith("Further")
+

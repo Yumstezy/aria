@@ -1334,7 +1334,7 @@ const LEAN_WORDS = { closer: "Closer to the good mixes", between: "Between the g
     (gold when it's past them the far way). Each row has its own scale, wide enough for the dot. */
 function GoodMixRow({ f, narrow }: { f: GoodMixFeature; narrow: boolean }) {
   const w = GOOD_FEATURES[f.name] ?? { label: f.name, more: "More", less: "Less" };
-  const [lo, hi] = f.good_range, spanOf = Math.max(Math.abs(f.diff) * 1.2, (hi - lo) * 2);
+  const [lo, hi] = f.good_range, spanOf = Math.max(Math.abs(f.diff) * 1.2, (hi - lo) * 2, 0.1);
   const x = (v: number) => `${((Math.max(-spanOf, Math.min(spanOf, v - f.good_median)) + spanOf) / (2 * spanOf)) * 100}%`;
   const unit = w.unit ?? "dB", color = f.off ? YOURS : "var(--ink)";
   return (
@@ -1356,12 +1356,12 @@ function GoodMixRow({ f, narrow }: { f: GoodMixFeature; narrow: boolean }) {
 /** Where the shape model puts the mix (Nov 2): a lean from further to closer, never a score, then the directions.
     Simple shows the few that are off the most; Detailed shows every one. */
 function GoodMixCard({ g, narrow, all }: { g: GoodMixes; narrow: boolean; all?: boolean }) {
-  const rows = all ? g.features : [...g.features].filter((f) => f.off).sort((a, b) => b.strength - a.strength).slice(0, 3);   // the model's strongest pulls
+  const rows = all ? g.features : [...g.features].filter((f) => f.off).sort((a, b) => (b.strength ?? 0) - (a.strength ?? 0)).slice(0, 3);   // the model's strongest pulls
   const n = g.mixes ? g.mixes.good + g.mixes.bad : null;
   return (
     <section className="cp-tile cp-card" style={{ gap: 12 }}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="cp-cap inline-flex items-center gap-1.5"><GoodMixIcon style={{ width: 14, height: 14 }} />Against the rated mixes</span>
+        <span className="cp-cap inline-flex items-center gap-1.5"><GoodMixIcon style={{ width: 14, height: 14 }} />These bars against the rated mixes</span>
         {n && <span className="ml-auto font-mono text-[11px] text-ink-faint"
                     title={`Aria's mix model looks at the EQ shape only, with loudness taken out. On songs it hadn't heard, it told good from weaker mixes ${Math.round((g.heldout_accuracy ?? 0) * 100)}% of the time.`}>
           model from {n} mixes our testers rated</span>}

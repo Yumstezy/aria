@@ -1023,12 +1023,17 @@ which didn't move enough, using only the numbers in context.results. If some did
 
 
 def heard_fixed(findings, result):
-    """FIXED_DB or more lower in its range. A good_mix finding with less there than the good mixes is fixed by more."""
+    """FIXED_DB or more lower in its range. A good_mix finding is fixed once it moved toward the good mixes by half its
+    gap (at most 3 dB): a 1.2 dB gap gets a cut of 1.2 dB at most, so 3 dB could never be reached. Less there than the
+    good mixes is fixed by more."""
     change, i = result.get("change_db"), result.get("index")
     if change is None:
         return False
     f = findings[i] if isinstance(i, int) and 0 <= i < len(findings) else {}
-    return change >= -FIXED_DB if f.get("kind") == "good_mix" and f.get("diff_db", 0) < 0 else change <= FIXED_DB
+    if f.get("kind") == "good_mix" and f.get("diff_db"):
+        need = min(-FIXED_DB, abs(f["diff_db"]) / 2)
+        return change >= need if f["diff_db"] < 0 else change <= -need
+    return change <= FIXED_DB
 
 
 def fix_round(stage, context, results=None, client=None):

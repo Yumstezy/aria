@@ -99,7 +99,7 @@ Every Mix check result has `good_mixes`, where the shape model (`ml/experiments/
     {"name": "band_sub_db", "hz": [30, 60], "value": -24.51, "good_median": -17.778, "bad_median": -21.063,
      "good_range": [-20.119, -16.468], "toward": 1, "off": true, "diff": -6.73, "strength": 0.755}
   ],
-  "error": null                 // with a reason, and lean null and no features: too short (under 4 s), silent, model missing
+  "error": null                 // with a reason: lean, lean_word, mixes and both accuracies null, no features. Too short (under 4 s), silent, model missing
 }
 ```
 
@@ -107,7 +107,9 @@ Every Mix check result has `good_mixes`, where the shape model (`ml/experiments/
 - `toward`: 1 when the good mixes have more of it, -1 when less. `off`: this mix is past the good mixes' middle half (`good_range`), the far way. `hz` is null for the measurements that aren't one range (bumpiness, tilt, top-end spread, low end against the mids).
 - Units are dB against the mix's loudness, except `tilt_db_per_oct` (dB per octave).
 - The `off` measurements an EQ move can change (the bands, and the low-mid build-up) join `clarity.findings` as `good_mix` findings, at most 2, after the clarity rules' findings, only without a reference: `{"kind": "good_mix", "feature", "band", "hz", "hz_range", "diff_db", "good_median_db", "toward", "bars"}`. `diff_db` is this mix minus the good mixes' middle. Positive (more than them): Muse may fix it with an EQ cut, like a reference finding. Negative: lift it on the track that carries it (Ask, Fix all), never a fader.
-- Muse Spark gets `lean_word`, `mixes` and `features`, not the number, and its summary says where the mix lands in words.
+- Muse Spark gets `lean_word`, `mixes` and `features`, not the number, and its summary says where the mix lands in words. Its advice may cite each direction's `value` and `good_median` and the number of rated mixes, and any reply that reads as a score, a grade or a rank is dropped.
+- Fixed, for a `good_mix` problem (Check again, Fix all's report, the chat): it moved toward the good mixes by half its `diff_db`, at most 3 dB. Up for a negative `diff_db`, down for a positive one.
+- A mono recording is measured as the same sound on both channels, as the rated mixes (stereo) were.
 - With a reference, `good_mixes` is still measured but neither joins the problems nor goes to Muse: the producer picked what to aim for.
 
 ### Before and after (Oct 30)
