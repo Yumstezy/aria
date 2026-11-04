@@ -307,3 +307,4 @@ docs/        build steps, contracts, the rubric, status
 - **Fonts:** the system font on Mac, and Geist, bundled under the OFL.
 - **Audiobox Aesthetics:** CC-BY 4.0, used in the mix model experiments (`ml/`).
 - **4Times4** Ending Music Credits, ('https://soundcloud.com/4times4-music').
+- **Video music:** "Thunder" by JVD ([YouTube](https://www.youtube.com/watch?v=DA2dfNoooIw)), a free house beat listed as free for use, in the demo video.
