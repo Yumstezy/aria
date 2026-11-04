@@ -192,7 +192,7 @@ const BEATS = [
   { t: "0:14", title: "It listens", line: "It finds what sounds wrong.", shot: "Mix check: numbered problems on the graph" },
   { t: "0:18", title: "Fix it", line: "One click to fix it.", shot: "The Fix first card, the EQ curve dips" },
   { t: "0:21", title: "Compare", line: "See how you compare to songs you love.", shot: "Gold and blue lines on one graph" },
-  { t: "0:24", title: "And more", line: "Live analyzer. Groove match. Song sections. Mix score.", shot: "Quick cuts of the Additional features pictures" },
+  { t: "0:24", title: "And more", line: "Live analyzer. Groove match. Song sections. Where your mix lands.", shot: "Quick cuts of the Additional features pictures" },
   { t: "0:27", title: "Logo, with a wink", line: "aria, make my song sound good. make no mistakes.", shot: "Types into the Ask Muse box like a real request, then the bird and \"Built with Meta Muse Spark\" below it" },
 ];
 

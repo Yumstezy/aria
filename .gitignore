@@ -39,3 +39,6 @@ judges/tsconfig.tsbuildinfo
 
 # Claude Code session files
 .claude/
+
+# Real names of the rated mixes (ml/anonymize.py): some producers asked to stay private
+ml/data/private/
