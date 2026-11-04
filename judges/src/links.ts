@@ -4,7 +4,7 @@ export const GITHUB = "https://github.com/Yumstezy/aria";
 export const DOWNLOAD = "https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip";
 // Ian's video of Aria in Ableton, when it's recorded: a YouTube link, or a file in public/ (like "/demo.mp4").
 // Both pages show their video section only once it's set.
-export const DEMO_VIDEO: string | null = "https://youtu.be/gnGZlabmZqY";
+export const DEMO_VIDEO: string | null = "https://youtu.be/c8artzu3P1w";
 
 // A YouTube link becomes its embed address; anything else is played as a file
 export function youtubeEmbed(url: string) {

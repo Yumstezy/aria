@@ -261,7 +261,7 @@ export default function App() {
       <Section id="watch" label="The demo" title="Watch Aria in Ableton." dim="The real thing, on a real song.">
         <Rise className="mt-12">
           <div className="overflow-hidden rounded-[22px] border border-hairline bg-card">
-            <iframe src="https://www.youtube-nocookie.com/embed/gnGZlabmZqY?rel=0" title="Aria in Ableton Live" className="block aspect-video w-full"
+            <iframe src="https://www.youtube-nocookie.com/embed/c8artzu3P1w?rel=0" title="Aria in Ableton Live" className="block aspect-video w-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
           </div>
         </Rise>

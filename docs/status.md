@@ -5,7 +5,7 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 **Nov 3, night: the demo video, and the private names out of history.**
-- The demo video (https://youtu.be/gnGZlabmZqY) is on both websites and in the README. The product site was deployed with `vercel --prod` (Ian asked).
+- The demo video (https://youtu.be/c8artzu3P1w, replaced the first cut on Nov 3) is on both websites and in the README. The product site was deployed with `vercel --prod` (Ian asked).
 - History rewritten (Ian OK'd it, "if it doesn't change any of the actual data"): git-filter-repo renamed the private mixes in every past version of `ml/data/*.csv` and took the names out of two notes. Checked on all 242 commits: 657 CSV versions changed only in their name columns, every number equal, no other file changed. Force-pushed `main` and the four release tags; the release zips never held `ml/`. GitHub's read-only `refs/pull/1/head` still points at the old PR #1 commits, which only GitHub Support can remove. Anyone with an older clone has to clone again.
 
 **Nov 3, evening: rules check, cleanup, and two new demo sections.** Ian asked for a check against the hackathon's rules, a cleanup, and new ideas on the demo page.
