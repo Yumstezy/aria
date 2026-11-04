@@ -4,6 +4,10 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 3, night: the demo video, and the private names out of history.**
+- The demo video (https://youtu.be/gnGZlabmZqY) is on both websites and in the README. The product site was deployed with `vercel --prod` (Ian asked).
+- History rewritten (Ian OK'd it, "if it doesn't change any of the actual data"): git-filter-repo renamed the private mixes in every past version of `ml/data/*.csv` and took the names out of two notes. Checked on all 242 commits: 657 CSV versions changed only in their name columns, every number equal, no other file changed. Force-pushed `main` and the four release tags; the release zips never held `ml/`. GitHub's read-only `refs/pull/1/head` still points at the old PR #1 commits, which only GitHub Support can remove. Anyone with an older clone has to clone again.
+
 **Nov 3, evening: rules check, cleanup, and two new demo sections.** Ian asked for a check against the hackathon's rules, a cleanup, and new ideas on the demo page.
 - Rules audit (read-only): public repo created Oct 26, 239 commits all Oct 26 to Nov 3, only Meta's models at runtime (every OpenAI client points at api.meta.ai; Audiobox only in `ml/` experiments), no credentials in files or history, no commercial audio tracked, only Geist fonts. 193 engine tests pass.
 - Cleanup: README test count (193), "What broke" rows for the full-screen crash and the Fix all retry, Raghav's Nov 3 search (0.77 best option, 0.75 honest) under What didn't work, the recorded outputs linked from the README and the sample README, the licenses line reworded to "no commercial audio", the three debug probes removed from `device/`, `.claude/` ignored.
