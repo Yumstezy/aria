@@ -20,6 +20,7 @@
 </table>
 
 <p align="center">
+  <a href="https://youtu.be/gnGZlabmZqY"><b>Watch the demo</b></a> &nbsp;·&nbsp;
   <a href="https://github.com/Yumstezy/aria/releases/latest/download/Aria-mac.zip"><b>Download for Mac</b></a> &nbsp;·&nbsp;
   <a href="#get-aria">Install</a>
 </p>
