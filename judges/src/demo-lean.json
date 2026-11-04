@@ -1,0 +1,420 @@
+{
+ "made": "2026-11-04 01:07 UTC",
+ "commit": "e2a4f02",
+ "mixes": [
+  {
+   "key": "rough",
+   "name": "Rough mix",
+   "file": "test-pack/sample/Rough mix.wav",
+   "lean": 0.06,
+   "lean_word": "further",
+   "features": [
+    {
+     "name": "band_sub_db",
+     "hz": [
+      30,
+      60
+     ],
+     "value": -24.51,
+     "good_median": -17.778,
+     "bad_median": -21.063,
+     "good_range": [
+      -20.119,
+      -16.468
+     ],
+     "toward": 1,
+     "off": true,
+     "diff": -6.74,
+     "strength": 0.755
+    },
+    {
+     "name": "band_mid_db",
+     "hz": [
+      400,
+      1000
+     ],
+     "value": -30.51,
+     "good_median": -28.937,
+     "bad_median": -29.822,
+     "good_range": [
+      -30.285,
+      -28.059
+     ],
+     "toward": 1,
+     "off": true,
+     "diff": -1.58,
+     "strength": 0.267
+    },
+    {
+     "name": "band_himid_db",
+     "hz": [
+      1000,
+      2500
+     ],
+     "value": -32.01,
+     "good_median": -29.541,
+     "bad_median": -30.492,
+     "good_range": [
+      -30.332,
+      -28.918
+     ],
+     "toward": 1,
+     "off": true,
+     "diff": -2.47,
+     "strength": 0.589
+    },
+    {
+     "name": "band_presence_db",
+     "hz": [
+      2500,
+      5000
+     ],
+     "value": -30.58,
+     "good_median": -30.905,
+     "bad_median": -31.124,
+     "good_range": [
+      -31.71,
+      -29.917
+     ],
+     "toward": 1,
+     "off": false,
+     "diff": 0.33,
+     "strength": 0.04
+    },
+    {
+     "name": "band_brilliance_db",
+     "hz": [
+      5000,
+      10000
+     ],
+     "value": -27.27,
+     "good_median": -30.671,
+     "bad_median": -30.459,
+     "good_range": [
+      -31.404,
+      -29.779
+     ],
+     "toward": -1,
+     "off": true,
+     "diff": 3.4,
+     "strength": 0.9
+    },
+    {
+     "name": "band_air_db",
+     "hz": [
+      10000,
+      16000
+     ],
+     "value": -32.43,
+     "good_median": -33.691,
+     "bad_median": -35.675,
+     "good_range": [
+      -35.242,
+      -33.097
+     ],
+     "toward": 1,
+     "off": false,
+     "diff": 1.26,
+     "strength": 0.098
+    },
+    {
+     "name": "low_power_db",
+     "hz": null,
+     "value": 7.77,
+     "good_median": 10.619,
+     "bad_median": 10.197,
+     "good_range": [
+      9.494,
+      12.772
+     ],
+     "toward": 1,
+     "off": true,
+     "diff": -2.85,
+     "strength": 0.073
+    },
+    {
+     "name": "mid_bumpiness_db",
+     "hz": null,
+     "value": 2.96,
+     "good_median": 1.95,
+     "bad_median": 2.519,
+     "good_range": [
+      1.681,
+      2.227
+     ],
+     "toward": -1,
+     "off": true,
+     "diff": 1.01,
+     "strength": 0.973
+    },
+    {
+     "name": "lowmid_buildup_db",
+     "hz": [
+      200,
+      500
+     ],
+     "value": -2.07,
+     "good_median": -3.013,
+     "bad_median": -1.67,
+     "good_range": [
+      -3.568,
+      -2.258
+     ],
+     "toward": -1,
+     "off": true,
+     "diff": 0.95,
+     "strength": 0.304
+    },
+    {
+     "name": "tilt_db_per_oct",
+     "hz": null,
+     "value": -1.26,
+     "good_median": -1.877,
+     "bad_median": -1.616,
+     "good_range": [
+      -2.052,
+      -1.719
+     ],
+     "toward": -1,
+     "off": true,
+     "diff": 0.62,
+     "strength": 0.387
+    },
+    {
+     "name": "top_spread_db",
+     "hz": null,
+     "value": 3.59,
+     "good_median": 2.495,
+     "bad_median": 3.178,
+     "good_range": [
+      2.066,
+      2.905
+     ],
+     "toward": -1,
+     "off": true,
+     "diff": 1.1,
+     "strength": 0.183
+    }
+   ],
+   "muse_summary": "Further from the good mixes, with the clearest lean being extra energy in the highs around 7100 Hz.",
+   "muse_notes": [
+    {
+     "short": "Cymbals and sizzle feel sharp",
+     "text": "Extra presence in the highs around 7100 Hz, about 3.4 dB more than the middle of the good rated mixes. It can make hats and air sound sharp and thin."
+    },
+    {
+     "short": "Low end feels light and small",
+     "text": "Less sub around 42 Hz, about 6.7 dB under the middle of the good rated mixes. Lift it on the part that should carry it, the kick or bass."
+    }
+   ],
+   "advice_error": null
+  },
+  {
+   "key": "finished",
+   "name": "Finished mix",
+   "file": "test-pack/sample/Finished mix (reference).wav",
+   "lean": 0.24,
+   "lean_word": "further",
+   "features": [
+    {
+     "name": "band_sub_db",
+     "hz": [
+      30,
+      60
+     ],
+     "value": -23.61,
+     "good_median": -17.778,
+     "bad_median": -21.063,
+     "good_range": [
+      -20.119,
+      -16.468
+     ],
+     "toward": 1,
+     "off": true,
+     "diff": -5.83,
+     "strength": 0.653
+    },
+    {
+     "name": "band_mid_db",
+     "hz": [
+      400,
+      1000
+     ],
+     "value": -30.89,
+     "good_median": -28.937,
+     "bad_median": -29.822,
+     "good_range": [
+      -30.285,
+      -28.059
+     ],
+     "toward": 1,
+     "off": true,
+     "diff": -1.95,
+     "strength": 0.331
+    },
+    {
+     "name": "band_himid_db",
+     "hz": [
+      1000,
+      2500
+     ],
+     "value": -31.38,
+     "good_median": -29.541,
+     "bad_median": -30.492,
+     "good_range": [
+      -30.332,
+      -28.918
+     ],
+     "toward": 1,
+     "off": true,
+     "diff": -1.84,
+     "strength": 0.439
+    },
+    {
+     "name": "band_presence_db",
+     "hz": [
+      2500,
+      5000
+     ],
+     "value": -31.0,
+     "good_median": -30.905,
+     "bad_median": -31.124,
+     "good_range": [
+      -31.71,
+      -29.917
+     ],
+     "toward": 1,
+     "off": false,
+     "diff": -0.1,
+     "strength": 0.011
+    },
+    {
+     "name": "band_brilliance_db",
+     "hz": [
+      5000,
+      10000
+     ],
+     "value": -28.88,
+     "good_median": -30.671,
+     "bad_median": -30.459,
+     "good_range": [
+      -31.404,
+      -29.779
+     ],
+     "toward": -1,
+     "off": true,
+     "diff": 1.79,
+     "strength": 0.474
+    },
+    {
+     "name": "band_air_db",
+     "hz": [
+      10000,
+      16000
+     ],
+     "value": -34.07,
+     "good_median": -33.691,
+     "bad_median": -35.675,
+     "good_range": [
+      -35.242,
+      -33.097
+     ],
+     "toward": 1,
+     "off": false,
+     "diff": -0.38,
+     "strength": 0.029
+    },
+    {
+     "name": "low_power_db",
+     "hz": null,
+     "value": 9.0,
+     "good_median": 10.619,
+     "bad_median": 10.197,
+     "good_range": [
+      9.494,
+      12.772
+     ],
+     "toward": 1,
+     "off": true,
+     "diff": -1.62,
+     "strength": 0.042
+    },
+    {
+     "name": "mid_bumpiness_db",
+     "hz": null,
+     "value": 2.38,
+     "good_median": 1.95,
+     "bad_median": 2.519,
+     "good_range": [
+      1.681,
+      2.227
+     ],
+     "toward": -1,
+     "off": true,
+     "diff": 0.43,
+     "strength": 0.413
+    },
+    {
+     "name": "lowmid_buildup_db",
+     "hz": [
+      200,
+      500
+     ],
+     "value": -3.27,
+     "good_median": -3.013,
+     "bad_median": -1.67,
+     "good_range": [
+      -3.568,
+      -2.258
+     ],
+     "toward": -1,
+     "off": false,
+     "diff": -0.26,
+     "strength": 0.082
+    },
+    {
+     "name": "tilt_db_per_oct",
+     "hz": null,
+     "value": -1.53,
+     "good_median": -1.877,
+     "bad_median": -1.616,
+     "good_range": [
+      -2.052,
+      -1.719
+     ],
+     "toward": -1,
+     "off": true,
+     "diff": 0.35,
+     "strength": 0.219
+    },
+    {
+     "name": "top_spread_db",
+     "hz": null,
+     "value": 2.93,
+     "good_median": 2.495,
+     "bad_median": 3.178,
+     "good_range": [
+      2.066,
+      2.905
+     ],
+     "toward": -1,
+     "off": true,
+     "diff": 0.44,
+     "strength": 0.073
+    }
+   ],
+   "muse_summary": "Further from the good mixes, with the clearest gap being less low sub than the middle of the good-rated mixes.",
+   "muse_notes": [
+    {
+     "short": "Low end feels light and thin",
+     "text": "In the 30 to 60 Hz sub range this mix sits 5.8 dB below the good mixes middle. That can leave the kick and bass feeling light. Bring that range up on the part that should carry it, the kick or bass."
+    },
+    {
+     "short": "High edge feels sharp and forward",
+     "text": "In the 5000 to 10000 Hz highs range this mix sits 1.8 dB above the good mixes middle. That can make the top edge stand forward. Cut a little inside that range on the brightest part."
+    }
+   ],
+   "advice_error": null
+  }
+ ]
+}

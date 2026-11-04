@@ -43,7 +43,7 @@
 3. **Fix.** Muse Spark makes room instead of turning the leads up: cut the bass 3 dB at 274 Hz, lifted the leads 2 dB at 699 Hz, turned the kick down 3 dB. Then seven more requests, like *"turn the bass high frequencys cut"* and *"add reverb to my vocals"*.
 4. **Compare.** Before and after, at the same loudness. The boxy low mids are 2.1 dB cleaner.
 
-It replays Ian's real run in Live, step by step: every reply and change exactly as Aria logged it, and the After is Live's own export. The five tracks are in [`test-pack/sample`](test-pack/sample), with how to run the same thing in Live, or through the engine without Live.
+It replays Ian's real run in Live, step by step: every reply and change exactly as Aria logged it, and the After is Live's own export. The recorded outputs are in the repo: [`judges/src/demo-run.json`](judges/src/demo-run.json) (the run in Live, Nov 1) and [`judges/src/demo-lean.json`](judges/src/demo-lean.json) (the mix model and Muse Spark on both sample mixes, Nov 3, made by [`judges/scripts/make_lean_data.py`](judges/scripts/make_lean_data.py)). The five tracks are in [`test-pack/sample`](test-pack/sample), with how to run the same thing in Live, or through the engine without Live.
 
 ---
 
@@ -64,7 +64,7 @@ One problem, start to finish. Aria's loop is the same for every problem it finds
 
 **Where your mix lands, from mixes people rated.** Raghav trained it on 63 mixes our testers rated good or bad, on the shape of the EQ alone, with loudness taken out. On songs it had never heard, it told good from bad 75% of the time. Chance is 50%, and a shuffle test puts luck at p = 0.002.
 
-- **A lean, not a score.** After a Mix check, Aria shows where your mix sits, from further from the good mixes to closer, and what would move it closer: *more sub, less highs, smoother mids.*
+- **A lean, not a score.** After a Mix check, Aria shows where your mix sits, on a line from far to close ("Compared with good mixes"), and what would move it closer: *more sub, less highs, smoother mids.* [Try it on the demo page](https://aria-judges.vercel.app/demo): switch between the rough and finished mix of our song.
 - **Muse Spark explains it and fixes it.** It gets the model's directions as measured numbers. On Ian's rough mix: *"The sub around 42 Hz sits 6.7 dB below the good mixes."* Too much of something gets an EQ cut you can undo. Too little gets lifted on the track that carries it, never a louder fader.
 - **Honest about what it is.** Loudness alone tells the same mixes apart 72% of the time, so shape isn't a stronger judge. It's the one that points to an EQ move. Aria shows only the 11 directions that pointed the same way in at least 40 of 50 test rounds and agreed with how the good and bad mixes actually differ ([results](ml/results/shape-experiment.md)).
 
@@ -206,12 +206,14 @@ Found by using Aria on real songs inside Live, every day of the build.
 | **Aria's checks couldn't hear Aria's own fixes.** Aria Ear sat before the fader, and Aria's EQs went in after the Ear. | Aria's devices now go in before the Ear, and the engine applies each track's fader. |
 | **Muse kept turning buried sounds up.** On an unleveled mix it raised the leads three times. | Muse sees every track's loudness and makes space instead: it cuts what covers the sound, and turns down whatever is too loud. |
 | **Live's browser doesn't see links.** "Name my tracks" couldn't find Aria Ear. | The installer copies the devices. |
+| **Opening Aria's window crashed Live in full screen.** Max can't bring a window up over full-screen Live on a Mac. | Aria checks first. In full screen the strip says "Full screen" and why, and no window opens. |
+| **Fix all sometimes changed nothing.** Muse answered in words with no change, three tries in a row, because each try was the same request. | A try again shows Muse its own reply and says nothing changed in Live. Forced to fail once, 4 of 4 real retries made the changes. |
 
 </details>
 
 ### What didn't work
 
-- **The mix model can't grade a mix.** Across good, mid and bad, nothing beat loudness alone: 0.49 against 0.45, and 0.51 with Audiobox Aesthetics. Only good against bad, on the EQ shape, held up, so that's what's in Aria. Adding stereo and clarity measurements didn't help (0.72 against 0.74) ([`ml/results`](ml/results)).
+- **The mix model can't grade a mix.** Across good, mid and bad, nothing beat loudness alone: 0.49 against 0.45, and 0.51 with Audiobox Aesthetics. Only good against bad, on the EQ shape, held up, so that's what's in Aria. Adding stereo and clarity measurements didn't help (0.72 against 0.74). With six clips of each song plus loudness and Audiobox, the best option scored 0.77, but the honest score of the whole search stayed at 0.75, short of 0.80, so Aria keeps the simpler shape model ([`ml/results`](ml/results)).
 - **Getting the right tempo was harder than expected. Tempo detection can land on the wrong reading, especially on vocals. Aria shows the next likely tempos alongside each reading, and the song’s own tempo is one tap away.
 - **Without a reference, a broad low-mid boost is hard to hear:** the rules found 1 of 3 planted problems. That's why the reference compare exists.
 
@@ -238,7 +240,7 @@ cd aria
 
 `install.sh` sets up the engine (a Python environment and `engine/.env`), copies Aria, Aria Ear and the 26 racks into Live's User Library (the scripts the devices run are linked, so `git pull` updates them), and copies the Remote Script for "Name my tracks" (in Live, once: Settings > Link, Tempo & MIDI > Control Surface: Aria).
 
-- Engine tests: `cd engine && .venv/bin/pytest` (170 passing)
+- Engine tests: `cd engine && .venv/bin/pytest` (193 passing)
 - Screens: `cd ui && npm install && npm run build` (the built pages in `ui/dist/` are committed, so running Aria never needs Node)
 - Website: `cd judges && npm run build` (aria-judges.vercel.app, deployed by Vercel on every push; the demos page is `/demo`); the demo's data comes from `judges/scripts/make_demo_data.py`
 - The release zip: `scripts/release.sh`
@@ -303,7 +305,7 @@ docs/        build steps, contracts, the rubric, status
 
 ## Licenses and credits
 
-- **No commercial music** anywhere in the repo or the video. The 99 rated mixes were given to us or released for free for us to use; only their measurements are in the repo, never the audio. The sample song is Ian's own.
+- **No commercial audio** in the repo or the video. The 99 rated mixes are producers' own productions, remixes and edits that they shared with us or released for free; only their measurements and file names are in the repo, never the audio. The sample song is Ian's own.
 - **Fonts:** the system font on Mac, and Geist, bundled under the OFL.
 - **Audiobox Aesthetics:** CC-BY 4.0, used in the mix model experiments (`ml/`).
 - **4Times4** Ending Music Credits, ('https://soundcloud.com/4times4-music').

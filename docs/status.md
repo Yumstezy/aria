@@ -4,6 +4,12 @@ Updated at the end of each session: what passed, what's next, any blocker.
 
 
 
+**Nov 3, evening: rules check, cleanup, and two new demo sections.** Ian asked for a check against the hackathon's rules, a cleanup, and new ideas on the demo page.
+- Rules audit (read-only): public repo created Oct 26, 239 commits all Oct 26 to Nov 3, only Meta's models at runtime (every OpenAI client points at api.meta.ai; Audiobox only in `ml/` experiments), no credentials in files or history, no commercial audio tracked, only Geist fonts. 193 engine tests pass.
+- Cleanup: README test count (193), "What broke" rows for the full-screen crash and the Fix all retry, Raghav's Nov 3 search (0.77 best option, 0.75 honest) under What didn't work, the recorded outputs linked from the README and the sample README, the licenses line reworded to "no commercial audio", the three debug probes removed from `device/`, `.claude/` ignored.
+- Demo page (`judges/src/demo.tsx`): "Where does your mix land?" switches between the sample's rough and finished mix (real Mix check of both, `demo-lean.json`, with audio) and "What Muse Spark does in Aria" (six real outputs). Checked in a browser at 1280 px, no console errors.
+- **Open, Ian to decide:** the ml CSVs name the rated mixes' files, and some are edits of commercial songs. No audio is in the repo, and `owner` and `permission_to_train` are blank for all 99. Options: replace the names with the existing `mix_id`, drop the one ripped file and retrain, and fill in permission. Also confirm `test-pack/sample/VOCAL.flac` is Ian's own (demo-run.json calls it "take me in your arms").
+
 **Nov 3, midday: fixes from Ian's use in Live.**
 - Good mixes card reworded (e7d2803): "Compared with good mixes", Far to Close, plain colors, problem names like "Highs fuller than good mixes".
 - Fix all said "Muse Spark didn't pick a change" (2cc4f4c): Muse answered three tries in words with no tool call, because each try was the same request. A try again now shows Muse its own reply and says nothing changed. With a forced words-only first reply, 4 of 4 real retries made the changes. Fix it gets the same.
@@ -203,7 +209,7 @@ So a producer is never stuck on a blank box, the strip now starts on a page buil
 
 Manual check for Ian: drag the new `device/Aria.amxd` onto Main. The strip shows as before. Optional: in Live's Settings, Audio, set Audio Output Device to No Device, remove and re-add Aria: after 4 s it says "Live's audio isn't running". Set the speakers back: the strip appears without re-adding.
 
-Test files from the debug, not committed, still to delete (Ian to OK): `device/Aria test.amxd`, `device/Probe A.amxd`, `device/hello-test.js`, and `~/Desktop/n4m-test/`.
+Test files from the debug: `device/Aria test.amxd`, `device/Probe A.amxd` and `device/hello-test.js` were removed from the repo on Nov 3 (repo cleanup Ian asked for); `~/Desktop/n4m-test/` is outside the repo.
 
 **Done after that (Oct 29, evening): no more words where a picture works.** Home lost the Get started card and the tool tiles; before a check it shows the six kinds of problem as icons and Check mix, after one the count, the problem icons and the real spectrum. Name my tracks is one switch with an ear. The empty Mix check has no sentences. PNGs of every screen (from Ian's real 20:10 check, his Ask Muse history) are in `~/Desktop/Aria screens Oct 29/` for the group. Manual check for Ian: Open window in Live, look at Home before and after a check.
 

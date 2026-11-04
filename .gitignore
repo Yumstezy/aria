@@ -36,3 +36,6 @@ release/
 # Private plans (the paid plugin), kept off the public repo
 docs/private/
 judges/tsconfig.tsbuildinfo
+
+# Claude Code session files
+.claude/

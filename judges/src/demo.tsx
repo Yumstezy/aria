@@ -6,6 +6,8 @@ import { MotionConfig } from "motion/react";
 import "./index.css";
 import { TryIt } from "@/components/try-it";
 import { DemoVideo } from "@/components/demo-video";
+import { MixLands } from "@/components/mix-lands";
+import { SparkJobs } from "@/components/spark-jobs";
 import { Button } from "@/components/ui/button";
 import { DEMO_VIDEO, DOWNLOAD, GITHUB } from "@/links";
 
@@ -24,6 +26,22 @@ function Demos() {
         </h1>
         <p className="mt-4 max-w-[600px] text-[16px] leading-relaxed text-muted">A house demo we made, before mixing. Four steps: listen, let Aria check it, fix it, then compare.</p>
         <TryIt />
+      </section>
+
+      <section className="mx-auto max-w-[1160px] border-t border-hairline px-6 py-20">
+        <h2 className="max-w-[760px] text-[clamp(28px,3.8vw,44px)] font-medium leading-[1.1] tracking-[-0.04em]">
+          <span className="fade-text">Where does your mix land?</span> <span className="text-faint">Our mix model, explained by Muse Spark.</span>
+        </h2>
+        <p className="mt-4 max-w-[640px] text-[16px] leading-relaxed text-muted">Switch between the same song’s rough mix and finished mix. Aria shows how close each one sits to mixes people rated good, what would move it closer, and Muse Spark says it in plain words.</p>
+        <MixLands />
+      </section>
+
+      <section className="mx-auto max-w-[1160px] border-t border-hairline px-6 py-20">
+        <h2 className="max-w-[760px] text-[clamp(28px,3.8vw,44px)] font-medium leading-[1.1] tracking-[-0.04em]">
+          <span className="fade-text">What Muse Spark does in Aria.</span> <span className="text-faint">Six jobs, real outputs.</span>
+        </h2>
+        <p className="mt-4 max-w-[640px] text-[16px] leading-relaxed text-muted">Meta’s Muse Spark isn’t a chat box on the side. It explains, changes Live, listens, asks, reads your screen, and checks its own work.</p>
+        <SparkJobs />
       </section>
 
       {DEMO_VIDEO && (

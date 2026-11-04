@@ -8,6 +8,8 @@
 | `Rough mix.wav` | The five added together: what Aria checks. |
 | `Finished mix (reference).wav` | Ian's own finished mix of the same 16 bars, to compare against. |
 
+Recorded outputs from these files: [`judges/src/demo-run.json`](../../judges/src/demo-run.json) is the real run in Live on Nov 1 (Aria's findings, Muse Spark's replies and every change, as Aria logged them), and [`judges/src/demo-lean.json`](../../judges/src/demo-lean.json) is a real Mix check of both mixes on Nov 3 (the mix model and what Muse Spark said), made by [`judges/scripts/make_lean_data.py`](../../judges/scripts/make_lean_data.py).
+
 ## What Aria finds
 
 Without a reference, nothing on these 16 bars goes over Aria's thresholds for clashes or buried sounds. The closest is the leads, covered by the rest at 400 to 1000 Hz for 49% of the time against a 50% threshold.
